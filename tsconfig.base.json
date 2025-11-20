@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": false,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "declaration": true,
+    "sourceMap": true,
+    "rootDir": ".",
+    "baseUrl": ".",
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "@sim-corp/*": ["./*"],
+      "@sim-corp/schemas": ["libs/schemas/src"],
+      "@sim-corp/schemas/*": ["libs/schemas/src/*"]
+    }
+  }
+}

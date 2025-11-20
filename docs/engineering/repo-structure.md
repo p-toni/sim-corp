@@ -5,43 +5,39 @@
 ## Planned layout
 
 ```text
-/apps
-  /roaster-desktop        # Tauri + React UI for roaster operators
-
-/services
-  /company-kernel         # agent registry, policy, trace API, approvals
-  /ingestion              # MQTT ingest → DB → push to UI
-  /sim-twin               # digital twin + eval helpers
-
-/agents
-  /strategist
-  /builder
-  /operator
-  /scientist
-  /community
-  /governor
-
-/drivers
-  /sim                    # simulated roaster
-  /bullet-r1              # Aillio Bullet R1 (read-only P0)
-  /modbus-tcp             # generic Modbus TCP driver for Giesen & similar
-
-/libs
-  /schemas                # shared types, Zod schemas, JSON Schemas
-  /agent-runtime          # core Think→Act→Observe loop
-  /logging                # OTel helpers, structured logging
-  /config                 # config management
-
-/infra
-  /local                  # docker-compose: Postgres+Timescale, Mosquitto, OTel, Grafana
-
-/docs
-  /foundation
-  /engineering
-
-/tasks
-  sprint0.md              # backlog for initial implementation
+.
+├── apps/
+│   └── roaster-desktop/        # Tauri + React UI for roaster operators
+├── services/
+│   ├── company-kernel/         # agent registry, policy, trace API, approvals
+│   ├── ingestion/              # MQTT ingest → DB → push to UI
+│   └── sim-twin/               # digital twin + eval helpers
+├── agents/
+│   ├── strategist/
+│   ├── builder/
+│   ├── operator/
+│   ├── scientist/
+│   ├── community/
+│   └── governor/
+├── drivers/
+│   ├── sim/                    # simulated roaster
+│   ├── bullet-r1/              # Aillio Bullet R1 (read-only P0)
+│   └── modbus-tcp/             # generic Modbus TCP driver for Giesen & similar
+├── libs/
+│   ├── schemas/                # shared types, Zod schemas, JSON Schemas (initialized)
+│   ├── agent-runtime/          # core Think→Act→Observe loop
+│   ├── logging/                # OTel helpers, structured logging
+│   └── config/                 # config management
+├── infra/
+│   └── local/                  # docker-compose: Postgres+Timescale, Mosquitto, OTel, Grafana
+├── docs/
+│   ├── foundation/
+│   └── engineering/
+└── tasks/
+    └── sprint0.md              # backlog for initial implementation
 ```
+
+> This listing is kept in sync with the actual filesystem. Any structural update (new top-level package, renamed folder, etc.) must be reflected here immediately.
 
 Keep this structure updated as the system evolves.
 
