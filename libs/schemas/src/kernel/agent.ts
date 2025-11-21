@@ -8,7 +8,14 @@ import {
 } from "../common/scalars";
 import { MissionSchema } from "./mission";
 
-export const AgentLoopStepSchema = z.enum(["GET", "SCAN", "THINK", "ACT", "OBSERVE"]);
+export const AgentLoopStepSchema = z.enum([
+  "GET",
+  "GET_MISSION",
+  "SCAN",
+  "THINK",
+  "ACT",
+  "OBSERVE"
+]);
 export type AgentLoopStep = z.infer<typeof AgentLoopStepSchema>;
 
 export const ToolCallSchema = z.object({
@@ -17,6 +24,7 @@ export const ToolCallSchema = z.object({
   input: JsonRecordSchema.optional(),
   output: JsonRecordSchema.optional(),
   durationMs: NonNegativeNumberSchema.optional(),
+  deniedByPolicy: z.boolean().optional(),
   error: z
     .object({
       message: NonEmptyStringSchema,
@@ -39,21 +47,39 @@ export const AgentTraceEntrySchema = z.object({
   missionId: IdentifierSchema,
   loopId: IdentifierSchema,
   spanId: IdentifierSchema.optional(),
+  iteration: NonNegativeNumberSchema.optional(),
   step: AgentLoopStepSchema,
   status: z.enum(["SUCCESS", "ERROR", "SKIPPED", "CANCELLED"]).default("SUCCESS"),
   startedAt: IsoDateTimeSchema,
   completedAt: IsoDateTimeSchema.optional(),
+  error: z
+    .object({
+      message: NonEmptyStringSchema,
+      stack: z.string().optional()
+    })
+    .optional(),
   toolCalls: z.array(ToolCallSchema).default([]),
   metrics: z.array(AgentLoopMetricSchema).default([]),
   notes: z.string().optional()
 });
 
 export type AgentTraceEntry = z.infer<typeof AgentTraceEntrySchema>;
+export type AgentTraceStep = AgentTraceEntry;
 
 export const AgentTraceSchema = z.object({
   traceId: IdentifierSchema,
   agentId: IdentifierSchema,
+  missionId: IdentifierSchema,
   mission: MissionSchema,
+  status: z.enum(["SUCCESS", "ERROR", "ABORTED", "TIMEOUT", "MAX_ITERATIONS"]).default("SUCCESS"),
+  startedAt: IsoDateTimeSchema,
+  completedAt: IsoDateTimeSchema.optional(),
+  error: z
+    .object({
+      message: NonEmptyStringSchema,
+      stack: z.string().optional()
+    })
+    .optional(),
   entries: z.array(AgentTraceEntrySchema),
   metadata: JsonRecordSchema.optional()
 });

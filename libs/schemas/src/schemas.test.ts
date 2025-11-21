@@ -99,16 +99,20 @@ describe("kernel schemas", () => {
     const trace = AgentTraceSchema.parse({
       traceId: "trace-1",
       agentId: "agent-1",
+      missionId: "mission-1",
       mission: {
         missionId: "mission-1",
         goal: { title: "Test", description: "" },
         constraints: [],
         context: {}
       },
+      status: "SUCCESS",
+      startedAt: "2025-01-01T00:00:00.000Z",
       entries: [
         {
           missionId: "mission-1",
           loopId: "loop-1",
+          iteration: 0,
           step: "THINK",
           startedAt: "2025-01-01T00:00:00.000Z",
           toolCalls: [],
