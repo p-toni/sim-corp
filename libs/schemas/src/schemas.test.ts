@@ -11,7 +11,8 @@ import {
   ToolCardSchema,
   RoastEventSchema,
   RoastSchema,
-  TelemetryPointSchema
+  TelemetryPointSchema,
+  TelemetryEnvelopeSchema
 } from "./index";
 
 const baseTelemetry = {
@@ -82,6 +83,50 @@ describe("roaster schemas", () => {
     });
 
     expect(tool.policyTags).toEqual([]);
+  });
+});
+
+describe("telemetry envelope schema", () => {
+  const baseEnvelope = {
+    ts: "2025-01-01T00:00:00.000Z",
+    origin: { orgId: "org-1", siteId: "site-1", machineId: "machine-1" },
+    payload: baseTelemetry
+  };
+
+  it("parses telemetry envelope payloads", () => {
+    const parsed = TelemetryEnvelopeSchema.parse({
+      ...baseEnvelope,
+      topic: "telemetry"
+    });
+
+    expect(parsed.topic).toBe("telemetry");
+    expect(parsed.payload.machineId).toBe("machine-1");
+  });
+
+  it("parses event envelope payloads", () => {
+    const parsed = TelemetryEnvelopeSchema.parse({
+      ...baseEnvelope,
+      topic: "event",
+      payload: {
+        ts: "2025-01-01T00:05:00.000Z",
+        machineId: "machine-1",
+        type: "CHARGE"
+      }
+    });
+
+    expect(parsed.topic).toBe("event");
+    const eventPayload = parsed.payload as { type: string };
+    expect(eventPayload.type).toBe("CHARGE");
+  });
+
+  it("rejects invalid payload shape", () => {
+    const result = TelemetryEnvelopeSchema.safeParse({
+      ...baseEnvelope,
+      topic: "telemetry",
+      payload: { machineId: "machine-1" }
+    });
+
+    expect(result.success).toBe(false);
   });
 });
 
