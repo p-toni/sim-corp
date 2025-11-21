@@ -85,3 +85,16 @@ export const AgentTraceSchema = z.object({
 });
 
 export type AgentTrace = z.infer<typeof AgentTraceSchema>;
+
+export const AgentCardSchema = z.object({
+  id: IdentifierSchema,
+  name: NonEmptyStringSchema,
+  role: NonEmptyStringSchema,
+  version: NonEmptyStringSchema,
+  description: z.string().optional(),
+  capabilities: z.array(NonEmptyStringSchema).default([]),
+  tags: z.array(NonEmptyStringSchema).default([]),
+  metadata: JsonRecordSchema.optional() // TODO(@human): clarify agent metadata structure.
+});
+
+export type AgentCard = z.infer<typeof AgentCardSchema>;

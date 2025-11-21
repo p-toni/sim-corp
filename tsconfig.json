@@ -8,6 +8,7 @@
   "files": [],
   "references": [
     { "path": "libs/schemas/tsconfig.json" },
-    { "path": "libs/agent-runtime/tsconfig.json" }
+    { "path": "libs/agent-runtime/tsconfig.json" },
+    { "path": "services/company-kernel/tsconfig.json" }
   ]
 }

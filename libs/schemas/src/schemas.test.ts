@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  AgentCardSchema,
   AgentTraceSchema,
   CuppingSchema,
   EvalRunSchema,
@@ -7,6 +8,7 @@ import {
   MissionSchema,
   PolicyCheckRequestSchema,
   PolicyCheckResultSchema,
+  ToolCardSchema,
   RoastEventSchema,
   RoastSchema,
   TelemetryPointSchema
@@ -61,6 +63,25 @@ describe("roaster schemas", () => {
     });
 
     expect(cupping.score).toBe(85);
+  });
+
+  it("parses agent and tool cards", () => {
+    const agent = AgentCardSchema.parse({
+      id: "strategist:v1",
+      name: "Strategist",
+      role: "strategist",
+      version: "1.0.0"
+    });
+
+    expect(agent.capabilities).toEqual([]);
+
+    const tool = ToolCardSchema.parse({
+      id: "search:v1",
+      name: "WebSearch",
+      version: "1.0.0"
+    });
+
+    expect(tool.policyTags).toEqual([]);
   });
 });
 
