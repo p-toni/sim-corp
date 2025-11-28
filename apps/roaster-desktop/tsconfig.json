@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "vitest/globals", "node"],
+    "noEmit": true,
+    "paths": {
+      "@sim-corp/agent-runtime": ["libs/agent-runtime/src/index.ts"],
+      "@sim-corp/agent-runtime/*": ["libs/agent-runtime/src/*"],
+      "@sim-corp/schemas": ["libs/schemas/src/index.ts"],
+      "@sim-corp/schemas/*": ["libs/schemas/src/*"],
+      "@sim-corp/sim-twin": ["services/sim-twin/src/index.ts"],
+      "@sim-corp/sim-twin/*": ["services/sim-twin/src/*"],
+      "@sim-corp/sim-roast-runner": ["agents/sim-roast-runner/src/index.ts"],
+      "@sim-corp/sim-roast-runner/src/agent": ["agents/sim-roast-runner/src/agent.ts"],
+      "@sim-corp/sim-roast-runner/src/*": ["agents/sim-roast-runner/src/*"],
+      "@sim-corp/sim-roast-runner/*": ["agents/sim-roast-runner/src/*"],
+      "node:crypto": ["./src/shims/node-crypto.ts"],
+      "node:perf_hooks": ["./src/shims/perf-hooks.ts"]
+    }
+  },
+  "include": ["src", "tests", "vite.config.ts", "vitest.config.ts", "index.html"],
+  "references": [
+    { "path": "../../libs/schemas/tsconfig.json" },
+    { "path": "../../agents/sim-roast-runner/tsconfig.json" }
+  ]
+}

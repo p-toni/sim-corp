@@ -1,0 +1,58 @@
+import { AgentTrace, AgentTraceEntry, Mission } from "@sim-corp/schemas";
+
+export interface SimMissionParams {
+  targetFirstCrackSeconds: number;
+  targetDropSeconds: number;
+  seed: number;
+  noiseStdDev: number;
+  sampleIntervalSeconds: number;
+}
+
+export const defaultMissionParams: SimMissionParams = {
+  targetFirstCrackSeconds: 500,
+  targetDropSeconds: 650,
+  seed: 42,
+  noiseStdDev: 0.5,
+  sampleIntervalSeconds: 2
+};
+
+function numeric(value: number | string): number {
+  if (typeof value === "number") {
+    return value;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function normalizeParams(params: SimMissionParams): SimMissionParams {
+  return {
+    targetFirstCrackSeconds: Math.max(1, numeric(params.targetFirstCrackSeconds)),
+    targetDropSeconds: Math.max(1, numeric(params.targetDropSeconds)),
+    seed: Math.round(numeric(params.seed)),
+    noiseStdDev: Math.max(0, numeric(params.noiseStdDev)),
+    sampleIntervalSeconds: Math.max(0.5, numeric(params.sampleIntervalSeconds))
+  };
+}
+
+export function buildMissionFromParams(params: SimMissionParams): Mission {
+  const normalized = normalizeParams(params);
+  return {
+    missionId: `roast-${crypto.randomUUID?.() ?? String(Date.now())}`,
+    goal: {
+      title: "simulate-roast",
+      description: "Run simulated roast for desktop UI"
+    },
+    constraints: [],
+    context: { environment: "SIM" },
+    priority: "MEDIUM",
+    params: normalized,
+    createdAt: new Date().toISOString()
+  };
+}
+
+export function stepIdForEntry(entry: AgentTraceEntry, index: number): string {
+  const iteration = entry.iteration ?? 0;
+  return `${iteration}:${entry.step}:${index}`;
+}
+
+export type MissionRunner = (mission: Mission) => Promise<AgentTrace>;
