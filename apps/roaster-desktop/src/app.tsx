@@ -1,15 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AgentTrace, RoastEvent, TelemetryPoint } from "@sim-corp/schemas";
+import type { AgentTrace, RoastEvent, TelemetryEnvelope, TelemetryPoint } from "@sim-corp/schemas";
 import { Controls } from "./components/Controls";
 import { CurveChart } from "./components/CurveChart";
 import { Layout } from "./components/Layout";
 import { LoopTimeline } from "./components/LoopTimeline";
 import { TraceViewer } from "./components/TraceViewer";
-import { extractSimOutputs, postTraceToKernel, runSelfContainedMission } from "./lib/api";
+import {
+  extractSimOutputs,
+  getSessionEvents,
+  getSessionTelemetry,
+  listSessions,
+  postTraceToKernel,
+  runSelfContainedMission
+} from "./lib/api";
 import {
   AppMode,
   LiveConfig,
   MissionRunner,
+  PlaybackState,
   SimMissionParams,
   appendWithLimit,
   buildMissionFromParams,
@@ -30,6 +38,8 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
   const [liveConfig, setLiveConfig] = useState<LiveConfig>(defaultLiveConfig);
   const [telemetry, setTelemetry] = useState<TelemetryPoint[]>([]);
   const [events, setEvents] = useState<RoastEvent[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [playback, setPlayback] = useState<PlaybackState>({ sessions: [], selectedSessionId: null });
   const [trace, setTrace] = useState<AgentTrace | null>(null);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>("Idle");
@@ -72,6 +82,10 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     if (nextMode === "batch") {
       stopLive();
     }
+    if (nextMode === "playback") {
+      stopLive();
+      void refreshSessions();
+    }
   };
 
   const handleLiveConfigChange = (next: Partial<LiveConfig>): void => {
@@ -84,6 +98,27 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     telemetrySourceRef.current = null;
     eventSourceRef.current = null;
     setLiveStatus("Disconnected");
+    setCurrentSessionId(null);
+  };
+
+  const startStream = (
+    url: string,
+    eventName: string,
+    onData: (data: TelemetryEnvelope) => void,
+    onError: (ev: Event) => void
+  ): EventSource => {
+    const source = new EventSource(url);
+    source.addEventListener(eventName, (event) => {
+      try {
+        const data = JSON.parse((event as MessageEvent).data) as TelemetryEnvelope;
+        onData(data);
+      } catch (err) {
+        console.error("Failed to parse SSE data", err);
+      }
+    });
+    source.onerror = onError;
+    source.onopen = () => setLiveStatus("Live");
+    return source;
   };
 
   const handleStartLive = (): void => {
@@ -104,40 +139,67 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
       machineId: liveConfig.machineId
     }).toString();
 
-    const telemetrySource = new EventSource(`${base}/stream/telemetry?${params}`);
-    const eventSource = new EventSource(`${base}/stream/events?${params}`);
+    const telemetryUrl = `${base}/stream/envelopes/telemetry?${params}`;
+    const eventsUrl = `${base}/stream/envelopes/events?${params}`;
 
-    telemetrySource.onopen = () => {
-      setLiveStatus("Live");
-    };
-    telemetrySource.onerror = (evt) => {
-      setLiveStatus("Error");
-      setLiveError(`Telemetry stream error: ${evt}`);
-    };
-    telemetrySource.addEventListener("telemetry", (event) => {
-      try {
-        const data = JSON.parse((event as MessageEvent).data) as TelemetryPoint;
-        setTelemetry((prev) => appendWithLimit(prev, data));
-      } catch (err) {
-        console.error("Failed to parse telemetry SSE", err);
+    const onTelemetry = (env: TelemetryEnvelope): void => {
+      const sessionId = env.sessionId ?? null;
+      if (sessionId && sessionId !== currentSessionId) {
+        setTelemetry([]);
+        setEvents([]);
+        setCurrentSessionId(sessionId);
       }
-    });
+      const payload = env.payload as TelemetryPoint;
+      setTelemetry((prev) => appendWithLimit(prev, payload));
+    };
 
-    eventSource.onopen = () => {
-      setLiveStatus("Live");
-    };
-    eventSource.onerror = (evt) => {
-      setLiveStatus("Error");
-      setLiveError(`Events stream error: ${evt}`);
-    };
-    eventSource.addEventListener("roastEvent", (event) => {
-      try {
-        const data = JSON.parse((event as MessageEvent).data) as RoastEvent;
-        setEvents((prev) => appendWithLimit(prev, data));
-      } catch (err) {
-        console.error("Failed to parse event SSE", err);
+    const onEvent = (env: TelemetryEnvelope): void => {
+      const payload = env.payload as RoastEvent;
+      setEvents((prev) => appendWithLimit(prev, payload));
+      if (env.sessionId && env.sessionId !== currentSessionId) {
+        setCurrentSessionId(env.sessionId);
       }
-    });
+    };
+
+    const fallback = (): void => {
+      const legacyTelemetry = `${base}/stream/telemetry?${params}`;
+      const legacyEvents = `${base}/stream/events?${params}`;
+      telemetrySourceRef.current = startStream(legacyTelemetry, "telemetry", (env) => {
+        const payload = env as unknown as TelemetryPoint;
+        setTelemetry((prev) => appendWithLimit(prev, payload));
+      }, (evt) => {
+        setLiveStatus("Error");
+        setLiveError(`Telemetry stream error: ${evt}`);
+      });
+      eventSourceRef.current = startStream(legacyEvents, "roastEvent", (env) => {
+        const payload = env as unknown as RoastEvent;
+        setEvents((prev) => appendWithLimit(prev, payload));
+      }, (evt) => {
+        setLiveStatus("Error");
+        setLiveError(`Events stream error: ${evt}`);
+      });
+    };
+
+    const telemetrySource = startStream(
+      telemetryUrl,
+      "telemetry",
+      onTelemetry,
+      (evt) => {
+        setLiveStatus("Error");
+        setLiveError(`Telemetry stream error: ${evt}`);
+        fallback();
+      }
+    );
+    const eventSource = startStream(
+      eventsUrl,
+      "roastEvent",
+      onEvent,
+      (evt) => {
+        setLiveStatus("Error");
+        setLiveError(`Events stream error: ${evt}`);
+        fallback();
+      }
+    );
 
     telemetrySourceRef.current = telemetrySource;
     eventSourceRef.current = eventSource;
@@ -145,6 +207,44 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
 
   const handleStopLive = (): void => {
     stopLive();
+  };
+
+  const refreshSessions = async (): Promise<void> => {
+    const base = liveConfig.ingestionUrl.replace(/\/$/, "");
+    try {
+      const sessions = await listSessions(base, {
+        orgId: liveConfig.orgId,
+        siteId: liveConfig.siteId,
+        machineId: liveConfig.machineId,
+        limit: 50
+      });
+      const sessionItems = sessions.map((s) => ({
+        id: s.sessionId,
+        label: `${s.startedAt} • ${s.status} • ${s.sessionId.slice(-6)}`,
+        startedAt: s.startedAt,
+        status: s.status
+      }));
+      setPlayback((prev) => ({ ...prev, sessions: sessionItems }));
+    } catch (err) {
+      console.error("Failed to load sessions", err);
+    }
+  };
+
+  const handleSelectSession = async (sessionId: string): Promise<void> => {
+    if (!sessionId) return;
+    const base = liveConfig.ingestionUrl.replace(/\/$/, "");
+    try {
+      const [telemetryData, eventData] = await Promise.all([
+        getSessionTelemetry(base, sessionId),
+        getSessionEvents(base, sessionId)
+      ]);
+      setTelemetry(telemetryData);
+      setEvents(eventData);
+      setPlayback((prev) => ({ ...prev, selectedSessionId: sessionId }));
+      setCurrentSessionId(sessionId);
+    } catch (err) {
+      console.error("Failed to load session data", err);
+    }
   };
 
   const handleRun = async (): Promise<void> => {
@@ -211,10 +311,18 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
           onStopLive={handleStopLive}
           liveStatus={liveStatus}
           liveError={liveError}
+          playback={playback}
+          onSelectSession={handleSelectSession}
+          onRefreshSessions={refreshSessions}
         />
       }
     >
       <div className="stack">
+        {mode !== "batch" ? (
+          <div className="muted small-text">
+            {currentSessionId ? `Current session: ${currentSessionId}` : "No session detected"}
+          </div>
+        ) : null}
         <CurveChart telemetry={telemetry} events={events} />
         <div className="split">
           <LoopTimeline

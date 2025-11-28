@@ -2,6 +2,10 @@ import {
   AgentTrace,
   AgentTraceSchema,
   RoastEvent,
+  RoastSession,
+  RoastSessionSchema,
+  RoastSessionSummary,
+  RoastSessionSummarySchema,
   RoastEventSchema,
   TelemetryPoint,
   TelemetryPointSchema,
@@ -10,7 +14,7 @@ import {
 import { AgentRuntime } from "@sim-corp/agent-runtime";
 import { SimRoastRequestSchema, simulateRoast } from "@sim-corp/sim-twin";
 import { runSimRoastMission } from "@sim-corp/sim-roast-runner";
-import { simRoastReasoner } from "@sim-corp/sim-roast-runner/src/agent";
+import { simRoastReasoner } from "../../../../agents/sim-roast-runner/src/agent";
 
 interface SimOutputs {
   telemetry: TelemetryPoint[];
@@ -208,4 +212,43 @@ export async function postTraceToKernel(trace: AgentTrace): Promise<void> {
     const message = await response.text();
     throw new Error(`Kernel responded ${response.status}: ${message || "unknown error"}`);
   }
+}
+
+async function fetchJson<T>(url: string, schema?: { safeParse: (value: unknown) => { success: boolean; data: T } }): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Request failed ${res.status}`);
+  }
+  const json = await res.json();
+  if (!schema) return json as T;
+  const parsed = schema.safeParse(json);
+  if (!parsed.success) {
+    throw new Error("Response validation failed");
+  }
+  return parsed.data;
+}
+
+export async function listSessions(baseUrl: string, params: { orgId?: string; siteId?: string; machineId?: string; limit?: number } = {}): Promise<RoastSessionSummary[]> {
+  const qs = new URLSearchParams();
+  if (params.orgId) qs.append("orgId", params.orgId);
+  if (params.siteId) qs.append("siteId", params.siteId);
+  if (params.machineId) qs.append("machineId", params.machineId);
+  if (typeof params.limit === "number") qs.append("limit", String(params.limit));
+  const url = `${baseUrl.replace(/\/$/, "")}/sessions${qs.toString() ? `?${qs.toString()}` : ""}`;
+  return fetchJson(url, RoastSessionSummarySchema.array());
+}
+
+export async function getSessionTelemetry(baseUrl: string, sessionId: string): Promise<TelemetryPoint[]> {
+  const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/telemetry`;
+  return fetchJson(url, TelemetryPointSchema.array());
+}
+
+export async function getSessionEvents(baseUrl: string, sessionId: string): Promise<RoastEvent[]> {
+  const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/events`;
+  return fetchJson(url, RoastEventSchema.array());
+}
+
+export async function getSessionSummary(baseUrl: string, sessionId: string): Promise<RoastSession> {
+  const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}`;
+  return fetchJson(url, RoastSessionSchema);
 }

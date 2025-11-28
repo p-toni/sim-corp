@@ -107,6 +107,13 @@ body {
   font-size: 14px;
 }
 
+.form-field select {
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
 .controls-footer {
   margin-top: 12px;
   display: flex;

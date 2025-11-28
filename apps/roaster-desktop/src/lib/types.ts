@@ -17,6 +17,7 @@ export const defaultMissionParams: SimMissionParams = {
 };
 
 export type AppMode = "batch" | "live";
+export type PlaybackMode = "playback";
 
 export interface LiveConfig {
   ingestionUrl: string;
@@ -31,6 +32,24 @@ export const defaultLiveConfig: LiveConfig = {
   siteId: "site",
   machineId: "SIM-MACHINE"
 };
+
+export interface PlaybackState {
+  sessions: Array<{
+    id: string;
+    label: string;
+    startedAt: string;
+    status: string;
+  }>;
+  selectedSessionId: string | null;
+  summary?: {
+    startedAt?: string;
+    endedAt?: string | null;
+    durationSeconds?: number;
+    maxBtC?: number;
+    fcSeconds?: number;
+    dropSeconds?: number;
+  };
+}
 
 function numeric(value: number | string): number {
   if (typeof value === "number") {

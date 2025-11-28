@@ -1,5 +1,5 @@
 import type { ChangeEvent } from "react";
-import type { AppMode, LiveConfig, SimMissionParams } from "../lib/types";
+import type { AppMode, LiveConfig, PlaybackState, SimMissionParams } from "../lib/types";
 
 interface ControlsProps {
   mode: AppMode;
@@ -19,6 +19,9 @@ interface ControlsProps {
   onStopLive: () => void;
   liveStatus: string;
   liveError?: string | null;
+  playback: PlaybackState;
+  onSelectSession: (id: string) => void;
+  onRefreshSessions: () => void;
 }
 
 export function Controls({
@@ -38,7 +41,10 @@ export function Controls({
   onStartLive,
   onStopLive,
   liveStatus,
-  liveError
+  liveError,
+  playback,
+  onSelectSession,
+  onRefreshSessions
 }: ControlsProps) {
   const handleChange =
     (key: keyof SimMissionParams) =>
@@ -69,6 +75,13 @@ export function Controls({
           onClick={() => onModeChange("live")}
         >
           Live Mode
+        </button>
+        <button
+          type="button"
+          className={mode === "playback" ? "chip active" : "chip"}
+          onClick={() => onModeChange("playback")}
+        >
+          Playback
         </button>
       </div>
       <h2 className="panel-title">Mission Parameters</h2>
@@ -142,7 +155,7 @@ export function Controls({
           </div>
           {error ? <div className="error-text">Error: {error}</div> : null}
         </div>
-      ) : (
+      ) : mode === "live" ? (
         <div className="controls-footer">
           <h3 className="section-title">Live stream</h3>
           <label className="form-field">
@@ -175,6 +188,36 @@ export function Controls({
             <strong>Live status:</strong> {liveStatus}
           </div>
           {liveError ? <div className="error-text">Error: {liveError}</div> : null}
+        </div>
+      ) : (
+        <div className="controls-footer">
+          <h3 className="section-title">Playback</h3>
+          <button type="button" className="secondary" onClick={onRefreshSessions}>
+            Refresh sessions
+          </button>
+          <label className="form-field">
+            <span>Sessions</span>
+            <select
+              value={playback.selectedSessionId ?? ""}
+              onChange={(event) => onSelectSession(event.target.value)}
+            >
+              <option value="">Select session</option>
+              {playback.sessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {playback.summary ? (
+            <div className="muted small-text">
+              Started: {playback.summary.startedAt ?? "?"} | Ended: {playback.summary.endedAt ?? "—"}
+              <br />
+              Duration: {playback.summary.durationSeconds ?? "?"}s | Max BT: {playback.summary.maxBtC ?? "?"}
+              <br />
+              FC: {playback.summary.fcSeconds ?? "—"} | DROP: {playback.summary.dropSeconds ?? "—"}
+            </div>
+          ) : null}
         </div>
       )}
     </div>

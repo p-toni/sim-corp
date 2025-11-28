@@ -34,9 +34,11 @@ services:
       NODE_ENV: development
       INGESTION_MQTT_URL: mqtt://mosquitto:1883
       INGESTION_MQTT_CLIENT_ID: ingestion-local
+      INGESTION_DB_PATH: /data/ingestion.db
     volumes:
       - ../../:/app
       - ../../node_modules:/app/node_modules
+      - ../../var/ingestion:/data
     ports:
       - "4001:4001"
     depends_on:
