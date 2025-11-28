@@ -21,6 +21,7 @@ Services:
 - sim-publisher: 4003
 - driver-bridge: 4004
 - event-inference: 4005
+- analytics: 4006
 
 ## Start roaster-desktop (optional UI)
 ```bash
@@ -86,6 +87,13 @@ Point roaster-desktop Live Mode at ingestion `http://127.0.0.1:4001` with the sa
 ## Inferred events (event-inference)
 - event-inference listens on MQTT telemetry and emits CHARGE/TP/FC/DROP to `/events`.
 - With driver-bridge running, you should see FC/DROP markers appear automatically in Live Mode.
+
+## Analyze a session (analytics)
+- Fetch analysis for a session:
+```bash
+curl http://127.0.0.1:4006/analysis/session/<SESSION_ID>
+```
+- In roaster-desktop Playback Mode, set Analytics URL `http://127.0.0.1:4006`, pick a session, and view analysis panel + phase overlays.
 
 ## Stop the stack
 ```bash

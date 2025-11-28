@@ -16,7 +16,7 @@ export const defaultMissionParams: SimMissionParams = {
   sampleIntervalSeconds: 2
 };
 
-export type AppMode = "batch" | "live";
+export type AppMode = "batch" | "live" | "playback";
 export type PlaybackMode = "playback";
 
 export interface LiveConfig {
@@ -49,6 +49,20 @@ export interface PlaybackState {
     fcSeconds?: number;
     dropSeconds?: number;
   };
+}
+
+export interface AnalysisState {
+  metrics?: {
+    totalDurationSeconds?: number;
+    fcSeconds?: number;
+    dropSeconds?: number;
+    developmentRatio?: number;
+    maxBtC?: number;
+    endBtC?: number;
+  };
+  warnings: { code: string; severity: string; message: string }[];
+  recommendations: { code: string; message: string; confidence: string }[];
+  phases: Array<{ startSeconds: number; endSeconds: number; phase: string }>;
 }
 
 function numeric(value: number | string): number {

@@ -5,11 +5,13 @@ import { CurveChart } from "./components/CurveChart";
 import { Layout } from "./components/Layout";
 import { LoopTimeline } from "./components/LoopTimeline";
 import { TraceViewer } from "./components/TraceViewer";
+import { AnalysisPanel } from "./components/AnalysisPanel";
 import {
   extractSimOutputs,
   getSessionEvents,
   getSessionTelemetry,
   listSessions,
+  getSessionAnalysis,
   postTraceToKernel,
   runSelfContainedMission
 } from "./lib/api";
@@ -40,6 +42,8 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
   const [events, setEvents] = useState<RoastEvent[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [playback, setPlayback] = useState<PlaybackState>({ sessions: [], selectedSessionId: null });
+  const [analysisUrl, setAnalysisUrl] = useState<string>("http://127.0.0.1:4006");
+  const [analysis, setAnalysis] = useState<import("@sim-corp/schemas").RoastAnalysis | null>(null);
   const [trace, setTrace] = useState<AgentTrace | null>(null);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>("Idle");
@@ -242,6 +246,13 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
       setEvents(eventData);
       setPlayback((prev) => ({ ...prev, selectedSessionId: sessionId }));
       setCurrentSessionId(sessionId);
+      setAnalysis(null);
+      try {
+        const a = await getSessionAnalysis(analysisUrl, sessionId);
+        setAnalysis(a);
+      } catch (err) {
+        console.error("Failed to load analysis", err);
+      }
     } catch (err) {
       console.error("Failed to load session data", err);
     }
@@ -314,6 +325,8 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
           playback={playback}
           onSelectSession={handleSelectSession}
           onRefreshSessions={refreshSessions}
+          analyticsUrl={analysisUrl}
+          onChangeAnalyticsUrl={setAnalysisUrl}
         />
       }
     >
@@ -323,14 +336,14 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
             {currentSessionId ? `Current session: ${currentSessionId}` : "No session detected"}
           </div>
         ) : null}
-        <CurveChart telemetry={telemetry} events={events} />
+        <CurveChart telemetry={telemetry} events={events} phases={analysis?.phases} />
         <div className="split">
           <LoopTimeline
             trace={trace}
             selectedStepId={selectedStepId}
             onSelectStep={setSelectedStepId}
           />
-          <TraceViewer step={selectedStep} />
+          {mode === "playback" ? <AnalysisPanel analysis={analysis} /> : <TraceViewer step={selectedStep} />}
         </div>
       </div>
     </Layout>

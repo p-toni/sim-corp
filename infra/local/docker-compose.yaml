@@ -108,6 +108,23 @@ services:
     depends_on:
       - mosquitto
 
+  analytics:
+    image: node:20-alpine
+    container_name: sim-analytics
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm --filter @sim-corp/analytics start"
+    environment:
+      NODE_ENV: development
+      INGESTION_URL: http://ingestion:4001
+      ANALYTICS_PORT: 4006
+    volumes:
+      - ../../:/app
+      - ../../node_modules:/app/node_modules
+    ports:
+      - "4006:4006"
+    depends_on:
+      - ingestion
+
 networks:
   default:
     name: sim-local

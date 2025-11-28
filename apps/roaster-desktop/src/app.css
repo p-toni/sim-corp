@@ -342,6 +342,12 @@ button.primary:not(:disabled):hover {
   gap: 8px;
 }
 
+.warnings ul,
+.recommendations ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
 @media (max-width: 960px) {
   .app-main {
     grid-template-columns: 1fr;

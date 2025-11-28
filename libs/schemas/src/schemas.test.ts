@@ -13,6 +13,7 @@ import {
   RoastSchema,
   RoastSessionSchema,
   RoastSessionSummarySchema,
+  RoastAnalysisSchema,
   TelemetryPointSchema,
   TelemetryEnvelopeSchema
 } from "./index";
@@ -157,6 +158,24 @@ describe("roast session schemas", () => {
 
     const session = RoastSessionSchema.parse(summary);
     expect(session.meta).toEqual({});
+  });
+});
+
+describe("roast analysis schema", () => {
+  it("parses roast analysis with defaults", () => {
+    const analysis = RoastAnalysisSchema.parse({
+      sessionId: "s1",
+      orgId: "o",
+      siteId: "s",
+      machineId: "m",
+      computedAt: new Date().toISOString(),
+      phases: [],
+      phaseStats: [],
+      crashFlick: { crashDetected: false, flickDetected: false }
+    });
+    expect(analysis.warnings).toEqual([]);
+    expect(analysis.recommendations).toEqual([]);
+    expect(analysis.config).toEqual({});
   });
 });
 

@@ -22,6 +22,8 @@ interface ControlsProps {
   playback: PlaybackState;
   onSelectSession: (id: string) => void;
   onRefreshSessions: () => void;
+  analyticsUrl: string;
+  onChangeAnalyticsUrl: (url: string) => void;
 }
 
 export function Controls({
@@ -44,7 +46,9 @@ export function Controls({
   liveError,
   playback,
   onSelectSession,
-  onRefreshSessions
+  onRefreshSessions,
+  analyticsUrl,
+  onChangeAnalyticsUrl
 }: ControlsProps) {
   const handleChange =
     (key: keyof SimMissionParams) =>
@@ -192,6 +196,14 @@ export function Controls({
       ) : (
         <div className="controls-footer">
           <h3 className="section-title">Playback</h3>
+          <label className="form-field">
+            <span>Analytics URL</span>
+            <input
+              type="text"
+              value={analyticsUrl}
+              onChange={(event) => onChangeAnalyticsUrl(event.target.value)}
+            />
+          </label>
           <button type="button" className="secondary" onClick={onRefreshSessions}>
             Refresh sessions
           </button>

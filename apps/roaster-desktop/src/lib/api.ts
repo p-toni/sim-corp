@@ -9,6 +9,8 @@ import {
   RoastEventSchema,
   TelemetryPoint,
   TelemetryPointSchema,
+  RoastAnalysis,
+  RoastAnalysisSchema,
   type Mission
 } from "@sim-corp/schemas";
 import { AgentRuntime } from "@sim-corp/agent-runtime";
@@ -251,4 +253,9 @@ export async function getSessionEvents(baseUrl: string, sessionId: string): Prom
 export async function getSessionSummary(baseUrl: string, sessionId: string): Promise<RoastSession> {
   const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}`;
   return fetchJson(url, RoastSessionSchema);
+}
+
+export async function getSessionAnalysis(analyticsUrl: string, sessionId: string): Promise<RoastAnalysis> {
+  const url = `${analyticsUrl.replace(/\/$/, "")}/analysis/session/${sessionId}`;
+  return fetchJson(url, RoastAnalysisSchema);
 }

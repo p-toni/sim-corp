@@ -1,4 +1,4 @@
-import type { RoastEvent, TelemetryPoint } from "@sim-corp/schemas";
+import type { PhaseBoundary, RoastEvent, TelemetryPoint } from "@sim-corp/schemas";
 import {
   CartesianGrid,
   Legend,
@@ -14,6 +14,7 @@ import {
 interface CurveChartProps {
   telemetry: TelemetryPoint[];
   events: RoastEvent[];
+  phases?: PhaseBoundary[];
 }
 
 const formatSeconds = (value: number): string => `${value}s`;
@@ -36,7 +37,7 @@ function eventElapsedSeconds(event: RoastEvent, telemetry: TelemetryPoint[]): nu
   return null;
 }
 
-export function CurveChart({ telemetry, events }: CurveChartProps) {
+export function CurveChart({ telemetry, events, phases = [] }: CurveChartProps) {
   const data = telemetry.map((point) => ({
     time: point.elapsedSeconds,
     bt: point.btC ?? null,
@@ -81,6 +82,14 @@ export function CurveChart({ telemetry, events }: CurveChartProps) {
               labelFormatter={formatSeconds}
             />
             <Legend />
+            {phases.map((phase, idx) => (
+              <ReferenceLine
+                key={`${phase.phase}-${idx}`}
+                x={phase.startSeconds}
+                stroke="#cbd5e1"
+                label={{ value: phase.phase, position: "insideTop", fontSize: 10 }}
+              />
+            ))}
             <Line
               yAxisId="temp"
               type="monotone"
