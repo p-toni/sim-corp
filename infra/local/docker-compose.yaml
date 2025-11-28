@@ -89,6 +89,23 @@ services:
     depends_on:
       - mosquitto
 
+  event-inference:
+    image: node:20-alpine
+    container_name: sim-event-inference
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm --filter @sim-corp/event-inference start"
+    environment:
+      NODE_ENV: development
+      MQTT_URL: mqtt://mosquitto:1883
+      EVENT_INFERENCE_PORT: 4005
+    volumes:
+      - ../../:/app
+      - ../../node_modules:/app/node_modules
+    ports:
+      - "4005:4005"
+    depends_on:
+      - mosquitto
+
 networks:
   default:
     name: sim-local

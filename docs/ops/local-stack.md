@@ -20,6 +20,7 @@ Services:
 - sim-twin: 4002
 - sim-publisher: 4003
 - driver-bridge: 4004
+- event-inference: 4005
 
 ## Start roaster-desktop (optional UI)
 ```bash
@@ -81,6 +82,10 @@ curl -X POST http://127.0.0.1:4004/bridge/start \
 ```
 
 Point roaster-desktop Live Mode at ingestion `http://127.0.0.1:4001` with the same org/site/machine to see the streamed telemetry.
+
+## Inferred events (event-inference)
+- event-inference listens on MQTT telemetry and emits CHARGE/TP/FC/DROP to `/events`.
+- With driver-bridge running, you should see FC/DROP markers appear automatically in Live Mode.
 
 ## Stop the stack
 ```bash
