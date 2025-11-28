@@ -1,4 +1,4 @@
-import { AgentTrace, AgentTraceEntry, EventOverride, Mission, SessionMeta, SessionNote } from "@sim-corp/schemas";
+import { AgentTrace, AgentTraceEntry, EventOverride, Mission, RoastReport, SessionMeta, SessionNote } from "@sim-corp/schemas";
 
 export interface SimMissionParams {
   targetFirstCrackSeconds: number;
@@ -18,6 +18,7 @@ export const defaultMissionParams: SimMissionParams = {
 
 export type AppMode = "batch" | "live" | "playback";
 export type PlaybackMode = "playback";
+export type PlaybackTab = "qc" | "report";
 
 export interface LiveConfig {
   ingestionUrl: string;
@@ -55,6 +56,13 @@ export interface QcState {
   meta: SessionMeta | null;
   overrides: EventOverride[];
   notes: SessionNote[];
+}
+
+export interface ReportState {
+  report: RoastReport | null;
+  loading: boolean;
+  error: string | null;
+  queuedMessage?: string | null;
 }
 
 export interface AnalysisState {

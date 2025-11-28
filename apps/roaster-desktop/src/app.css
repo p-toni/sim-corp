@@ -202,6 +202,33 @@ button.primary:not(:disabled):hover {
   color: #0f172a;
 }
 
+.tab-switcher {
+  display: flex;
+  gap: 8px;
+}
+
+.report-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.report-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.report-markdown {
+  white-space: pre-wrap;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 10px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
 .section-title {
   margin: 0;
   font-size: 14px;

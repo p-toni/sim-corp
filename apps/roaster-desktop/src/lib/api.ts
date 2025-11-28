@@ -17,6 +17,9 @@ import {
   SessionNoteSchema,
   EventOverride,
   EventOverrideSchema,
+  RoastReport,
+  RoastReportSchema,
+  MissionSchema,
   type Mission
 } from "@sim-corp/schemas";
 import { AgentRuntime } from "@sim-corp/agent-runtime";
@@ -337,6 +340,44 @@ export async function saveEventOverrides(
   const parsed = EventOverrideSchema.array().safeParse(json);
   if (!parsed.success) {
     throw new Error("Failed to parse overrides response");
+  }
+  return parsed.data;
+}
+
+export async function getLatestSessionReport(baseUrl: string, sessionId: string): Promise<RoastReport | null> {
+  const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/reports/latest`;
+  const res = await fetch(url);
+  if (res.status === 404) {
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(`Failed to fetch report ${res.status}`);
+  }
+  const json = await res.json();
+  const parsed = RoastReportSchema.safeParse(json);
+  if (!parsed.success) {
+    throw new Error("Failed to parse report response");
+  }
+  return parsed.data;
+}
+
+export async function enqueueReportMission(sessionId: string): Promise<Mission> {
+  const url = new URL("/missions", resolveKernelUrl()).toString();
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      goal: "generate-roast-report",
+      params: { sessionId }
+    })
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to enqueue mission ${res.status}`);
+  }
+  const json = await res.json();
+  const parsed = MissionSchema.safeParse(json);
+  if (!parsed.success) {
+    throw new Error("Failed to parse mission response");
   }
   return parsed.data;
 }

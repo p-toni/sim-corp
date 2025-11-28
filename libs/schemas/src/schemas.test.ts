@@ -17,6 +17,7 @@ import {
   SessionMetaSchema,
   SessionNoteSchema,
   EventOverrideSchema,
+  RoastReportSchema,
   TelemetryPointSchema,
   TelemetryEnvelopeSchema
 } from "./index";
@@ -208,6 +209,59 @@ describe("qc schemas", () => {
       updatedAt: "2025-01-01T00:10:00.000Z"
     });
     expect(override.source).toBe("HUMAN");
+  });
+});
+
+describe("roast report schema", () => {
+  it("parses roast report with defaults", () => {
+    const report = RoastReportSchema.parse({
+      reportId: "r-1",
+      sessionId: "s1",
+      orgId: "o1",
+      siteId: "site",
+      machineId: "mach",
+      createdAt: "2025-01-01T00:00:00.000Z",
+      analysis: RoastAnalysisSchema.parse({
+        sessionId: "s1",
+        orgId: "o1",
+        siteId: "site",
+        machineId: "mach",
+        computedAt: "2025-01-01T00:00:00.000Z",
+        phases: [],
+        phaseStats: [],
+        crashFlick: { crashDetected: false, flickDetected: false }
+      }),
+      markdown: "# Report"
+    });
+
+    expect(report.createdBy).toBe("AGENT");
+    expect(report.overrides).toEqual([]);
+    expect(report.notes).toEqual([]);
+    expect(report.nextActions).toEqual([]);
+  });
+
+  it("requires ids to be strings", () => {
+    const result = RoastReportSchema.safeParse({
+      reportId: 123,
+      sessionId: "s1",
+      orgId: "o1",
+      siteId: "site",
+      machineId: "mach",
+      createdAt: "2025-01-01T00:00:00.000Z",
+      analysis: {
+        sessionId: "s1",
+        orgId: "o1",
+        siteId: "site",
+        machineId: "mach",
+        computedAt: "2025-01-01T00:00:00.000Z",
+        phases: [],
+        phaseStats: [],
+        crashFlick: { crashDetected: false, flickDetected: false }
+      },
+      markdown: "ok"
+    });
+
+    expect(result.success).toBe(false);
   });
 });
 

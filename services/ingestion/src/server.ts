@@ -15,6 +15,8 @@ import { registerSessionRoutes } from "./routes/sessions";
 import { EnvelopeStream } from "./core/envelope-stream";
 import { registerEnvelopeStreamRoutes } from "./routes/stream-envelopes";
 import { registerSessionQcRoutes } from "./routes/sessions-qc";
+import { registerSessionReportRoutes } from "./routes/session-reports";
+import { ReportMissionEnqueuer } from "./core/report-missions";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -31,7 +33,16 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   const db = openDatabase();
   const repo = new IngestionRepository(db);
   const sessionizer = new Sessionizer();
-  const persist = new PersistencePipeline({ repo, sessionizer });
+  const reportMissionEnqueuer = new ReportMissionEnqueuer({
+    repo,
+    logger: app.log,
+    kernelUrl: process.env.INGESTION_KERNEL_URL
+  });
+  const persist = new PersistencePipeline({
+    repo,
+    sessionizer,
+    onSessionClosed: (session) => reportMissionEnqueuer.handleSessionClosed(session)
+  });
   const envelopeStream = new EnvelopeStream();
   const handlers = new IngestionHandlers(telemetryStore, eventStore, persist, envelopeStream);
 
@@ -60,6 +71,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   registerStreamRoutes(app, { telemetryStore, eventStore });
   registerSessionRoutes(app, { repo });
   registerSessionQcRoutes(app, { repo });
+  registerSessionReportRoutes(app, { repo });
   registerEnvelopeStreamRoutes(app, { envelopeStream });
 
   return app;

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { IngestionRepository } from "../src/db/repo";
-import { TelemetryPointSchema } from "@sim-corp/schemas";
+import { RoastAnalysisSchema, TelemetryPointSchema } from "@sim-corp/schemas";
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ingestion-repo-"));
 
@@ -89,5 +89,71 @@ describe("IngestionRepository", () => {
       { eventType: "FC", elapsedSeconds: 420, source: "HUMAN", updatedAt: new Date().toISOString() }
     ]);
     expect(overrides[0].eventType).toBe("FC");
+  });
+
+  it("stores and retrieves session reports", () => {
+    dbPath = path.join(tmpDir, `${Date.now()}-reports.db`);
+    const db = new Database(dbPath);
+    const schema = fs.readFileSync(path.resolve(__dirname, "../src/db/schema.sql"), "utf-8");
+    db.exec(schema);
+    repo = new IngestionRepository(db);
+
+    repo.upsertSession({
+      sessionId: "s1",
+      orgId: "o",
+      siteId: "s",
+      machineId: "m",
+      startedAt: new Date(0).toISOString(),
+      endedAt: null,
+      status: "CLOSED",
+      dropSeconds: 600
+    });
+
+    const analysis = RoastAnalysisSchema.parse({
+      sessionId: "s1",
+      orgId: "o",
+      siteId: "s",
+      machineId: "m",
+      computedAt: new Date(0).toISOString(),
+      phases: [],
+      phaseStats: [],
+      crashFlick: { crashDetected: false, flickDetected: false }
+    });
+
+    const created = repo.createSessionReport("s1", {
+      reportId: "r-1",
+      sessionId: "s1",
+      orgId: "o",
+      siteId: "s",
+      machineId: "m",
+      createdAt: new Date(0).toISOString(),
+      createdBy: "AGENT",
+      analysis,
+      markdown: "# Report"
+    } as any);
+
+    expect(created.reportId).toBeTruthy();
+    expect(created.markdown).toContain("Report");
+
+    const latest = repo.getLatestSessionReport("s1");
+    expect(latest?.reportId).toBe(created.reportId);
+
+    const listed = repo.listSessionReports("s1");
+    expect(listed.length).toBe(1);
+    expect(listed[0].markdown).toContain("Report");
+
+    db.prepare(
+      `INSERT INTO session_reports (report_id, session_id, created_at, created_by, markdown, report_json)
+       VALUES (@reportId, @sessionId, @createdAt, @createdBy, @markdown, @reportJson)`
+    ).run({
+      reportId: "bad",
+      sessionId: "s1",
+      createdAt: new Date().toISOString(),
+      createdBy: "AGENT",
+      markdown: "invalid",
+      reportJson: JSON.stringify({ markdown: "missing fields" })
+    });
+
+    expect(() => repo.getLatestSessionReport("s1")).toThrow();
   });
 });

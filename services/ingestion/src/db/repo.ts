@@ -4,6 +4,7 @@ import {
   RoastEventSchema,
   RoastSessionSchema,
   RoastSessionSummarySchema,
+  RoastReportSchema,
   SessionMetaSchema,
   SessionNoteSchema,
   TelemetryPointSchema
@@ -13,6 +14,7 @@ import type {
   RoastEvent,
   RoastSession,
   RoastSessionSummary,
+  RoastReport,
   SessionMeta,
   SessionNote,
   TelemetryPoint
@@ -316,5 +318,69 @@ export class IngestionRepository {
     if (!row) return null;
     const value = Number(row.elapsed_seconds);
     return Number.isFinite(value) ? value : null;
+  }
+
+  createSessionReport(sessionId: string, report: RoastReport, traceId?: string): RoastReport {
+    const baseId = report.reportId ?? this.generateReportId(sessionId);
+    const createdAt = report.createdAt ?? new Date().toISOString();
+    const parsed = RoastReportSchema.parse({
+      ...report,
+      reportId: baseId,
+      sessionId,
+      createdAt
+    });
+
+    this.db
+      .prepare(
+        `INSERT INTO session_reports (report_id, session_id, created_at, created_by, agent_name, agent_version, markdown, report_json, trace_id)
+         VALUES (@reportId, @sessionId, @createdAt, @createdBy, @agentName, @agentVersion, @markdown, @reportJson, @traceId)`
+      )
+      .run({
+        reportId: parsed.reportId,
+        sessionId,
+        createdAt: parsed.createdAt,
+        createdBy: parsed.createdBy,
+        agentName: parsed.agentName ?? null,
+        agentVersion: parsed.agentVersion ?? null,
+        markdown: parsed.markdown,
+        reportJson: JSON.stringify(parsed),
+        traceId: traceId ?? null
+      });
+
+    return parsed;
+  }
+
+  listSessionReports(sessionId: string, limit = 20, offset = 0): RoastReport[] {
+    const rows = this.db
+      .prepare(
+        `SELECT report_json FROM session_reports WHERE session_id = @sessionId ORDER BY created_at DESC LIMIT @limit OFFSET @offset`
+      )
+      .all({ sessionId, limit, offset });
+
+    return rows.map((row) => RoastReportSchema.parse(JSON.parse(row.report_json)));
+  }
+
+  getLatestSessionReport(sessionId: string): RoastReport | null {
+    const row = this.db
+      .prepare(
+        `SELECT report_json FROM session_reports WHERE session_id = @sessionId ORDER BY created_at DESC LIMIT 1`
+      )
+      .get({ sessionId });
+    if (!row) return null;
+    return RoastReportSchema.parse(JSON.parse(row.report_json));
+  }
+
+  getSessionReportById(reportId: string): RoastReport | null {
+    const row = this.db
+      .prepare(`SELECT report_json FROM session_reports WHERE report_id = @reportId LIMIT 1`)
+      .get({ reportId });
+    if (!row) return null;
+    return RoastReportSchema.parse(JSON.parse(row.report_json));
+  }
+
+  private generateReportId(sessionId: string): string {
+    const ts = new Date().toISOString().replace(/[-:.]/g, "").slice(0, 15);
+    const rand = Math.random().toString(36).slice(2, 8);
+    return `R-${sessionId}-${ts}-${rand}`;
   }
 }

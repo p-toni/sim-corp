@@ -22,6 +22,7 @@ Services:
 - driver-bridge: 4004
 - event-inference: 4005
 - analytics: 4006
+- report-worker: 4007
 
 ## Start roaster-desktop (optional UI)
 ```bash
@@ -117,6 +118,25 @@ curl -X PUT http://127.0.0.1:4001/sessions/<SESSION_ID>/events/overrides \
   -d '{"overrides":[{"eventType":"FC","elapsedSeconds":480,"updatedAt":"'\"'\"$(date -Iseconds)'\"'\""}]}'
 ```
 Refresh analytics (`/analysis/session/<SESSION_ID>`) or the Playback Analysis panel to see updated markers and deltas.
+
+## Post-roast report loop (report-worker)
+- ingestion auto-enqueues a `generate-roast-report` mission on session close when `AUTO_REPORT_MISSIONS_ENABLED=true` (set in compose).
+- report-worker polls company-kernel for missions, runs `roast-report-agent`, posts the trace to kernel, and saves the report via ingestion.
+
+Quick checks:
+```bash
+# see the latest report for a session
+curl http://127.0.0.1:4001/sessions/<SESSION_ID>/reports/latest
+
+# enqueue manually
+curl -X POST http://127.0.0.1:3000/missions -H "content-type: application/json" \
+  -d '{"goal":"generate-roast-report","params":{"sessionId":"<SESSION_ID>"}}'
+
+# worker status
+curl http://127.0.0.1:4007/status
+```
+
+In roaster-desktop Playback, open the Report tab to refresh or queue a report for the selected session.
 
 ## Stop the stack
 ```bash

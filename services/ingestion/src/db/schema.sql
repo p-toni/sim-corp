@@ -79,3 +79,20 @@ CREATE TABLE IF NOT EXISTS event_overrides (
 );
 
 CREATE INDEX IF NOT EXISTS idx_event_overrides_session ON event_overrides (session_id);
+
+CREATE TABLE IF NOT EXISTS session_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  report_id TEXT NOT NULL UNIQUE,
+  session_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  agent_name TEXT NULL,
+  agent_version TEXT NULL,
+  markdown TEXT NOT NULL,
+  report_json TEXT NOT NULL,
+  trace_id TEXT NULL,
+  FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_reports_session_created ON session_reports (session_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_session_reports_report_id ON session_reports (report_id);

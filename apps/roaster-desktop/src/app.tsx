@@ -18,6 +18,8 @@ import {
   addSessionNote,
   getEventOverrides,
   saveEventOverrides,
+  getLatestSessionReport,
+  enqueueReportMission,
   postTraceToKernel,
   runSelfContainedMission
 } from "./lib/api";
@@ -25,7 +27,9 @@ import {
   AppMode,
   LiveConfig,
   MissionRunner,
+  PlaybackTab,
   PlaybackState,
+  ReportState,
   SimMissionParams,
   appendWithLimit,
   buildMissionFromParams,
@@ -36,6 +40,7 @@ import {
 } from "./lib/types";
 import "./app.css";
 import { QcPanel } from "./components/QcPanel";
+import { ReportPanel } from "./components/ReportPanel";
 
 interface AppProps {
   runMission?: MissionRunner;
@@ -53,6 +58,13 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
   const [analysisUrl, setAnalysisUrl] = useState<string>("http://127.0.0.1:4006");
   const [analysis, setAnalysis] = useState<import("@sim-corp/schemas").RoastAnalysis | null>(null);
   const [qc, setQc] = useState<QcState>({ meta: null, overrides: [], notes: [] });
+  const [reportState, setReportState] = useState<ReportState>({
+    report: null,
+    loading: false,
+    error: null,
+    queuedMessage: null
+  });
+  const [playbackTab, setPlaybackTab] = useState<PlaybackTab>("qc");
   const [trace, setTrace] = useState<AgentTrace | null>(null);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>("Idle");
@@ -98,9 +110,11 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     if (nextMode === "playback") {
       stopLive();
       void refreshSessions();
+      setPlaybackTab("qc");
     }
     if (nextMode !== "playback") {
       setQc({ meta: null, overrides: [], notes: [] });
+      setReportState({ report: null, loading: false, error: null, queuedMessage: null });
     }
   };
 
@@ -249,6 +263,7 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
   const handleSelectSession = async (sessionId: string): Promise<void> => {
     if (!sessionId) return;
     const base = liveConfig.ingestionUrl.replace(/\/$/, "");
+    setReportState({ report: null, loading: true, error: null, queuedMessage: null });
     try {
       const [telemetryData, eventData, metaData, overridesData, notesData] = await Promise.all([
         getSessionTelemetry(base, sessionId),
@@ -264,8 +279,10 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
       setQc({ meta: metaData, overrides: overridesData, notes: notesData });
       setAnalysis(null);
       await refreshAnalysis(sessionId);
+      await refreshReport(sessionId);
     } catch (err) {
       console.error("Failed to load session data", err);
+      setReportState((prev) => ({ ...prev, loading: false, error: "Failed to load session report" }));
     }
   };
 
@@ -275,6 +292,22 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
       setAnalysis(a);
     } catch (err) {
       console.error("Failed to load analysis", err);
+    }
+  };
+
+  const refreshReport = async (sessionId: string): Promise<void> => {
+    setReportState((prev) => ({ ...prev, loading: true, error: null }));
+    const base = liveConfig.ingestionUrl.replace(/\/$/, "");
+    try {
+      const latest = await getLatestSessionReport(base, sessionId);
+      setReportState((prev) => ({
+        ...prev,
+        report: latest,
+        loading: false
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load report";
+      setReportState((prev) => ({ ...prev, loading: false, error: message }));
     }
   };
 
@@ -300,6 +333,18 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     const base = liveConfig.ingestionUrl.replace(/\/$/, "");
     const created = await addSessionNote(base, playback.selectedSessionId, note);
     setQc((prev) => ({ ...prev, notes: [created, ...prev.notes] }));
+  };
+
+  const handleGenerateReport = async (): Promise<void> => {
+    if (!playback.selectedSessionId) return;
+    setReportState((prev) => ({ ...prev, queuedMessage: "Queuing mission…", error: null }));
+    try {
+      await enqueueReportMission(playback.selectedSessionId);
+      setReportState((prev) => ({ ...prev, queuedMessage: "Report mission queued" }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to enqueue mission";
+      setReportState((prev) => ({ ...prev, error: message, queuedMessage: null }));
+    }
   };
 
   const handleRun = async (): Promise<void> => {
@@ -390,16 +435,44 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
           {mode === "playback" ? (
             <div className="stack">
               <AnalysisPanel analysis={analysis} />
-              <QcPanel
-                sessionId={playback.selectedSessionId}
-                meta={qc.meta}
-                overrides={qc.overrides}
-                notes={qc.notes}
-                analysis={analysis}
-                onSaveMeta={handleSaveMeta}
-                onSaveOverrides={handleSaveOverrides}
-                onAddNote={handleAddNote}
-              />
+              <div className="tab-switcher">
+                <button
+                  type="button"
+                  className={`chip ${playbackTab === "qc" ? "active" : ""}`}
+                  onClick={() => setPlaybackTab("qc")}
+                >
+                  QC
+                </button>
+                <button
+                  type="button"
+                  className={`chip ${playbackTab === "report" ? "active" : ""}`}
+                  onClick={() => setPlaybackTab("report")}
+                >
+                  Report
+                </button>
+              </div>
+              {playbackTab === "qc" ? (
+                <QcPanel
+                  sessionId={playback.selectedSessionId}
+                  meta={qc.meta}
+                  overrides={qc.overrides}
+                  notes={qc.notes}
+                  analysis={analysis}
+                  onSaveMeta={handleSaveMeta}
+                  onSaveOverrides={handleSaveOverrides}
+                  onAddNote={handleAddNote}
+                />
+              ) : (
+                <ReportPanel
+                  sessionId={playback.selectedSessionId}
+                  report={reportState.report}
+                  loading={reportState.loading}
+                  error={reportState.error}
+                  queuedMessage={reportState.queuedMessage}
+                  onRefresh={() => playback.selectedSessionId ? refreshReport(playback.selectedSessionId) : Promise.resolve()}
+                  onGenerate={handleGenerateReport}
+                />
+              )}
             </div>
           ) : (
             <TraceViewer step={selectedStep} />

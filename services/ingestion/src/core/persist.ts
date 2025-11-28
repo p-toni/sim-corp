@@ -1,10 +1,16 @@
-import type { RoastEvent, TelemetryEnvelope, TelemetryPoint } from "@sim-corp/schemas";
+import type {
+  RoastEvent,
+  RoastSessionSummary,
+  TelemetryEnvelope,
+  TelemetryPoint
+} from "@sim-corp/schemas";
 import { IngestionRepository } from "../db/repo";
 import type { Sessionizer } from "./sessionizer";
 
 interface PersistDeps {
   repo: IngestionRepository;
   sessionizer: Sessionizer;
+  onSessionClosed?: (session: RoastSessionSummary) => void | Promise<void>;
 }
 
 export class PersistencePipeline {
@@ -39,6 +45,9 @@ export class PersistencePipeline {
         }
       }
       this.deps.repo.upsertSession(update);
+      if (update.status === "CLOSED") {
+        this.notifyClosedSession(update);
+      }
       this.deps.sessionizer.handleEvent(withSession);
     }
 
@@ -49,6 +58,16 @@ export class PersistencePipeline {
     const closed = this.deps.sessionizer.tick(nowIso);
     closed.forEach((state) => {
       this.deps.repo.upsertSession({
+        sessionId: state.sessionId,
+        orgId: state.orgId,
+        siteId: state.siteId,
+        machineId: state.machineId,
+        startedAt: state.startedAt,
+        endedAt: state.lastSeenAt,
+        status: "CLOSED",
+        durationSeconds: (Date.parse(state.lastSeenAt) - Date.parse(state.startedAt)) / 1000
+      });
+      this.notifyClosedSession({
         sessionId: state.sessionId,
         orgId: state.orgId,
         siteId: state.siteId,
@@ -71,5 +90,12 @@ export class PersistencePipeline {
       endedAt: null,
       status: "ACTIVE" as const
     };
+  }
+
+  private notifyClosedSession(session: RoastSessionSummary): void {
+    if (!this.deps.onSessionClosed) return;
+    Promise.resolve(this.deps.onSessionClosed(session)).catch(() => {
+      // swallow errors; hook errors should not disrupt ingestion
+    });
   }
 }
