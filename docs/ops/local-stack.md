@@ -19,6 +19,7 @@ Services:
 - ingestion: 4001
 - sim-twin: 4002
 - sim-publisher: 4003
+- driver-bridge: 4004
 
 ## Start roaster-desktop (optional UI)
 ```bash
@@ -63,6 +64,23 @@ curl "http://127.0.0.1:4001/events?orgId=org&siteId=site&machineId=SIM-MACHINE&l
 curl http://127.0.0.1:3000/traces
 ```
 (Traces appear if posting to kernel is enabled in the UI.)
+
+## Shadow-mode driver bridge (FakeDriver)
+```bash
+curl -X POST http://127.0.0.1:4004/bridge/start \
+  -H "content-type: application/json" \
+  -d '{
+    "driverName": "fake",
+    "config": {
+      "orgId": "org",
+      "siteId": "site",
+      "machineId": "SIM-MACHINE",
+      "connection": { "seed": 7, "sampleIntervalSeconds": 2 }
+    }
+  }'
+```
+
+Point roaster-desktop Live Mode at ingestion `http://127.0.0.1:4001` with the same org/site/machine to see the streamed telemetry.
 
 ## Stop the stack
 ```bash

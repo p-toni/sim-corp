@@ -73,6 +73,22 @@ services:
       - mosquitto
       - sim-twin
 
+  driver-bridge:
+    image: node:20-alpine
+    container_name: sim-driver-bridge
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm --filter @sim-corp/driver-bridge start"
+    environment:
+      NODE_ENV: development
+      MQTT_URL: mqtt://mosquitto:1883
+    volumes:
+      - ../../:/app
+      - ../../node_modules:/app/node_modules
+    ports:
+      - "4004:4004"
+    depends_on:
+      - mosquitto
+
 networks:
   default:
     name: sim-local

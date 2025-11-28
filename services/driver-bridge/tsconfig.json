@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["src", "tests"],
+  "references": [
+    { "path": "../../drivers/core/tsconfig.json" },
+    { "path": "../../drivers/fake/tsconfig.json" },
+    { "path": "../../libs/schemas/tsconfig.json" }
+  ]
+}

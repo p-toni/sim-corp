@@ -12,6 +12,7 @@
     { "path": "services/company-kernel/tsconfig.json" },
     { "path": "services/sim-twin/tsconfig.json" },
     { "path": "services/sim-publisher/tsconfig.json" },
+    { "path": "services/driver-bridge/tsconfig.json" },
     { "path": "agents/sim-roast-runner/tsconfig.json" }
   ]
 }
