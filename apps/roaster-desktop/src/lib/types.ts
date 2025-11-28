@@ -16,6 +16,22 @@ export const defaultMissionParams: SimMissionParams = {
   sampleIntervalSeconds: 2
 };
 
+export type AppMode = "batch" | "live";
+
+export interface LiveConfig {
+  ingestionUrl: string;
+  orgId: string;
+  siteId: string;
+  machineId: string;
+}
+
+export const defaultLiveConfig: LiveConfig = {
+  ingestionUrl: "http://127.0.0.1:4001",
+  orgId: "org",
+  siteId: "site",
+  machineId: "SIM-MACHINE"
+};
+
 function numeric(value: number | string): number {
   if (typeof value === "number") {
     return value;
@@ -56,3 +72,11 @@ export function stepIdForEntry(entry: AgentTraceEntry, index: number): string {
 }
 
 export type MissionRunner = (mission: Mission) => Promise<AgentTrace>;
+
+export function appendWithLimit<T>(buffer: T[], item: T, limit = 2000): T[] {
+  const next = [...buffer, item];
+  if (next.length > limit) {
+    return next.slice(next.length - limit);
+  }
+  return next;
+}

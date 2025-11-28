@@ -6,6 +6,7 @@ import { RealMqttClient, type MqttClient } from "./mqtt-client";
 import { registerHealthRoutes } from "./routes/health";
 import { registerTelemetryRoutes } from "./routes/telemetry";
 import { registerEventRoutes } from "./routes/events";
+import { registerStreamRoutes } from "./routes/stream";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -36,6 +37,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   registerHealthRoutes(app);
   registerTelemetryRoutes(app, { telemetryStore });
   registerEventRoutes(app, { eventStore });
+  registerStreamRoutes(app, { telemetryStore, eventStore });
 
   return app;
 }

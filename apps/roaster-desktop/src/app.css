@@ -134,6 +134,21 @@ button.primary:not(:disabled):hover {
   transform: translateY(-1px);
 }
 
+.secondary {
+  background: #0ea5e9;
+  color: #fff;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.secondary.ghost {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
 .status-text {
   font-size: 14px;
   color: #0f172a;
@@ -158,6 +173,36 @@ button.primary:not(:disabled):hover {
   align-items: center;
   gap: 8px;
   font-size: 14px;
+}
+
+.mode-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.chip {
+  border: 1px solid #cbd5e1;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.chip.active {
+  border-color: #2563eb;
+  background: #e0f2fe;
+  color: #0f172a;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 14px;
+}
+
+.live-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .empty {

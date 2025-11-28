@@ -11,9 +11,15 @@ export type StoredTelemetryPoint = TelemetryPoint & TelemetryOrigin;
 
 export class TelemetryStore {
   private readonly telemetry: StoredTelemetryPoint[] = [];
+  private readonly subscribers: Array<{ filter: TelemetryQuery; fn: (point: StoredTelemetryPoint) => void }> = [];
 
   add(point: StoredTelemetryPoint): void {
     this.telemetry.push(point);
+    this.subscribers.forEach(({ filter, fn }) => {
+      if (matchesFilter(filter, point)) {
+        fn(point);
+      }
+    });
   }
 
   query(q: TelemetryQuery = {}): StoredTelemetryPoint[] {
@@ -33,6 +39,17 @@ export class TelemetryStore {
     }
     return results;
   }
+
+  subscribe(filter: TelemetryQuery, fn: (point: StoredTelemetryPoint) => void): () => void {
+    const entry = { filter, fn };
+    this.subscribers.push(entry);
+    return () => {
+      const idx = this.subscribers.indexOf(entry);
+      if (idx >= 0) {
+        this.subscribers.splice(idx, 1);
+      }
+    };
+  }
 }
 
 export type EventQuery = TelemetryQuery;
@@ -41,9 +58,15 @@ export type StoredRoastEvent = RoastEvent & TelemetryOrigin;
 
 export class EventStore {
   private readonly events: StoredRoastEvent[] = [];
+  private readonly subscribers: Array<{ filter: EventQuery; fn: (event: StoredRoastEvent) => void }> = [];
 
   add(evt: StoredRoastEvent): void {
     this.events.push(evt);
+    this.subscribers.forEach(({ filter, fn }) => {
+      if (matchesFilter(filter, evt)) {
+        fn(evt);
+      }
+    });
   }
 
   query(q: EventQuery = {}): StoredRoastEvent[] {
@@ -63,4 +86,23 @@ export class EventStore {
     }
     return results;
   }
+
+  subscribe(filter: EventQuery, fn: (event: StoredRoastEvent) => void): () => void {
+    const entry = { filter, fn };
+    this.subscribers.push(entry);
+    return () => {
+      const idx = this.subscribers.indexOf(entry);
+      if (idx >= 0) {
+        this.subscribers.splice(idx, 1);
+      }
+    };
+  }
+}
+
+function matchesFilter(filter: TelemetryQuery, origin: TelemetryOrigin): boolean {
+  return (
+    (filter.orgId ? origin.orgId === filter.orgId : true) &&
+    (filter.siteId ? origin.siteId === filter.siteId : true) &&
+    (filter.machineId ? origin.machineId === filter.machineId : true)
+  );
 }

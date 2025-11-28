@@ -1,7 +1,9 @@
 import type { ChangeEvent } from "react";
-import type { SimMissionParams } from "../lib/types";
+import type { AppMode, LiveConfig, SimMissionParams } from "../lib/types";
 
 interface ControlsProps {
+  mode: AppMode;
+  onModeChange: (mode: AppMode) => void;
   params: SimMissionParams;
   onChange: (next: Partial<SimMissionParams>) => void;
   onRun: () => void;
@@ -11,9 +13,17 @@ interface ControlsProps {
   postToKernel: boolean;
   onTogglePost: (value: boolean) => void;
   kernelStatus?: string;
+  liveConfig: LiveConfig;
+  onLiveConfigChange: (next: Partial<LiveConfig>) => void;
+  onStartLive: () => void;
+  onStopLive: () => void;
+  liveStatus: string;
+  liveError?: string | null;
 }
 
 export function Controls({
+  mode,
+  onModeChange,
   params,
   onChange,
   onRun,
@@ -22,7 +32,13 @@ export function Controls({
   error,
   postToKernel,
   onTogglePost,
-  kernelStatus
+  kernelStatus,
+  liveConfig,
+  onLiveConfigChange,
+  onStartLive,
+  onStopLive,
+  liveStatus,
+  liveError
 }: ControlsProps) {
   const handleChange =
     (key: keyof SimMissionParams) =>
@@ -31,8 +47,30 @@ export function Controls({
       onChange({ [key]: Number.isFinite(nextValue) ? nextValue : 0 });
     };
 
+  const handleLiveChange =
+    (key: keyof LiveConfig) =>
+    (event: ChangeEvent<HTMLInputElement>): void => {
+      onLiveConfigChange({ [key]: event.target.value });
+    };
+
   return (
     <div className="panel">
+      <div className="mode-toggle">
+        <button
+          type="button"
+          className={mode === "batch" ? "chip active" : "chip"}
+          onClick={() => onModeChange("batch")}
+        >
+          Batch Mode
+        </button>
+        <button
+          type="button"
+          className={mode === "live" ? "chip active" : "chip"}
+          onClick={() => onModeChange("live")}
+        >
+          Live Mode
+        </button>
+      </div>
       <h2 className="panel-title">Mission Parameters</h2>
       <div className="form-grid">
         <label className="form-field">
@@ -80,29 +118,65 @@ export function Controls({
           />
         </label>
       </div>
-      <div className="controls-footer">
-        <label className="checkbox-field">
-          <input
-            type="checkbox"
-            checked={postToKernel}
-            onChange={(event) => onTogglePost(event.target.checked)}
-            disabled={running}
-          />
-          <span>Post trace to kernel</span>
-        </label>
-        {postToKernel ? (
-          <div className="muted small-text">
-            Kernel status: {kernelStatus ?? "Pending"}
+      {mode === "batch" ? (
+        <div className="controls-footer">
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={postToKernel}
+              onChange={(event) => onTogglePost(event.target.checked)}
+              disabled={running}
+            />
+            <span>Post trace to kernel</span>
+          </label>
+          {postToKernel ? (
+            <div className="muted small-text">
+              Kernel status: {kernelStatus ?? "Pending"}
+            </div>
+          ) : null}
+          <button className="primary" type="button" onClick={onRun} disabled={running}>
+            {running ? "Running…" : "Run Sim Roast Mission"}
+          </button>
+          <div className="status-text">
+            <strong>Status:</strong> {status}
           </div>
-        ) : null}
-        <button className="primary" type="button" onClick={onRun} disabled={running}>
-          {running ? "Running…" : "Run Sim Roast Mission"}
-        </button>
-        <div className="status-text">
-          <strong>Status:</strong> {status}
+          {error ? <div className="error-text">Error: {error}</div> : null}
         </div>
-        {error ? <div className="error-text">Error: {error}</div> : null}
-      </div>
+      ) : (
+        <div className="controls-footer">
+          <h3 className="section-title">Live stream</h3>
+          <label className="form-field">
+            <span>Ingestion URL</span>
+            <input type="text" value={liveConfig.ingestionUrl} onChange={handleLiveChange("ingestionUrl")} />
+          </label>
+          <div className="form-grid">
+            <label className="form-field">
+              <span>Org ID</span>
+              <input type="text" value={liveConfig.orgId} onChange={handleLiveChange("orgId")} />
+            </label>
+            <label className="form-field">
+              <span>Site ID</span>
+              <input type="text" value={liveConfig.siteId} onChange={handleLiveChange("siteId")} />
+            </label>
+            <label className="form-field">
+              <span>Machine ID</span>
+              <input type="text" value={liveConfig.machineId} onChange={handleLiveChange("machineId")} />
+            </label>
+          </div>
+          <div className="live-actions">
+            <button type="button" className="secondary" onClick={onStartLive}>
+              Start Live
+            </button>
+            <button type="button" className="secondary ghost" onClick={onStopLive}>
+              Stop
+            </button>
+          </div>
+          <div className="status-text">
+            <strong>Live status:</strong> {liveStatus}
+          </div>
+          {liveError ? <div className="error-text">Error: {liveError}</div> : null}
+        </div>
+      )}
     </div>
   );
 }
