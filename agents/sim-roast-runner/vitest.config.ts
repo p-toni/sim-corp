@@ -16,7 +16,8 @@ export default defineConfig({
     alias: {
       "@sim-corp/agent-runtime": resolveWorkspacePath("libs/agent-runtime/src/index.ts"),
       "@sim-corp/schemas": resolveWorkspacePath("libs/schemas/src/index.ts"),
-      "@sim-corp/sim-twin": resolveWorkspacePath("services/sim-twin/src/index.ts")
+      "@sim-corp/sim-twin": resolveWorkspacePath("services/sim-twin/src/client.ts"),
+      "@sim-corp/sim-twin/client": resolveWorkspacePath("services/sim-twin/src/client.ts")
     }
   }
 });

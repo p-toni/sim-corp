@@ -23,7 +23,7 @@ import {
   type Mission
 } from "@sim-corp/schemas";
 import { AgentRuntime } from "@sim-corp/agent-runtime";
-import { SimRoastRequestSchema, simulateRoast } from "@sim-corp/sim-twin";
+import { SimRoastRequestSchema, simulateRoast } from "./simTwinClient";
 import { runSimRoastMission } from "@sim-corp/sim-roast-runner";
 import { simRoastReasoner } from "../../../../agents/sim-roast-runner/src/agent";
 
@@ -85,15 +85,10 @@ function resolveKernelUrl(): string {
   return getEnv("KERNEL_URL") ?? DEFAULT_KERNEL_URL;
 }
 
-function isNodeLike(): boolean {
-  return typeof process !== "undefined" && !!process.versions?.node;
-}
-
 function ensureProcessShim(): () => void {
   if (typeof process !== "undefined") {
     return () => {};
   }
-
   const globalObj = globalThis as Record<string, unknown>;
   if (!globalObj.process) {
     globalObj.process = { env: {} };
@@ -101,54 +96,7 @@ function ensureProcessShim(): () => void {
       delete globalObj.process;
     };
   }
-
   return () => {};
-}
-
-async function runWithProcessShim<T>(fn: () => Promise<T>): Promise<T> {
-  const cleanup = ensureProcessShim();
-  try {
-    return await fn();
-  } finally {
-    cleanup();
-  }
-}
-
-async function withLocalSimTwin<T>(fn: (url: string) => Promise<T>): Promise<T> {
-  if (!isNodeLike()) {
-    throw new Error("Local sim-twin requires a Node-like runtime");
-  }
-
-  // Avoid Vite pre-bundling fastify by deferring import.
-  const moduleName = "@sim-corp/sim-twin";
-  const mod = await import(/* @vite-ignore */ moduleName);
-  const buildServer: typeof import("@sim-corp/sim-twin").buildServer = mod.buildServer;
-
-  const app = await buildServer({ logger: false });
-  const address = await app.listen({ port: 0, host: "127.0.0.1" });
-
-  try {
-    return await fn(address);
-  } finally {
-    await app.close();
-  }
-}
-
-function withSimTwinEnv<T>(url: string, fn: () => Promise<T>): Promise<T> {
-  if (typeof process === "undefined") {
-    return fn();
-  }
-
-  const previous = process.env.SIM_TWIN_URL;
-  process.env.SIM_TWIN_URL = url;
-
-  return fn().finally(() => {
-    if (previous) {
-      process.env.SIM_TWIN_URL = previous;
-    } else {
-      delete process.env.SIM_TWIN_URL;
-    }
-  });
 }
 
 const ALLOW_POLICY = {
@@ -184,21 +132,9 @@ async function runSimRoastMissionDirect(mission: Mission): Promise<AgentTrace> {
 }
 
 export async function runSelfContainedMission(mission: Mission): Promise<AgentTrace> {
-  const configuredUrl = resolveSimTwinUrl();
-
-  if (configuredUrl) {
-    return runWithProcessShim(() => withSimTwinEnv(configuredUrl, () => runSimRoastMission(mission)));
-  }
-
-  if (isNodeLike()) {
-    try {
-      return await runWithProcessShim(() =>
-        withLocalSimTwin((url) => withSimTwinEnv(url, () => runSimRoastMission(mission)))
-      );
-    } catch (err) {
-      // fall back to direct simulation if local server fails
-      return runSimRoastMissionDirect(mission);
-    }
+  // In browser/test environments, avoid spinning up local sim-twin (Fastify) and use direct simulation.
+  if (typeof window !== "undefined") {
+    return runSimRoastMissionDirect(mission);
   }
 
   return runSimRoastMissionDirect(mission);

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ToolRegistry } from "@sim-corp/agent-runtime";
 import { RoastEventSchema, TelemetryPointSchema } from "@sim-corp/schemas";
-import { SimRoastRequestSchema } from "@sim-corp/sim-twin";
+import { SimRoastRequestSchema } from "../../../services/sim-twin/src/client";
 
 const SIM_TWIN_DEFAULT_URL = "http://127.0.0.1:4002";
 

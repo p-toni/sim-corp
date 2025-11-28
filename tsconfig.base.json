@@ -21,8 +21,9 @@
       "@sim-corp/*": ["./*"],
       "@sim-corp/schemas": ["libs/schemas/src"],
       "@sim-corp/schemas/*": ["libs/schemas/src/*"],
-      "@sim-corp/sim-twin": ["services/sim-twin/src/index.ts"],
-      "@sim-corp/sim-twin/*": ["services/sim-twin/src/*"]
+      "@sim-corp/sim-twin": ["services/sim-twin/src/client.ts"],
+      "@sim-corp/sim-twin/*": ["services/sim-twin/src/*"],
+      "@sim-corp/sim-twin/client": ["services/sim-twin/src/client.ts"]
     }
   }
 }

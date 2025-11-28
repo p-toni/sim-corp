@@ -1,6 +1,6 @@
 import type { LoopStep, Reasoner, StepContext, StepOutput } from "@sim-corp/agent-runtime";
 import type { Mission } from "@sim-corp/schemas";
-import { SimRoastRequestSchema, type SimRoastRequest } from "@sim-corp/sim-twin";
+import { SimRoastRequestSchema, type SimRoastRequest } from "../../../services/sim-twin/src/client";
 import { SIMULATE_ROAST_TOOL_NAME } from "./tools";
 
 const SIM_TWIN_DEFAULT_URL = "http://127.0.0.1:4002";

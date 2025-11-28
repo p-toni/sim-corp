@@ -1,18 +1,17 @@
 import path from "node:path";
-import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 const resolvePath = (p: string): string => path.resolve(__dirname, p);
 
 export default defineConfig({
-  plugins: [tsconfigPaths(), react()],
-  optimizeDeps: {
-    // Avoid pulling server-only fastify (and dependencies) into the browser bundle
-    exclude: ["fastify", "@fastify/error", "avvio", "pino", "light-my-request", "@sim-corp/sim-twin"]
-  },
-  server: {
-    host: "127.0.0.1"
+  plugins: [tsconfigPaths()],
+  test: {
+    environment: "jsdom",
+    globals: true,
+    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
+    setupFiles: ["./tests/setup.ts"],
+    css: true
   },
   resolve: {
     alias: {
@@ -26,12 +25,5 @@ export default defineConfig({
       "node:crypto": resolvePath("src/shims/node-crypto.ts"),
       "node:perf_hooks": resolvePath("src/shims/perf-hooks.ts")
     }
-  },
-  test: {
-    environment: "jsdom",
-    globals: true,
-    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
-    setupFiles: ["./tests/setup.ts"],
-    css: true
   }
 });
