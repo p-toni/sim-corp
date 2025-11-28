@@ -8,6 +8,8 @@
     "node": ">=20 <21"
   },
   "scripts": {
+    "preinstall": "node ./scripts/require-node-major.mjs 20",
+    "pretest": "node ./scripts/require-node-major.mjs 20",
     "build": "pnpm -r --filter=!@sim-corp/root run build",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --check .",

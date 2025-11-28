@@ -69,9 +69,13 @@ export function registerSessionReportRoutes(app: FastifyInstance, deps: SessionR
           siteId: session.siteId,
           machineId: session.machineId
         };
-        const stored = repo.createSessionReport(session.sessionId, reportInput as RoastReport, typeof traceId === "string" ? traceId : undefined);
-        reply.status(201);
-        return stored;
+        const { report, created } = repo.createSessionReport(
+          session.sessionId,
+          reportInput as RoastReport,
+          typeof traceId === "string" ? traceId : undefined
+        );
+        reply.status(created ? 201 : 200);
+        return report;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Invalid report";
         return reply.status(400).send({ error: message });

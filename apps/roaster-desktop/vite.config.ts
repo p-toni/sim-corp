@@ -7,18 +7,10 @@ const resolvePath = (p: string): string => path.resolve(__dirname, p);
 
 export default defineConfig({
   plugins: [tsconfigPaths(), react()],
-  optimizeDeps: {
-    // Avoid pulling server-only fastify (and dependencies) into the browser bundle
-    exclude: ["fastify", "@fastify/error", "avvio", "pino", "light-my-request", "@sim-corp/sim-twin"]
-  },
-  server: {
-    host: "127.0.0.1"
-  },
   resolve: {
     alias: {
       "@sim-corp/agent-runtime": resolvePath("../../libs/agent-runtime/src/index.ts"),
-      "@sim-corp/sim-twin": resolvePath("../../services/sim-twin/src/client.ts"),
-      "@sim-corp/sim-twin/client": resolvePath("../../services/sim-twin/src/client.ts"),
+      "@sim-corp/sim-twin": resolvePath("../../services/sim-twin/src/index.ts"),
       "@sim-corp/schemas": resolvePath("../../libs/schemas/src/index.ts"),
       "@sim-corp/sim-roast-runner": resolvePath("../../agents/sim-roast-runner/src/index.ts"),
       "@sim-corp/sim-roast-runner/src": resolvePath("../../agents/sim-roast-runner/src"),

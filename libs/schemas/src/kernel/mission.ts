@@ -28,11 +28,13 @@ export type MissionConstraint = z.infer<typeof MissionConstraintSchema>;
 export const MissionSchema = z.object({
   id: IdentifierSchema.optional(),
   missionId: IdentifierSchema.optional(),
+  idempotencyKey: IdentifierSchema.optional(),
   goal: MissionGoalSchema,
   constraints: z.array(MissionConstraintSchema).default([]),
   params: JsonRecordSchema.default({}),
   context: JsonRecordSchema.default({}),
   priority: MissionPrioritySchema.default("MEDIUM"),
+  maxAttempts: z.number().int().min(1).optional(),
   requestedBy: IdentifierSchema.optional(),
   createdAt: IsoDateTimeSchema.optional()
 });

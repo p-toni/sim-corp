@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS session_reports (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   report_id TEXT NOT NULL UNIQUE,
   session_id TEXT NOT NULL,
+  report_kind TEXT NOT NULL DEFAULT 'POST_ROAST_V1',
   created_at TEXT NOT NULL,
   created_by TEXT NOT NULL,
   agent_name TEXT NULL,
@@ -95,4 +96,5 @@ CREATE TABLE IF NOT EXISTS session_reports (
 );
 
 CREATE INDEX IF NOT EXISTS idx_session_reports_session_created ON session_reports (session_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_session_reports_session_kind ON session_reports (session_id, report_kind);
 CREATE INDEX IF NOT EXISTS idx_session_reports_report_id ON session_reports (report_id);

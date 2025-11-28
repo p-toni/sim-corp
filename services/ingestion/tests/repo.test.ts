@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { IngestionRepository } from "../src/db/repo";
+import { applyMigrations } from "../src/db/connection";
 import { RoastAnalysisSchema, TelemetryPointSchema } from "@sim-corp/schemas";
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ingestion-repo-"));
@@ -120,7 +121,7 @@ describe("IngestionRepository", () => {
       crashFlick: { crashDetected: false, flickDetected: false }
     });
 
-    const created = repo.createSessionReport("s1", {
+    const { report: created } = repo.createSessionReport("s1", {
       reportId: "r-1",
       sessionId: "s1",
       orgId: "o",
@@ -155,5 +156,92 @@ describe("IngestionRepository", () => {
     });
 
     expect(() => repo.getLatestSessionReport("s1")).toThrow();
+  });
+
+  it("migrates legacy reports and enforces uniqueness by report kind", () => {
+    const db = new Database(":memory:");
+    db.exec(
+      `CREATE TABLE session_reports (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         report_id TEXT NOT NULL UNIQUE,
+         session_id TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         created_by TEXT NOT NULL,
+         markdown TEXT NOT NULL,
+         report_json TEXT NOT NULL
+       )`
+    );
+
+    const analysis = RoastAnalysisSchema.parse({
+      sessionId: "s1",
+      orgId: "o",
+      siteId: "s",
+      machineId: "m",
+      computedAt: new Date(0).toISOString(),
+      phases: [],
+      phaseStats: [],
+      crashFlick: { crashDetected: false, flickDetected: false }
+    });
+
+    db.prepare(
+      `INSERT INTO session_reports (report_id, session_id, created_at, created_by, markdown, report_json)
+       VALUES (@reportId, @sessionId, @createdAt, @createdBy, @markdown, @reportJson)`
+    ).run({
+      reportId: "old-1",
+      sessionId: "s1",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      createdBy: "AGENT",
+      markdown: "#1",
+      reportJson: JSON.stringify({
+        reportId: "old-1",
+        sessionId: "s1",
+        orgId: "o",
+        siteId: "s",
+        machineId: "m",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        createdBy: "AGENT",
+        analysis,
+        markdown: "#1"
+      })
+    });
+    db.prepare(
+      `INSERT INTO session_reports (report_id, session_id, created_at, created_by, markdown, report_json)
+       VALUES (@reportId, @sessionId, @createdAt, @createdBy, @markdown, @reportJson)`
+    ).run({
+      reportId: "old-2",
+      sessionId: "s1",
+      createdAt: "2024-02-01T00:00:00.000Z",
+      createdBy: "AGENT",
+      markdown: "#2",
+      reportJson: JSON.stringify({
+        reportId: "old-2",
+        sessionId: "s1",
+        orgId: "o",
+        siteId: "s",
+        machineId: "m",
+        createdAt: "2024-02-01T00:00:00.000Z",
+        createdBy: "AGENT",
+        analysis,
+        markdown: "#2"
+      })
+    });
+
+    applyMigrations(db);
+    const rows = db.prepare(`SELECT report_kind FROM session_reports`).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].report_kind).toBe("POST_ROAST_V1");
+
+    const repoMigrated = new IngestionRepository(db);
+    const latest = repoMigrated.getLatestSessionReport("s1");
+    expect(latest?.reportId).toBe("old-2");
+
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO session_reports (report_id, session_id, report_kind, created_at, created_by, markdown, report_json)
+           VALUES ('new', 's1', 'POST_ROAST_V1', '2024-03-01T00:00:00.000Z', 'AGENT', '#3', '{}')`
+        )
+        .run()
+    ).toThrow();
   });
 });

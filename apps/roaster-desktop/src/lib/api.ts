@@ -11,19 +11,10 @@ import {
   TelemetryPointSchema,
   RoastAnalysis,
   RoastAnalysisSchema,
-  SessionMeta,
-  SessionMetaSchema,
-  SessionNote,
-  SessionNoteSchema,
-  EventOverride,
-  EventOverrideSchema,
-  RoastReport,
-  RoastReportSchema,
-  MissionSchema,
   type Mission
 } from "@sim-corp/schemas";
 import { AgentRuntime } from "@sim-corp/agent-runtime";
-import { SimRoastRequestSchema, simulateRoast } from "./simTwinClient";
+import { SimRoastRequestSchema, simulateRoast } from "@sim-corp/sim-twin";
 import { runSimRoastMission } from "@sim-corp/sim-roast-runner";
 import { simRoastReasoner } from "../../../../agents/sim-roast-runner/src/agent";
 
@@ -85,10 +76,15 @@ function resolveKernelUrl(): string {
   return getEnv("KERNEL_URL") ?? DEFAULT_KERNEL_URL;
 }
 
+function isNodeLike(): boolean {
+  return typeof process !== "undefined" && !!process.versions?.node;
+}
+
 function ensureProcessShim(): () => void {
   if (typeof process !== "undefined") {
     return () => {};
   }
+
   const globalObj = globalThis as Record<string, unknown>;
   if (!globalObj.process) {
     globalObj.process = { env: {} };
@@ -96,7 +92,54 @@ function ensureProcessShim(): () => void {
       delete globalObj.process;
     };
   }
+
   return () => {};
+}
+
+async function runWithProcessShim<T>(fn: () => Promise<T>): Promise<T> {
+  const cleanup = ensureProcessShim();
+  try {
+    return await fn();
+  } finally {
+    cleanup();
+  }
+}
+
+async function withLocalSimTwin<T>(fn: (url: string) => Promise<T>): Promise<T> {
+  if (!isNodeLike()) {
+    throw new Error("Local sim-twin requires a Node-like runtime");
+  }
+
+  // Avoid Vite pre-bundling fastify by deferring import.
+  const moduleName = "@sim-corp/sim-twin";
+  const mod = await import(/* @vite-ignore */ moduleName);
+  const buildServer: typeof import("@sim-corp/sim-twin").buildServer = mod.buildServer;
+
+  const app = await buildServer({ logger: false });
+  const address = await app.listen({ port: 0, host: "127.0.0.1" });
+
+  try {
+    return await fn(address);
+  } finally {
+    await app.close();
+  }
+}
+
+function withSimTwinEnv<T>(url: string, fn: () => Promise<T>): Promise<T> {
+  if (typeof process === "undefined") {
+    return fn();
+  }
+
+  const previous = process.env.SIM_TWIN_URL;
+  process.env.SIM_TWIN_URL = url;
+
+  return fn().finally(() => {
+    if (previous) {
+      process.env.SIM_TWIN_URL = previous;
+    } else {
+      delete process.env.SIM_TWIN_URL;
+    }
+  });
 }
 
 const ALLOW_POLICY = {
@@ -132,9 +175,21 @@ async function runSimRoastMissionDirect(mission: Mission): Promise<AgentTrace> {
 }
 
 export async function runSelfContainedMission(mission: Mission): Promise<AgentTrace> {
-  // In browser/test environments, avoid spinning up local sim-twin (Fastify) and use direct simulation.
-  if (typeof window !== "undefined") {
-    return runSimRoastMissionDirect(mission);
+  const configuredUrl = resolveSimTwinUrl();
+
+  if (configuredUrl) {
+    return runWithProcessShim(() => withSimTwinEnv(configuredUrl, () => runSimRoastMission(mission)));
+  }
+
+  if (isNodeLike()) {
+    try {
+      return await runWithProcessShim(() =>
+        withLocalSimTwin((url) => withSimTwinEnv(url, () => runSimRoastMission(mission)))
+      );
+    } catch (err) {
+      // fall back to direct simulation if local server fails
+      return runSimRoastMissionDirect(mission);
+    }
   }
 
   return runSimRoastMissionDirect(mission);
@@ -203,117 +258,4 @@ export async function getSessionSummary(baseUrl: string, sessionId: string): Pro
 export async function getSessionAnalysis(analyticsUrl: string, sessionId: string): Promise<RoastAnalysis> {
   const url = `${analyticsUrl.replace(/\/$/, "")}/analysis/session/${sessionId}`;
   return fetchJson(url, RoastAnalysisSchema);
-}
-
-export async function getSessionMeta(baseUrl: string, sessionId: string): Promise<SessionMeta> {
-  const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/meta`;
-  return fetchJson(url, SessionMetaSchema);
-}
-
-export async function saveSessionMeta(baseUrl: string, sessionId: string, meta: SessionMeta): Promise<SessionMeta> {
-  const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/meta`;
-  const res = await fetch(url, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(meta)
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to save meta ${res.status}`);
-  }
-  const json = await res.json();
-  const parsed = SessionMetaSchema.safeParse(json);
-  if (!parsed.success) {
-    throw new Error("Failed to validate saved meta");
-  }
-  return parsed.data;
-}
-
-export async function listSessionNotes(baseUrl: string, sessionId: string): Promise<SessionNote[]> {
-  const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/notes`;
-  return fetchJson(url, SessionNoteSchema.array());
-}
-
-export async function addSessionNote(baseUrl: string, sessionId: string, note: Partial<SessionNote>): Promise<SessionNote> {
-  const payload = { ...note };
-  delete (payload as Record<string, unknown>).noteId;
-  delete (payload as Record<string, unknown>).createdAt;
-  const res = await fetch(`${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/notes`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to add note ${res.status}`);
-  }
-  const json = await res.json();
-  const parsed = SessionNoteSchema.safeParse(json);
-  if (!parsed.success) {
-    throw new Error("Failed to parse added note");
-  }
-  return parsed.data;
-}
-
-export async function getEventOverrides(baseUrl: string, sessionId: string): Promise<EventOverride[]> {
-  const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/events/overrides`;
-  return fetchJson(url, EventOverrideSchema.array());
-}
-
-export async function saveEventOverrides(
-  baseUrl: string,
-  sessionId: string,
-  overrides: EventOverride[]
-): Promise<EventOverride[]> {
-  const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/events/overrides`;
-  const res = await fetch(url, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ overrides })
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to save overrides ${res.status}`);
-  }
-  const json = await res.json();
-  const parsed = EventOverrideSchema.array().safeParse(json);
-  if (!parsed.success) {
-    throw new Error("Failed to parse overrides response");
-  }
-  return parsed.data;
-}
-
-export async function getLatestSessionReport(baseUrl: string, sessionId: string): Promise<RoastReport | null> {
-  const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/reports/latest`;
-  const res = await fetch(url);
-  if (res.status === 404) {
-    return null;
-  }
-  if (!res.ok) {
-    throw new Error(`Failed to fetch report ${res.status}`);
-  }
-  const json = await res.json();
-  const parsed = RoastReportSchema.safeParse(json);
-  if (!parsed.success) {
-    throw new Error("Failed to parse report response");
-  }
-  return parsed.data;
-}
-
-export async function enqueueReportMission(sessionId: string): Promise<Mission> {
-  const url = new URL("/missions", resolveKernelUrl()).toString();
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      goal: "generate-roast-report",
-      params: { sessionId }
-    })
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to enqueue mission ${res.status}`);
-  }
-  const json = await res.json();
-  const parsed = MissionSchema.safeParse(json);
-  if (!parsed.success) {
-    throw new Error("Failed to parse mission response");
-  }
-  return parsed.data;
 }

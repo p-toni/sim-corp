@@ -5,6 +5,7 @@ import { EventOverrideSchema, SessionMetaSchema, SessionNoteSchema } from "./qc"
 export const RoastReportSchema = z.object({
   reportId: z.string(),
   sessionId: z.string(),
+  reportKind: z.string().default("POST_ROAST_V1"),
   orgId: z.string(),
   siteId: z.string(),
   machineId: z.string(),

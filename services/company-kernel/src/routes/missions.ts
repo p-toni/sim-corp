@@ -6,22 +6,29 @@ interface MissionRouteDeps {
   missions: MissionStore;
 }
 
-type MissionCreateRequest = FastifyRequest<{ Body: Mission | (Mission & { goal?: string }) }>;
+type MissionCreateRequest = FastifyRequest<{ Body: Mission | (Mission & { goal?: string; idempotencyKey?: string; maxAttempts?: number }) }>;
 type MissionListRequest = FastifyRequest<{
   Querystring: { status?: MissionStatus; goal?: string; agent?: string; sessionId?: string };
 }>;
 type MissionClaimRequest = FastifyRequest<{ Body: { agentName?: string; goals?: string[] } }>;
-type MissionUpdateRequest = FastifyRequest<{ Params: { id: string }; Body: { summary?: Record<string, unknown> } }>;
-type MissionFailRequest = FastifyRequest<{ Params: { id: string }; Body: { error?: string; details?: Record<string, unknown> } }>;
+type MissionUpdateRequest = FastifyRequest<{ Params: { id: string }; Body: { summary?: Record<string, unknown>; leaseId?: string } }>;
+type MissionFailRequest = FastifyRequest<{
+  Params: { id: string };
+  Body: { error?: string; details?: Record<string, unknown>; retryable?: boolean; leaseId?: string };
+}>;
+type MissionHeartbeatRequest = FastifyRequest<{
+  Params: { id: string };
+  Body: { leaseId?: string; agentName?: string };
+}>;
 
 export async function registerMissionRoutes(app: FastifyInstance, deps: MissionRouteDeps): Promise<void> {
   const { missions } = deps;
 
   app.post("/missions", async (request: MissionCreateRequest, reply: FastifyReply) => {
     try {
-      const created = missions.createMission(request.body as Mission);
-      reply.status(201);
-      return created;
+      const { mission, created } = missions.createMission(request.body as Mission);
+      reply.status(created ? 201 : 200);
+      return mission;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Invalid mission";
       return reply.status(400).send({ error: message });
@@ -48,10 +55,12 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
 
   app.post("/missions/:id/complete", async (request: MissionUpdateRequest, reply: FastifyReply) => {
     try {
-      const updated = missions.completeMission(request.params.id, request.body?.summary);
+      const updated = missions.completeMission(request.params.id, request.body?.summary, request.body?.leaseId);
       return updated;
     } catch (err) {
-      return reply.status(404).send({ error: "Mission not found" });
+      const message = err instanceof Error ? err.message : "Mission not found";
+      const status = message === "Mission not found" ? 404 : 409;
+      return reply.status(status).send({ error: message });
     }
   });
 
@@ -63,10 +72,29 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
       const updated = missions.failMission(request.params.id, {
         error: request.body.error,
         details: request.body.details
-      });
+      }, { retryable: request.body.retryable, leaseId: request.body.leaseId });
       return updated;
     } catch (err) {
-      return reply.status(404).send({ error: "Mission not found" });
+      const message = err instanceof Error ? err.message : "Mission not found";
+      const status = message === "Mission not found" ? 404 : 409;
+      return reply.status(status).send({ error: message });
     }
   });
+
+  app.post("/missions/:id/heartbeat", async (request: MissionHeartbeatRequest, reply: FastifyReply) => {
+    const leaseId = request.body?.leaseId;
+    if (!leaseId) {
+      return reply.status(400).send({ error: "leaseId is required" });
+    }
+    try {
+      const updated = missions.heartbeatMission(request.params.id, leaseId, request.body?.agentName);
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Mission not found";
+      const status = message === "Mission not found" ? 404 : 409;
+      return reply.status(status).send({ error: message });
+    }
+  });
+
+  app.get("/missions/metrics", async () => missions.metrics());
 }

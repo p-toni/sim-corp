@@ -20,6 +20,13 @@ import type {
   TelemetryPoint
 } from "@sim-corp/schemas";
 
+export const DEFAULT_REPORT_KIND = "POST_ROAST_V1";
+
+export interface SessionReportResult {
+  report: RoastReport;
+  created: boolean;
+}
+
 export interface SessionFilters {
   orgId?: string;
   siteId?: string;
@@ -320,24 +327,27 @@ export class IngestionRepository {
     return Number.isFinite(value) ? value : null;
   }
 
-  createSessionReport(sessionId: string, report: RoastReport, traceId?: string): RoastReport {
+  createSessionReport(sessionId: string, report: RoastReport, traceId?: string): SessionReportResult {
     const baseId = report.reportId ?? this.generateReportId(sessionId);
     const createdAt = report.createdAt ?? new Date().toISOString();
+    const reportKind = (report as RoastReport & { reportKind?: string }).reportKind ?? DEFAULT_REPORT_KIND;
     const parsed = RoastReportSchema.parse({
       ...report,
       reportId: baseId,
       sessionId,
-      createdAt
+      createdAt,
+      reportKind
     });
 
-    this.db
+    const result = this.db
       .prepare(
-        `INSERT INTO session_reports (report_id, session_id, created_at, created_by, agent_name, agent_version, markdown, report_json, trace_id)
-         VALUES (@reportId, @sessionId, @createdAt, @createdBy, @agentName, @agentVersion, @markdown, @reportJson, @traceId)`
+        `INSERT OR IGNORE INTO session_reports (report_id, session_id, report_kind, created_at, created_by, agent_name, agent_version, markdown, report_json, trace_id)
+         VALUES (@reportId, @sessionId, @reportKind, @createdAt, @createdBy, @agentName, @agentVersion, @markdown, @reportJson, @traceId)`
       )
       .run({
         reportId: parsed.reportId,
         sessionId,
+        reportKind: parsed.reportKind,
         createdAt: parsed.createdAt,
         createdBy: parsed.createdBy,
         agentName: parsed.agentName ?? null,
@@ -347,7 +357,15 @@ export class IngestionRepository {
         traceId: traceId ?? null
       });
 
-    return parsed;
+    if (result.changes === 0) {
+      const existing = this.getSessionReportByKind(sessionId, reportKind);
+      if (!existing) {
+        throw new Error("Failed to persist session report");
+      }
+      return { report: existing, created: false };
+    }
+
+    return { report: parsed, created: true };
   }
 
   listSessionReports(sessionId: string, limit = 20, offset = 0): RoastReport[] {
@@ -360,12 +378,22 @@ export class IngestionRepository {
     return rows.map((row) => RoastReportSchema.parse(JSON.parse(row.report_json)));
   }
 
-  getLatestSessionReport(sessionId: string): RoastReport | null {
+  getLatestSessionReport(sessionId: string, reportKind: string = DEFAULT_REPORT_KIND): RoastReport | null {
     const row = this.db
       .prepare(
-        `SELECT report_json FROM session_reports WHERE session_id = @sessionId ORDER BY created_at DESC LIMIT 1`
+        `SELECT report_json FROM session_reports WHERE session_id = @sessionId AND report_kind = @reportKind ORDER BY created_at DESC LIMIT 1`
       )
-      .get({ sessionId });
+      .get({ sessionId, reportKind });
+    if (!row) return null;
+    return RoastReportSchema.parse(JSON.parse(row.report_json));
+  }
+
+  getSessionReportByKind(sessionId: string, reportKind: string = DEFAULT_REPORT_KIND): RoastReport | null {
+    const row = this.db
+      .prepare(
+        `SELECT report_json FROM session_reports WHERE session_id = @sessionId AND report_kind = @reportKind LIMIT 1`
+      )
+      .get({ sessionId, reportKind });
     if (!row) return null;
     return RoastReportSchema.parse(JSON.parse(row.report_json));
   }

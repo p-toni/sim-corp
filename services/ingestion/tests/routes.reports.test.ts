@@ -71,4 +71,52 @@ describe("session report routes", () => {
 
     await app.close();
   });
+
+  it("is idempotent for post-roast reports", async () => {
+    const { app, repo } = buildTestServer();
+
+    repo.upsertSession({
+      sessionId: "s1",
+      orgId: "o1",
+      siteId: "site",
+      machineId: "mach",
+      startedAt: new Date(0).toISOString(),
+      endedAt: new Date(0).toISOString(),
+      status: "CLOSED"
+    });
+
+    const analysis = RoastAnalysisSchema.parse({
+      sessionId: "s1",
+      orgId: "o1",
+      siteId: "site",
+      machineId: "mach",
+      computedAt: new Date(0).toISOString(),
+      phases: [],
+      phaseStats: [],
+      crashFlick: { crashDetected: false, flickDetected: false }
+    });
+
+    const first = await app.inject({
+      method: "POST",
+      url: "/sessions/s1/reports",
+      payload: {
+        markdown: "# Report",
+        analysis
+      }
+    });
+    const second = await app.inject({
+      method: "POST",
+      url: "/sessions/s1/reports",
+      payload: {
+        markdown: "# Report updated",
+        analysis
+      }
+    });
+
+    expect(first.statusCode).toBe(201);
+    expect(second.statusCode).toBe(200);
+    expect((first.json() as { reportId: string }).reportId).toBe((second.json() as { reportId: string }).reportId);
+
+    await app.close();
+  });
 });

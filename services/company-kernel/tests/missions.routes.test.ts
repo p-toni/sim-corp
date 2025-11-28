@@ -1,12 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildServer } from "../src/server";
+import { MissionStore } from "../src/core/mission-store";
 
 describe("mission routes", () => {
   let server: FastifyInstance;
 
   beforeEach(async () => {
-    server = await buildServer();
+    server = await buildServer({ missionStore: new MissionStore({ baseBackoffMs: 1 }) });
   });
 
   afterEach(async () => {
@@ -32,21 +33,29 @@ describe("mission routes", () => {
     expect(list.statusCode).toBe(200);
     const missions = list.json() as Array<{ missionId: string }>;
     expect(missions.length).toBeGreaterThan(0);
+
+    const metrics = await server.inject({ method: "GET", url: "/missions/metrics" });
+    expect(metrics.statusCode).toBe(200);
+    expect(metrics.json().total).toBeGreaterThan(0);
   });
 
-  it("claims, completes, and fails missions", async () => {
-    const first = await server.inject({
+  it("dedupes mission creation by idempotencyKey", async () => {
+    const payload = { goal: "generate-roast-report", params: { sessionId: "s1" }, idempotencyKey: "report-s1" };
+    const first = await server.inject({ method: "POST", url: "/missions", payload });
+    const second = await server.inject({ method: "POST", url: "/missions", payload });
+
+    expect(first.statusCode).toBe(201);
+    expect(second.statusCode).toBe(200);
+    expect((first.json() as { missionId: string }).missionId).toBe((second.json() as { missionId: string }).missionId);
+  });
+
+  it("supports leases, heartbeat, and retryable failures", async () => {
+    const create = await server.inject({
       method: "POST",
       url: "/missions",
       payload: { goal: "generate-roast-report", params: { sessionId: "s1" } }
     });
-    const second = await server.inject({
-      method: "POST",
-      url: "/missions",
-      payload: { goal: "other-task", params: {} }
-    });
-    expect(first.statusCode).toBe(201);
-    expect(second.statusCode).toBe(201);
+    expect(create.statusCode).toBe(201);
 
     const claim = await server.inject({
       method: "POST",
@@ -54,21 +63,33 @@ describe("mission routes", () => {
       payload: { agentName: "worker-1", goals: ["generate-roast-report"] }
     });
     expect(claim.statusCode).toBe(200);
-    const claimed = claim.json() as { missionId: string };
+    const claimed = claim.json() as { missionId: string; leaseId?: string };
+    expect(claimed.leaseId).toBeTruthy();
 
-    const complete = await server.inject({
+    const heartbeat = await server.inject({
       method: "POST",
-      url: `/missions/${claimed.missionId}/complete`,
-      payload: { summary: { ok: true } }
+      url: `/missions/${claimed.missionId}/heartbeat`,
+      payload: { leaseId: claimed.leaseId, agentName: "worker-1" }
     });
-    expect(complete.statusCode).toBe(200);
-    expect(complete.json().status).toBe("DONE");
+    expect(heartbeat.statusCode).toBe(200);
 
     const fail = await server.inject({
       method: "POST",
-      url: "/missions/unknown/fail",
-      payload: { error: "boom" }
+      url: `/missions/${claimed.missionId}/fail`,
+      payload: { error: "boom", retryable: true, leaseId: claimed.leaseId }
     });
-    expect(fail.statusCode).toBe(404);
+    expect(fail.statusCode).toBe(200);
+    expect(fail.json().status).toBe("PENDING");
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    const reclaim = await server.inject({
+      method: "POST",
+      url: "/missions/claim",
+      payload: { agentName: "worker-1", goals: ["generate-roast-report"] }
+    });
+    expect(reclaim.statusCode).toBe(200);
+    const retryMission = reclaim.json() as { missionId: string; attempts: number };
+    expect(retryMission.attempts).toBeGreaterThan(0);
   });
 });

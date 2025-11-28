@@ -4,7 +4,7 @@
   "compilerOptions": {
     "composite": true,
     "tsBuildInfoFile": "dist/.tsbuildinfo",
-    "noEmit": true
+    "noEmit": false
   },
   "include": ["src", "tests"],
   "references": [{ "path": "../../libs/schemas/tsconfig.build.json" }]

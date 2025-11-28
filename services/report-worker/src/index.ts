@@ -4,15 +4,17 @@ import { RoastReportRunner } from "./core/runner";
 import { ReportWorker } from "./core/worker";
 import { registerHealthRoutes } from "./routes/health";
 import { registerStatusRoutes } from "./routes/status";
+import { IngestionClient } from "./core/ingestion-client";
 
 async function main(): Promise<void> {
   const app = Fastify({ logger: true });
   const kernelClient = new KernelClient();
+  const ingestionClient = new IngestionClient();
   const runner = new RoastReportRunner({
     ingestionUrl: process.env.INGESTION_URL,
     analyticsUrl: process.env.ANALYTICS_URL
   });
-  const worker = new ReportWorker({ runner, kernelClient });
+  const worker = new ReportWorker({ runner, kernelClient, ingestionClient });
   worker.start();
 
   await registerHealthRoutes(app);
