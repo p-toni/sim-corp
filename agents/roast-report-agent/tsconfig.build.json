@@ -13,5 +13,9 @@
     "lib": ["ES2022"]
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["**/*.test.ts", "tests", "vitest.config.ts"]
+  "exclude": ["**/*.test.ts", "tests", "vitest.config.ts"],
+  "references": [
+    { "path": "../../libs/schemas/tsconfig.json" },
+    { "path": "../../libs/agent-runtime/tsconfig.json" }
+  ]
 }

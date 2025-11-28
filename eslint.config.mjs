@@ -10,7 +10,7 @@ const project = path.resolve(__dirname, "tsconfig.eslint.json");
 
 export default tseslint.config(
   {
-    ignores: ["dist", "build", "coverage", "node_modules", "eslint.config.mjs"]
+    ignores: ["dist", "build", "coverage", "node_modules", "eslint.config.mjs", "scripts/**/*.mjs"]
   },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,

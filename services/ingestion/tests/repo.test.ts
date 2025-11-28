@@ -143,15 +143,8 @@ describe("IngestionRepository", () => {
     expect(listed.length).toBe(1);
     expect(listed[0].markdown).toContain("Report");
 
-    db.prepare(
-      `INSERT INTO session_reports (report_id, session_id, created_at, created_by, markdown, report_json)
-       VALUES (@reportId, @sessionId, @createdAt, @createdBy, @markdown, @reportJson)`
-    ).run({
-      reportId: "bad",
-      sessionId: "s1",
-      createdAt: new Date().toISOString(),
-      createdBy: "AGENT",
-      markdown: "invalid",
+    db.prepare(`UPDATE session_reports SET report_json = @reportJson WHERE report_id = @reportId`).run({
+      reportId: created.reportId,
       reportJson: JSON.stringify({ markdown: "missing fields" })
     });
 

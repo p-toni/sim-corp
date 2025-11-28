@@ -92,44 +92,97 @@ export function createReportTools(config: ReportToolsConfig = {}): ToolRegistry 
     [GET_SESSION_TOOL]: async (input, ctx): Promise<RoastSession> => {
       const sessionId = resolveSessionId(input);
       const url = `${ingestionUrl.replace(/\/$/, "")}/sessions/${sessionId}`;
-      const session = await fetcher(url, RoastSessionSchema);
+      const session = normalizeSession(await fetcher(url, RoastSessionSchema));
       setScratch(ctx, "session", session);
       return session;
     },
     [GET_META_TOOL]: async (input, ctx): Promise<SessionMeta> => {
       const sessionId = resolveSessionId(input);
       const url = `${ingestionUrl.replace(/\/$/, "")}/sessions/${sessionId}/meta`;
-      const meta = await fetcher(url, SessionMetaSchema);
+      const meta = normalizeMeta(await fetcher(url, SessionMetaSchema));
       setScratch(ctx, "meta", meta);
       return meta;
     },
     [GET_NOTES_TOOL]: async (input, ctx): Promise<SessionNote[]> => {
       const sessionId = resolveSessionId(input);
       const url = `${ingestionUrl.replace(/\/$/, "")}/sessions/${sessionId}/notes`;
-      const notes = await fetcher(url, SessionNoteSchema.array());
+      const notes = normalizeNotes(await fetcher(url, SessionNoteSchema.array()));
       setScratch(ctx, "notes", notes);
       return notes;
     },
     [GET_OVERRIDES_TOOL]: async (input, ctx): Promise<EventOverride[]> => {
       const sessionId = resolveSessionId(input);
       const url = `${ingestionUrl.replace(/\/$/, "")}/sessions/${sessionId}/events/overrides`;
-      const overrides = await fetcher(url, EventOverrideSchema.array());
+      const overrides = normalizeOverrides(await fetcher(url, EventOverrideSchema.array()));
       setScratch(ctx, "overrides", overrides);
       return overrides;
     },
     [GET_ANALYSIS_TOOL]: async (input, ctx): Promise<RoastAnalysis> => {
       const sessionId = resolveSessionId(input);
       const url = `${analyticsUrl.replace(/\/$/, "")}/analysis/session/${sessionId}`;
-      const analysis = await fetcher(url, RoastAnalysisSchema);
+      const analysis = normalizeAnalysis(await fetcher(url, RoastAnalysisSchema));
       setScratch(ctx, "analysis", analysis);
       return analysis;
     },
     [WRITE_REPORT_TOOL]: async (input, ctx): Promise<RoastReport> => {
       const parsedInput = WriteReportInputSchema.parse(input);
       const url = `${ingestionUrl.replace(/\/$/, "")}/sessions/${parsedInput.sessionId}/reports`;
-      const report = await writeJson(url, parsedInput.report, RoastReportSchema);
+      const rawReport = (await writeJson(
+        url,
+        parsedInput.report as RoastReport,
+        RoastReportSchema
+      )) as RoastReport;
+      const report = normalizeReport(rawReport);
       setScratch(ctx, "report", report);
       return report;
     }
+  };
+}
+
+function normalizeSession(session: unknown): RoastSession {
+  const data = session as RoastSession & { meta?: Record<string, unknown> };
+  return { ...data, meta: data.meta ?? {} };
+}
+
+function normalizeMeta(meta: unknown): SessionMeta {
+  const data = meta as SessionMeta & { tags?: string[]; extra?: Record<string, unknown> };
+  return {
+    ...data,
+    tags: data.tags ?? [],
+    extra: data.extra ?? {}
+  };
+}
+
+function normalizeNotes(notes: unknown): SessionNote[] {
+  const list = (notes as Array<SessionNote & { defects?: SessionNote["defects"]; extra?: Record<string, unknown> }>) ?? [];
+  return list.map((note) => ({
+    ...note,
+    defects: note.defects ?? [],
+    extra: note.extra ?? {}
+  }));
+}
+
+function normalizeOverrides(overrides: unknown): EventOverride[] {
+  const list = (overrides as Array<EventOverride & { source?: EventOverride["source"] }>) ?? [];
+  return list.map((o) => ({
+    ...o,
+    source: o.source ?? "HUMAN"
+  }));
+}
+
+function normalizeAnalysis(analysis: unknown): RoastAnalysis {
+  const data = analysis as RoastAnalysis;
+  return {
+    ...data,
+    crashFlick: { ...data.crashFlick, details: data.crashFlick.details ?? {} }
+  };
+}
+
+function normalizeReport(report: RoastReport): RoastReport {
+  return {
+    ...report,
+    notes: report.notes ?? [],
+    overrides: report.overrides ?? [],
+    nextActions: report.nextActions ?? []
   };
 }

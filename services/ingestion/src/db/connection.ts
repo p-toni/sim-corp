@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { FastifyBaseLogger } from "fastify";
 import Database from "better-sqlite3";
 
@@ -25,6 +26,8 @@ export function openDatabase(
   }
 
   try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
     const schemaPath = path.resolve(__dirname, "schema.sql");
     const schema = fs.readFileSync(schemaPath, "utf-8");
     db.exec(schema);

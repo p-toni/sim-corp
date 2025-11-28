@@ -335,6 +335,9 @@ importers:
       fastify:
         specifier: ^4.28.1
         version: 4.29.1
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^24.10.1

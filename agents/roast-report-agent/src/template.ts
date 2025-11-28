@@ -83,7 +83,8 @@ function renderWarnings(analysis: RoastAnalysis): string {
       code: "CRASH",
       severity: "ALERT",
       message: "Crash detected after FC",
-      atSeconds: analysis.crashFlick.crashAtSeconds
+      atSeconds: analysis.crashFlick.crashAtSeconds,
+      details: {}
     });
   }
   if (analysis.crashFlick.flickDetected) {
@@ -91,7 +92,8 @@ function renderWarnings(analysis: RoastAnalysis): string {
       code: "FLICK",
       severity: "WARN",
       message: "Flick detected late in roast",
-      atSeconds: analysis.crashFlick.flickAtSeconds
+      atSeconds: analysis.crashFlick.flickAtSeconds,
+      details: {}
     });
   }
   if (!warnings.length) {

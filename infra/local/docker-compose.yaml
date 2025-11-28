@@ -26,7 +26,7 @@ services:
       - mosquitto
 
   ingestion:
-    image: node:20-alpine
+    image: node:20-bullseye
     container_name: sim-ingestion
     working_dir: /app
     command: sh -c "corepack enable && pnpm --filter @sim-corp/ingestion start"

@@ -8,9 +8,12 @@
     "declaration": true,
     "declarationMap": true,
     "emitDeclarationOnly": false,
-    "tsBuildInfoFile": "dist/.tsbuildinfo"
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    "types": ["node"],
+    "lib": ["ES2022"]
   },
-  "include": ["src"],
+  "include": ["src/**/*.ts"],
+  "exclude": ["**/*.test.ts", "tests", "vitest.config.ts"],
   "references": [
     { "path": "../schemas/tsconfig.json" }
   ]

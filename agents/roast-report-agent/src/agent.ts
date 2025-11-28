@@ -21,7 +21,7 @@ import { renderReport } from "./template";
 const AGENT_NAME = "roast-report-agent";
 const AGENT_VERSION = "0.0.1";
 
-interface ReportAgentState {
+interface ReportAgentState extends Record<string, unknown> {
   sessionId?: string;
   ingestionUrl?: string;
   analyticsUrl?: string;
@@ -69,6 +69,7 @@ function buildReport(ctx: StepContext): RoastReport {
   return {
     reportId: `R-${session.sessionId}-${Date.now()}`,
     sessionId: session.sessionId,
+    reportKind: "POST_ROAST_V1",
     orgId: session.orgId,
     siteId: session.siteId,
     machineId: session.machineId,
@@ -87,7 +88,7 @@ function buildReport(ctx: StepContext): RoastReport {
 
 async function handleGetMission(ctx: StepContext): Promise<StepOutput> {
   const sessionId = getSessionIdFromMission(ctx.mission);
-  return { state: mergeState(ctx, { sessionId }), notes: "mission loaded" };
+  return { state: mergeState(ctx, { sessionId }) as Record<string, unknown>, notes: "mission loaded" };
 }
 
 async function handleScan(ctx: StepContext): Promise<StepOutput> {
@@ -97,7 +98,7 @@ async function handleScan(ctx: StepContext): Promise<StepOutput> {
 }
 
 async function handleThink(ctx: StepContext): Promise<StepOutput> {
-  return { state: { ...ctx.state }, notes: "fetch plan prepared" };
+  return { state: { ...(ctx.state as ReportAgentState) } as Record<string, unknown>, notes: "fetch plan prepared" };
 }
 
 async function handleAct(ctx: StepContext): Promise<StepOutput> {
@@ -107,7 +108,7 @@ async function handleAct(ctx: StepContext): Promise<StepOutput> {
   }
 
   return {
-    state: { ...ctx.state },
+    state: { ...(ctx.state as ReportAgentState) } as Record<string, unknown>,
     toolInvocations: [
       { toolName: GET_SESSION_TOOL, input: { sessionId } },
       { toolName: GET_META_TOOL, input: { sessionId } },
@@ -122,7 +123,7 @@ async function handleAct(ctx: StepContext): Promise<StepOutput> {
 async function handleObserve(ctx: StepContext): Promise<StepOutput> {
   const report = buildReport(ctx);
   return {
-    state: mergeState(ctx, { report }),
+    state: mergeState(ctx, { report }) as Record<string, unknown>,
     toolInvocations: [
       {
         toolName: WRITE_REPORT_TOOL,
@@ -151,7 +152,7 @@ export const roastReportReasoner: Reasoner = {
       case "OBSERVE":
         return handleObserve(ctx);
       default:
-        return { state: { ...ctx.state } };
+        return { state: { ...(ctx.state as ReportAgentState) } as Record<string, unknown> };
     }
   }
 };
