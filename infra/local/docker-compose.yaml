@@ -1,0 +1,78 @@
+version: "3.9"
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: sim-mosquitto
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+
+  company-kernel:
+    image: node:20-alpine
+    container_name: sim-company-kernel
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm --filter @sim-corp/company-kernel start"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ../../:/app
+      - ../../node_modules:/app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mosquitto
+
+  ingestion:
+    image: node:20-alpine
+    container_name: sim-ingestion
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm --filter @sim-corp/ingestion start"
+    environment:
+      NODE_ENV: development
+      INGESTION_MQTT_URL: mqtt://mosquitto:1883
+      INGESTION_MQTT_CLIENT_ID: ingestion-local
+    volumes:
+      - ../../:/app
+      - ../../node_modules:/app/node_modules
+    ports:
+      - "4001:4001"
+    depends_on:
+      - mosquitto
+
+  sim-twin:
+    image: node:20-alpine
+    container_name: sim-twin
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm --filter @sim-corp/sim-twin start"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ../../:/app
+      - ../../node_modules:/app/node_modules
+    ports:
+      - "4002:4002"
+
+  sim-publisher:
+    image: node:20-alpine
+    container_name: sim-publisher
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm --filter @sim-corp/sim-publisher start"
+    environment:
+      NODE_ENV: development
+      MQTT_URL: mqtt://mosquitto:1883
+      SIM_TWIN_URL: http://sim-twin:4002
+    volumes:
+      - ../../:/app
+      - ../../node_modules:/app/node_modules
+    ports:
+      - "4003:4003"
+    depends_on:
+      - mosquitto
+      - sim-twin
+
+networks:
+  default:
+    name: sim-local

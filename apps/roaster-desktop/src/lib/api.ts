@@ -10,7 +10,7 @@ import {
 import { AgentRuntime } from "@sim-corp/agent-runtime";
 import { SimRoastRequestSchema, simulateRoast } from "@sim-corp/sim-twin";
 import { runSimRoastMission } from "@sim-corp/sim-roast-runner";
-import { simRoastReasoner } from "../../../../agents/sim-roast-runner/src/agent";
+import { simRoastReasoner } from "@sim-corp/sim-roast-runner/src/agent";
 
 interface SimOutputs {
   telemetry: TelemetryPoint[];

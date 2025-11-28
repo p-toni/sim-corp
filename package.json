@@ -14,7 +14,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "dev:kernel": "pnpm --filter @sim-corp/company-kernel dev",
-    "test:kernel": "pnpm --filter @sim-corp/company-kernel test"
+    "test:kernel": "pnpm --filter @sim-corp/company-kernel test",
+    "stack:up": "docker compose -f infra/local/docker-compose.yaml up -d",
+    "stack:logs": "docker compose -f infra/local/docker-compose.yaml logs -f",
+    "stack:down": "docker compose -f infra/local/docker-compose.yaml down -v"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
