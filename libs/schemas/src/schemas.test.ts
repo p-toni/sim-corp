@@ -11,6 +11,8 @@ import {
   ToolCardSchema,
   RoastEventSchema,
   RoastSchema,
+  RoastSessionSchema,
+  RoastSessionSummarySchema,
   TelemetryPointSchema,
   TelemetryEnvelopeSchema
 } from "./index";
@@ -119,6 +121,15 @@ describe("telemetry envelope schema", () => {
     expect(eventPayload.type).toBe("CHARGE");
   });
 
+  it("allows optional sessionId", () => {
+    const parsed = TelemetryEnvelopeSchema.parse({
+      ...baseEnvelope,
+      topic: "telemetry",
+      sessionId: "session-1"
+    });
+    expect(parsed.sessionId).toBe("session-1");
+  });
+
   it("rejects invalid payload shape", () => {
     const result = TelemetryEnvelopeSchema.safeParse({
       ...baseEnvelope,
@@ -127,6 +138,25 @@ describe("telemetry envelope schema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("roast session schemas", () => {
+  it("parses session summary and defaults meta", () => {
+    const summary = {
+      sessionId: "s1",
+      orgId: "o1",
+      siteId: "s1",
+      machineId: "m1",
+      startedAt: "2025-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "ACTIVE" as const
+    };
+    const parsed = RoastSessionSummarySchema.parse(summary);
+    expect(parsed.sessionId).toBe("s1");
+
+    const session = RoastSessionSchema.parse(summary);
+    expect(session.meta).toEqual({});
   });
 });
 

@@ -15,6 +15,7 @@ export const TelemetryEnvelopeSchema = z.object({
   origin: TelemetryOriginSchema,
   topic: TelemetryTopicSchema,
   payload: z.union([TelemetryPointSchema, RoastEventSchema]),
+  sessionId: z.string().optional(),
   sig: z.string().optional(),
   kid: z.string().optional()
 });

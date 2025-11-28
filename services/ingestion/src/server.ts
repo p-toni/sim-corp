@@ -7,6 +7,13 @@ import { registerHealthRoutes } from "./routes/health";
 import { registerTelemetryRoutes } from "./routes/telemetry";
 import { registerEventRoutes } from "./routes/events";
 import { registerStreamRoutes } from "./routes/stream";
+import { openDatabase } from "./db/connection";
+import { IngestionRepository } from "./db/repo";
+import { Sessionizer } from "./core/sessionizer";
+import { PersistencePipeline } from "./core/persist";
+import { registerSessionRoutes } from "./routes/sessions";
+import { EnvelopeStream } from "./core/envelope-stream";
+import { registerEnvelopeStreamRoutes } from "./routes/stream-envelopes";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -20,7 +27,12 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
 
   const telemetryStore = options.telemetryStore ?? new TelemetryStore();
   const eventStore = options.eventStore ?? new EventStore();
-  const handlers = new IngestionHandlers(telemetryStore, eventStore);
+  const db = openDatabase();
+  const repo = new IngestionRepository(db);
+  const sessionizer = new Sessionizer();
+  const persist = new PersistencePipeline({ repo, sessionizer });
+  const envelopeStream = new EnvelopeStream();
+  const handlers = new IngestionHandlers(telemetryStore, eventStore, persist, envelopeStream);
 
   const mqttClient = resolveMqttClient(options.mqttClient, app);
   if (mqttClient) {
@@ -34,10 +46,19 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     app.log.warn("INGESTION_MQTT_URL not set; running without MQTT ingestion");
   }
 
+  const tickInterval = setInterval(() => {
+    persist.tick(new Date().toISOString());
+  }, 1000);
+  app.addHook("onClose", async () => {
+    clearInterval(tickInterval);
+  });
+
   registerHealthRoutes(app);
   registerTelemetryRoutes(app, { telemetryStore });
   registerEventRoutes(app, { eventStore });
   registerStreamRoutes(app, { telemetryStore, eventStore });
+  registerSessionRoutes(app, { repo });
+  registerEnvelopeStreamRoutes(app, { envelopeStream });
 
   return app;
 }

@@ -6,3 +6,4 @@ export * from "./kernel/tool";
 export * from "./kernel/policy";
 export * from "./kernel/eval";
 export * from "./kernel/telemetry-envelope";
+export * from "./domain/session";
