@@ -39,6 +39,9 @@ services:
       INGESTION_DB_PATH: /data/ingestion.db
       AUTO_REPORT_MISSIONS_ENABLED: "true"
       INGESTION_KERNEL_URL: http://company-kernel:3000
+      INGESTION_OPS_EVENTS_ENABLED: "true"
+      INGESTION_OPS_MQTT_URL: mqtt://mosquitto:1883
+      INGESTION_KERNEL_ENQUEUE_FALLBACK_ENABLED: "true"
     volumes:
       - ../../:/app
       - ../../node_modules:/app/node_modules
@@ -149,6 +152,25 @@ services:
       - company-kernel
       - ingestion
       - analytics
+
+  dispatcher:
+    image: node:20-bullseye
+    container_name: sim-dispatcher
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm --filter @sim-corp/dispatcher start"
+    environment:
+      NODE_ENV: development
+      KERNEL_URL: http://company-kernel:3000
+      DISPATCHER_MQTT_URL: mqtt://mosquitto:1883
+      DISPATCHER_PORT: 4010
+    volumes:
+      - ../../:/app
+      - ../../node_modules:/app/node_modules
+    ports:
+      - "4010:4010"
+    depends_on:
+      - mosquitto
+      - company-kernel
 
 networks:
   default:

@@ -17,12 +17,14 @@ import { registerEnvelopeStreamRoutes } from "./routes/stream-envelopes";
 import { registerSessionQcRoutes } from "./routes/sessions-qc";
 import { registerSessionReportRoutes } from "./routes/session-reports";
 import { ReportMissionEnqueuer } from "./core/report-missions";
+import { MqttOpsEventPublisher, type OpsEventPublisher } from "./ops/publisher";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
   telemetryStore?: TelemetryStore;
   eventStore?: EventStore;
   mqttClient?: MqttClient | null;
+  opsPublisher?: OpsEventPublisher | null;
 }
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -33,10 +35,12 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   const db = openDatabase();
   const repo = new IngestionRepository(db);
   const sessionizer = new Sessionizer();
+  const opsPublisher = resolveOpsPublisher(options.opsPublisher, app);
   const reportMissionEnqueuer = new ReportMissionEnqueuer({
     repo,
     logger: app.log,
-    kernelUrl: process.env.INGESTION_KERNEL_URL
+    kernelUrl: process.env.INGESTION_KERNEL_URL,
+    opsPublisher
   });
   const persist = new PersistencePipeline({
     repo,
@@ -56,6 +60,14 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     });
   } else {
     app.log.warn("INGESTION_MQTT_URL not set; running without MQTT ingestion");
+  }
+
+  if (opsPublisher) {
+    app.addHook("onClose", async () => {
+      await opsPublisher.disconnect().catch((error: unknown) => {
+        app.log.error(error, "Failed to disconnect ops MQTT publisher");
+      });
+    });
   }
 
   const tickInterval = setInterval(() => {
@@ -95,6 +107,32 @@ function resolveMqttClient(providedClient: MqttClient | null | undefined, app: F
     return new RealMqttClient(brokerUrl, clientId);
   } catch (error) {
     app.log.error(error, "Failed to initialize MQTT client");
+    return null;
+  }
+}
+
+function resolveOpsPublisher(provided: OpsEventPublisher | null | undefined, app: FastifyInstance): OpsEventPublisher | null {
+  const flag = process.env.INGESTION_OPS_EVENTS_ENABLED ?? "false";
+  if (flag.toLowerCase() !== "true") {
+    return null;
+  }
+  if (provided === null) {
+    return null;
+  }
+  if (provided) {
+    return provided;
+  }
+
+  const brokerUrl = process.env.INGESTION_OPS_MQTT_URL ?? process.env.INGESTION_MQTT_URL;
+  if (!brokerUrl) {
+    app.log.warn("INGESTION_OPS_EVENTS_ENABLED is true but INGESTION_OPS_MQTT_URL is not set");
+    return null;
+  }
+
+  try {
+    return new MqttOpsEventPublisher(brokerUrl, process.env.INGESTION_OPS_MQTT_CLIENT_ID);
+  } catch (error) {
+    app.log.error(error, "Failed to initialize ops MQTT publisher");
     return null;
   }
 }

@@ -59,7 +59,7 @@ export class ReportWorker {
     this.kernel = options.kernelClient ?? new KernelClient();
     this.ingestion = options.ingestionClient;
     this.runner = options.runner;
-    this.pollIntervalMs = options.pollIntervalMs ?? Number(process.env.POLL_INTERVAL_MS ?? 2000);
+    this.pollIntervalMs = options.pollIntervalMs ?? Number(process.env.POLL_INTERVAL_MS ?? 5000);
     this.missionTimeoutMs = options.missionTimeoutMs ?? Number(process.env.MISSION_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
     this.heartbeatIntervalMs =
       options.heartbeatIntervalMs ?? Number(process.env.WORKER_HEARTBEAT_MS ?? DEFAULT_HEARTBEAT_MS);

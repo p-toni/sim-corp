@@ -4,6 +4,7 @@ import type { FastifyBaseLogger } from "fastify";
 import Database from "better-sqlite3";
 
 const DEFAULT_DB_PATH = "./var/kernel.db";
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 export function openKernelDatabase(
   dbPath: string = process.env.KERNEL_DB_PATH ?? DEFAULT_DB_PATH,

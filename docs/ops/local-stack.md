@@ -23,6 +23,7 @@ Services:
 - event-inference: 4005
 - analytics: 4006
 - report-worker: 4007
+- dispatcher: 4010
 
 ## Start roaster-desktop (optional UI)
 ```bash
@@ -119,12 +120,16 @@ curl -X PUT http://127.0.0.1:4001/sessions/<SESSION_ID>/events/overrides \
 ```
 Refresh analytics (`/analysis/session/<SESSION_ID>`) or the Playback Analysis panel to see updated markers and deltas.
 
-## Post-roast report loop (report-worker)
-- ingestion auto-enqueues a `generate-roast-report` mission on session close when `AUTO_REPORT_MISSIONS_ENABLED=true` (set in compose).
-- report-worker polls company-kernel for missions, runs `roast-report-agent`, posts the trace to kernel, and saves the report via ingestion.
+## Post-roast report loop (dispatcher + report-worker)
+- ingestion publishes `session.closed` ops events to MQTT when `INGESTION_OPS_EVENTS_ENABLED=true` (set in compose). If publishing fails, it falls back to direct kernel enqueue while `INGESTION_KERNEL_ENQUEUE_FALLBACK_ENABLED=true`.
+- dispatcher subscribes to `ops/+/+/+/session/closed`, enqueues `generate-roast-report` missions with idempotency keys (`generate-roast-report:<reportKind>:<sessionId>`), and exposes status at `:4010/status`.
+- report-worker polls company-kernel for missions (slower default polling), runs `roast-report-agent`, posts the trace to kernel, and saves the report via ingestion.
 
 Quick checks:
 ```bash
+# dispatcher status / counters
+curl http://127.0.0.1:4010/status
+
 # see the latest report for a session
 curl http://127.0.0.1:4001/sessions/<SESSION_ID>/reports/latest
 

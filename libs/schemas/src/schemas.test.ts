@@ -19,7 +19,8 @@ import {
   EventOverrideSchema,
   RoastReportSchema,
   TelemetryPointSchema,
-  TelemetryEnvelopeSchema
+  TelemetryEnvelopeSchema,
+  SessionClosedEventSchema
 } from "./index";
 
 const baseTelemetry = {
@@ -261,6 +262,30 @@ describe("roast report schema", () => {
       markdown: "ok"
     });
 
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("ops event schemas", () => {
+  it("parses session.closed with default reportKind", () => {
+    const event = SessionClosedEventSchema.parse({
+      type: "session.closed",
+      version: 1,
+      emittedAt: "2025-01-01T00:00:00.000Z",
+      orgId: "o",
+      siteId: "s",
+      machineId: "m",
+      sessionId: "sess-1"
+    });
+    expect(event.reportKind).toBe("POST_ROAST_V1");
+  });
+
+  it("requires required identifiers", () => {
+    const result = SessionClosedEventSchema.safeParse({
+      type: "session.closed",
+      version: 1,
+      emittedAt: "2025-01-01T00:00:00.000Z"
+    });
     expect(result.success).toBe(false);
   });
 });
