@@ -6,8 +6,8 @@ interface SimulateRoastRoute {
   Body: unknown;
 }
 
-export async function registerSimulateRoutes(app: FastifyInstance): Promise<void> {
-  app.post<SimulateRoastRoute>("/simulate/roast", async (request, reply) => {
+export function registerSimulateRoutes(app: FastifyInstance): void {
+  app.post<SimulateRoastRoute>("/simulate/roast", (request, reply) => {
     return handleSimulateRoast(request, reply);
   });
 }

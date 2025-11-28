@@ -12,10 +12,11 @@ async function main(): Promise<void> {
     const server = await buildServer();
 
     await server.listen({ port, host });
-    server.log.info(`sim-twin listening on ${host}:${port}`);
+    const endpoint = `${host}:${String(port)}`;
+    server.log.info(`sim-twin listening on ${endpoint}`);
   } catch (error) {
-    // eslint-disable-next-line no-console -- startup errors must surface in logs
-    console.error("Failed to start sim-twin server", error);
+    const message = error instanceof Error ? `${error.message}\n${error.stack ?? ""}` : String(error);
+    process.stderr.write(`Failed to start sim-twin server: ${message}\n`);
     process.exitCode = 1;
   }
 }

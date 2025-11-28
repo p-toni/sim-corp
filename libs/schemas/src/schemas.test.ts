@@ -141,6 +141,17 @@ describe("kernel schemas", () => {
 
     expect(mission.priority).toBe("MEDIUM");
     expect(mission.constraints).toHaveLength(0);
+    expect(mission.params).toEqual({});
+  });
+
+  it("allows overriding mission params", () => {
+    const mission = MissionSchema.parse({
+      missionId: "mission-roast",
+      goal: { title: "Simulated roast" },
+      params: { targetDropSeconds: 650 }
+    });
+
+    expect(mission.params).toEqual({ targetDropSeconds: 650 });
   });
 
   it("validates policy requests and results", () => {

@@ -25,7 +25,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   if (mqttClient) {
     attachMqttHandlers(mqttClient, handlers, { logger: app.log });
     app.addHook("onClose", async () => {
-      await mqttClient.disconnect().catch((error) => {
+      await mqttClient.disconnect().catch((error: unknown) => {
         app.log.error(error, "Failed to disconnect MQTT client");
       });
     });
@@ -33,9 +33,9 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     app.log.warn("INGESTION_MQTT_URL not set; running without MQTT ingestion");
   }
 
-  await registerHealthRoutes(app);
-  await registerTelemetryRoutes(app, { telemetryStore });
-  await registerEventRoutes(app, { eventStore });
+  registerHealthRoutes(app);
+  registerTelemetryRoutes(app, { telemetryStore });
+  registerEventRoutes(app, { eventStore });
 
   return app;
 }

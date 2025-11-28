@@ -12,15 +12,12 @@ interface EventQuerystring {
   limit?: string | number;
 }
 
-export async function registerEventRoutes(
-  app: FastifyInstance,
-  deps: EventRouteDeps
-): Promise<void> {
+export function registerEventRoutes(app: FastifyInstance, deps: EventRouteDeps): void {
   const { eventStore } = deps;
 
   app.get(
     "/events",
-    async (request: FastifyRequest<{ Querystring: EventQuerystring }>, reply: FastifyReply) => {
+    (request: FastifyRequest<{ Querystring: EventQuerystring }>, reply: FastifyReply) => {
       const { limit, ...filters } = request.query;
       const parsedLimit = parseLimit(limit);
       if (parsedLimit === "INVALID") {

@@ -1,6 +1,7 @@
-import { TelemetryEnvelopeSchema, type TelemetryEnvelope } from "@sim-corp/schemas";
+import { TelemetryEnvelopeSchema } from "@sim-corp/schemas";
+import type { TelemetryEnvelope } from "@sim-corp/schemas";
 import type { MqttClient } from "../mqtt-client";
-import { IngestionHandlers } from "./handlers";
+import type { IngestionHandlers } from "./handlers";
 
 type Logger = Partial<Record<"debug" | "info" | "warn" | "error", (...args: unknown[]) => void>>;
 
@@ -35,20 +36,26 @@ export function attachMqttHandlers(
       handlers.handleEnvelope(parsed.data);
     })
     .catch((error: unknown) => {
-      logger.error?.("ingestion: failed to subscribe to MQTT topics", error);
+      logger.error?.("ingestion: failed to subscribe to MQTT topics", toSafeLogValue(error));
     });
 }
 
 function parseEnvelope(topic: string, payload: Buffer, logger: Logger): TelemetryEnvelope | undefined {
   const topicParts = topic.split("/");
-  if (topicParts.length !== 5 || topicParts[0] !== "roaster") {
+  if (topicParts.length !== 5) {
     logger.warn?.(`ingestion: received unsupported topic ${topic}`);
     return undefined;
   }
 
-  const suffix = topicParts[4];
-  if (suffix !== "telemetry" && suffix !== "events") {
-    logger.warn?.(`ingestion: unsupported topic suffix ${suffix}`);
+  const [root, orgId, siteId, machineId, suffix] = topicParts;
+  if (root !== "roaster" || !orgId || !siteId || !machineId) {
+    logger.warn?.(`ingestion: received unsupported topic ${topic}`);
+    return undefined;
+  }
+
+  if (!isSupportedSuffix(suffix)) {
+    const suffixLabel = suffix ?? "(missing)";
+    logger.warn?.(`ingestion: unsupported topic suffix ${suffixLabel}`);
     return undefined;
   }
 
@@ -56,10 +63,6 @@ function parseEnvelope(topic: string, payload: Buffer, logger: Logger): Telemetr
   if (!rawPayload) {
     return undefined;
   }
-
-  const orgId = topicParts[1]!;
-  const siteId = topicParts[2]!;
-  const machineId = topicParts[3]!;
 
   const ts = typeof rawPayload.ts === "string" ? rawPayload.ts : new Date().toISOString();
   const sig = typeof rawPayload.sig === "string" ? rawPayload.sig : undefined;
@@ -80,9 +83,28 @@ function parseEnvelope(topic: string, payload: Buffer, logger: Logger): Telemetr
 function safeJsonParse(buffer: Buffer, logger: Logger): Record<string, unknown> | undefined {
   try {
     const text = buffer.toString("utf-8");
-    return JSON.parse(text) as Record<string, unknown>;
+    const parsed: unknown = JSON.parse(text);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      logger.warn?.("ingestion: MQTT payload is not an object");
+      return undefined;
+    }
+    return parsed as Record<string, unknown>;
   } catch (error) {
-    logger.warn?.("ingestion: failed to parse MQTT message as JSON", error);
+    logger.warn?.("ingestion: failed to parse MQTT message as JSON", toSafeLogValue(error));
     return undefined;
   }
+}
+
+function isSupportedSuffix(value: string | undefined): value is "telemetry" | "events" {
+  return value === "telemetry" || value === "events";
+}
+
+function toSafeLogValue(value: unknown): string {
+  if (value instanceof Error) {
+    return value.message;
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return JSON.stringify(value);
 }

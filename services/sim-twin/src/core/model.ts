@@ -26,7 +26,7 @@ export function simulateRoast(input: SimRoastRequest): SimRoastResult {
   const baseEpochSeconds = input.seed ?? Math.floor(Date.now() / 1000);
   const baseEpochMs = baseEpochSeconds * 1000;
   const timestampFor = (elapsedSeconds: number): string => new Date(baseEpochMs + elapsedSeconds * 1000).toISOString();
-  const batchId = `SIM-BATCH-${baseEpochSeconds}`;
+  const batchId = `SIM-BATCH-${String(baseEpochSeconds)}`;
 
   const telemetry: TelemetryPoint[] = [];
   let previousBt = input.chargeTempC;

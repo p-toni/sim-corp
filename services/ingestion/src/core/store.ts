@@ -35,7 +35,7 @@ export class TelemetryStore {
   }
 }
 
-export interface EventQuery extends TelemetryQuery {}
+export type EventQuery = TelemetryQuery;
 
 export type StoredRoastEvent = RoastEvent & TelemetryOrigin;
 

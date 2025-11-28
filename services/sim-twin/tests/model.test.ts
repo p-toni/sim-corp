@@ -64,8 +64,11 @@ function extractElapsed(events: ReturnType<typeof simulateRoast>["events"], type
 function countLargeNegativeSteps(points: TelemetryPoint[]): number {
   let count = 0;
   for (let idx = 1; idx < points.length; idx += 1) {
-    const previousPoint = points[idx - 1]!;
-    const currentPoint = points[idx]!;
+    const previousPoint = points[idx - 1];
+    const currentPoint = points[idx];
+    if (!previousPoint || !currentPoint) {
+      continue;
+    }
     const previous = previousPoint.btC ?? 0;
     const current = currentPoint.btC ?? 0;
     if (current - previous < -3) {

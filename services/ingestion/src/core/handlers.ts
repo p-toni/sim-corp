@@ -8,23 +8,27 @@ export class IngestionHandlers {
   ) {}
 
   handleEnvelope(envelope: TelemetryEnvelope): void {
-    if (envelope.topic === "telemetry") {
-      const payload = envelope.payload as TelemetryPoint;
-      const storedPoint: StoredTelemetryPoint = {
-        ...payload,
-        ...envelope.origin
-      };
-      this.telemetryStore.add(storedPoint);
-      return;
-    }
-
-    if (envelope.topic === "event") {
-      const payload = envelope.payload as RoastEvent;
-      const storedEvent: StoredRoastEvent = {
-        ...payload,
-        ...envelope.origin
-      };
-      this.eventStore.add(storedEvent);
+    switch (envelope.topic) {
+      case "telemetry": {
+        const payload = envelope.payload as TelemetryPoint;
+        const storedPoint: StoredTelemetryPoint = {
+          ...payload,
+          ...envelope.origin
+        };
+        this.telemetryStore.add(storedPoint);
+        return;
+      }
+      case "event": {
+        const payload = envelope.payload as RoastEvent;
+        const storedEvent: StoredRoastEvent = {
+          ...payload,
+          ...envelope.origin
+        };
+        this.eventStore.add(storedEvent);
+        return;
+      }
+      default:
+        return;
     }
   }
 }

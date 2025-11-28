@@ -9,8 +9,8 @@ export interface BuildServerOptions {
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? true });
 
-  await registerHealthRoutes(app);
-  await registerSimulateRoutes(app);
+  registerHealthRoutes(app);
+  registerSimulateRoutes(app);
 
   return app;
 }

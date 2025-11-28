@@ -10,6 +10,7 @@
     { "path": "libs/schemas/tsconfig.json" },
     { "path": "libs/agent-runtime/tsconfig.json" },
     { "path": "services/company-kernel/tsconfig.json" },
-    { "path": "services/sim-twin/tsconfig.json" }
+    { "path": "services/sim-twin/tsconfig.json" },
+    { "path": "agents/sim-roast-runner/tsconfig.json" }
   ]
 }

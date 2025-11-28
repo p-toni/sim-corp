@@ -12,15 +12,12 @@ interface TelemetryQuerystring {
   limit?: string | number;
 }
 
-export async function registerTelemetryRoutes(
-  app: FastifyInstance,
-  deps: TelemetryRouteDeps
-): Promise<void> {
+export function registerTelemetryRoutes(app: FastifyInstance, deps: TelemetryRouteDeps): void {
   const { telemetryStore } = deps;
 
   app.get(
     "/telemetry",
-    async (request: FastifyRequest<{ Querystring: TelemetryQuerystring }>, reply: FastifyReply) => {
+    (request: FastifyRequest<{ Querystring: TelemetryQuerystring }>, reply: FastifyReply) => {
       const { limit, ...filters } = request.query;
       const parsedLimit = parseLimit(limit);
       if (parsedLimit === "INVALID") {

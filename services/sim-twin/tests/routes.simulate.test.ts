@@ -22,10 +22,13 @@ describe("sim-twin routes", () => {
   it("simulates a roast with defaults", async () => {
     const response = await server.inject({ method: "POST", url: "/simulate/roast", payload: {} });
     expect(response.statusCode).toBe(200);
-    const body = response.json();
+    const body = response.json<{
+      telemetry?: unknown;
+      events?: Array<{ type?: unknown }> | undefined;
+    }>();
     expect(Array.isArray(body.telemetry)).toBe(true);
     expect(Array.isArray(body.events)).toBe(true);
-    const eventTypes = body.events.map((event: { type: string }) => event.type);
+    const eventTypes = (body.events ?? []).map((event) => String(event.type));
     expect(eventTypes).toContain("FC");
     expect(eventTypes).toContain("DROP");
   });

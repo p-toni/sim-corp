@@ -30,6 +30,7 @@ export const MissionSchema = z.object({
   missionId: IdentifierSchema.optional(),
   goal: MissionGoalSchema,
   constraints: z.array(MissionConstraintSchema).default([]),
+  params: JsonRecordSchema.default({}),
   context: JsonRecordSchema.default({}),
   priority: MissionPrioritySchema.default("MEDIUM"),
   requestedBy: IdentifierSchema.optional(),
