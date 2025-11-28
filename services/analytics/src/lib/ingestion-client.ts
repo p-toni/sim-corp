@@ -2,10 +2,16 @@ import {
   RoastEventSchema,
   RoastSessionSchema,
   RoastSessionSummarySchema,
+  SessionMetaSchema,
+  EventOverrideSchema,
   TelemetryPointSchema,
+  SessionNoteSchema,
   type RoastEvent,
   type RoastSession,
   type RoastSessionSummary,
+  type SessionMeta,
+  type EventOverride,
+  type SessionNote,
   type TelemetryPoint
 } from "@sim-corp/schemas";
 
@@ -41,4 +47,22 @@ export async function fetchSessionTelemetry(sessionId: string): Promise<Telemetr
 
 export async function fetchSessionEvents(sessionId: string): Promise<RoastEvent[]> {
   return fetchJson(`/sessions/${sessionId}/events`, RoastEventSchema.array());
+}
+
+export async function fetchSessionMeta(sessionId: string): Promise<SessionMeta | null> {
+  const res = await fetch(`${baseUrl()}/sessions/${sessionId}/meta`);
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`ingestion request failed ${res.status}`);
+  }
+  const json = await res.json();
+  return SessionMetaSchema.parse(json);
+}
+
+export async function fetchSessionNotes(sessionId: string): Promise<SessionNote[]> {
+  return fetchJson(`/sessions/${sessionId}/notes`, SessionNoteSchema.array());
+}
+
+export async function fetchEventOverrides(sessionId: string): Promise<EventOverride[]> {
+  return fetchJson(`/sessions/${sessionId}/events/overrides`, EventOverrideSchema.array());
 }

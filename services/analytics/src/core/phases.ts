@@ -11,19 +11,16 @@ function crossingTime(points: TelemetryPoint[], threshold: number, afterSeconds:
   return undefined;
 }
 
-export function derivePhases(args: {
+export function deriveMarkers(args: {
   telemetry: TelemetryPoint[];
   events: RoastEvent[];
-  config: AnalysisConfig;
 }): {
   chargeSeconds?: number;
   tpSeconds?: number;
   fcSeconds?: number;
   dropSeconds?: number;
-  phases: PhaseBoundary[];
-  warnings: string[];
 } {
-  const { telemetry, events, config } = args;
+  const { telemetry, events } = args;
   const chargeEvent = events.find((e) => e.type === "CHARGE");
   const tpEvent = events.find((e) => e.type === "TP");
   const fcEvent = events.find((e) => e.type === "FC");
@@ -37,6 +34,29 @@ export function derivePhases(args: {
     telemetry[telemetry.length - 1]?.elapsedSeconds ??
     (fcSeconds ? fcSeconds + 120 : undefined);
 
+  return {
+    chargeSeconds,
+    tpSeconds,
+    fcSeconds,
+    dropSeconds
+  };
+}
+
+export function buildPhasesFromMarkers(args: {
+  telemetry: TelemetryPoint[];
+  markers: {
+    chargeSeconds?: number;
+    tpSeconds?: number;
+    fcSeconds?: number;
+    dropSeconds?: number;
+  };
+  config: AnalysisConfig;
+}): {
+  phases: PhaseBoundary[];
+  warnings: string[];
+} {
+  const { telemetry, markers, config } = args;
+  const { chargeSeconds = telemetry[0]?.elapsedSeconds ?? 0, tpSeconds, fcSeconds, dropSeconds } = markers;
   const warnings: string[] = [];
   const phases: PhaseBoundary[] = [];
 
@@ -98,11 +118,28 @@ export function derivePhases(args: {
   }
 
   return {
-    chargeSeconds,
-    tpSeconds,
-    fcSeconds,
-    dropSeconds,
     phases,
     warnings
   };
+}
+
+export function derivePhases(args: {
+  telemetry: TelemetryPoint[];
+  events: RoastEvent[];
+  config: AnalysisConfig;
+}): {
+  chargeSeconds?: number;
+  tpSeconds?: number;
+  fcSeconds?: number;
+  dropSeconds?: number;
+  phases: PhaseBoundary[];
+  warnings: string[];
+} {
+  const markers = deriveMarkers({ telemetry: args.telemetry, events: args.events });
+  const { phases, warnings } = buildPhasesFromMarkers({
+    telemetry: args.telemetry,
+    markers,
+    config: args.config
+  });
+  return { ...markers, phases, warnings };
 }

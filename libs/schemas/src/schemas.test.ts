@@ -14,6 +14,9 @@ import {
   RoastSessionSchema,
   RoastSessionSummarySchema,
   RoastAnalysisSchema,
+  SessionMetaSchema,
+  SessionNoteSchema,
+  EventOverrideSchema,
   TelemetryPointSchema,
   TelemetryEnvelopeSchema
 } from "./index";
@@ -176,6 +179,35 @@ describe("roast analysis schema", () => {
     expect(analysis.warnings).toEqual([]);
     expect(analysis.recommendations).toEqual([]);
     expect(analysis.config).toEqual({});
+    expect(analysis.eventTimeSource).toEqual({});
+    expect(analysis.overrideDeltasSeconds).toEqual({});
+  });
+});
+
+describe("qc schemas", () => {
+  it("parses session meta with defaults", () => {
+    const meta = SessionMetaSchema.parse({ beanName: "Colombia" });
+    expect(meta.tags).toEqual([]);
+    expect(meta.extra).toEqual({});
+  });
+
+  it("parses session note and fills defaults", () => {
+    const note = SessionNoteSchema.parse({
+      noteId: "n1",
+      createdAt: "2025-01-01T00:00:00.000Z",
+      text: "Tastes great"
+    });
+    expect(note.defects).toEqual([]);
+    expect(note.extra).toEqual({});
+  });
+
+  it("validates event overrides", () => {
+    const override = EventOverrideSchema.parse({
+      eventType: "FC",
+      elapsedSeconds: 480,
+      updatedAt: "2025-01-01T00:10:00.000Z"
+    });
+    expect(override.source).toBe("HUMAN");
   });
 });
 

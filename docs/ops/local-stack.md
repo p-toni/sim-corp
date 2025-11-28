@@ -95,6 +95,29 @@ curl http://127.0.0.1:4006/analysis/session/<SESSION_ID>
 ```
 - In roaster-desktop Playback Mode, set Analytics URL `http://127.0.0.1:4006`, pick a session, and view analysis panel + phase overlays.
 
+## QC + Ground Truth (meta, notes, overrides)
+- Attach meta to a session:
+```bash
+curl -X PUT http://127.0.0.1:4001/sessions/<SESSION_ID>/meta \
+  -H "content-type: application/json" \
+  -d '{"beanName":"Colombia","process":"washed","operator":"sam","tags":["washed","lot-42"]}'
+```
+
+- Add a note:
+```bash
+curl -X POST http://127.0.0.1:4001/sessions/<SESSION_ID>/notes \
+  -H "content-type: application/json" \
+  -d '{"title":"QC","text":"Sweet, balanced","cuppingScore":85}'
+```
+
+- Override event times (seconds elapsed):
+```bash
+curl -X PUT http://127.0.0.1:4001/sessions/<SESSION_ID>/events/overrides \
+  -H "content-type: application/json" \
+  -d '{"overrides":[{"eventType":"FC","elapsedSeconds":480,"updatedAt":"'\"'\"$(date -Iseconds)'\"'\""}]}'
+```
+Refresh analytics (`/analysis/session/<SESSION_ID>`) or the Playback Analysis panel to see updated markers and deltas.
+
 ## Stop the stack
 ```bash
 pnpm stack:down

@@ -12,6 +12,12 @@ import {
   getSessionTelemetry,
   listSessions,
   getSessionAnalysis,
+  getSessionMeta,
+  saveSessionMeta,
+  listSessionNotes,
+  addSessionNote,
+  getEventOverrides,
+  saveEventOverrides,
   postTraceToKernel,
   runSelfContainedMission
 } from "./lib/api";
@@ -23,11 +29,13 @@ import {
   SimMissionParams,
   appendWithLimit,
   buildMissionFromParams,
+  QcState,
   defaultLiveConfig,
   defaultMissionParams,
   stepIdForEntry
 } from "./lib/types";
 import "./app.css";
+import { QcPanel } from "./components/QcPanel";
 
 interface AppProps {
   runMission?: MissionRunner;
@@ -44,6 +52,7 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
   const [playback, setPlayback] = useState<PlaybackState>({ sessions: [], selectedSessionId: null });
   const [analysisUrl, setAnalysisUrl] = useState<string>("http://127.0.0.1:4006");
   const [analysis, setAnalysis] = useState<import("@sim-corp/schemas").RoastAnalysis | null>(null);
+  const [qc, setQc] = useState<QcState>({ meta: null, overrides: [], notes: [] });
   const [trace, setTrace] = useState<AgentTrace | null>(null);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>("Idle");
@@ -89,6 +98,9 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     if (nextMode === "playback") {
       stopLive();
       void refreshSessions();
+    }
+    if (nextMode !== "playback") {
+      setQc({ meta: null, overrides: [], notes: [] });
     }
   };
 
@@ -238,24 +250,56 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     if (!sessionId) return;
     const base = liveConfig.ingestionUrl.replace(/\/$/, "");
     try {
-      const [telemetryData, eventData] = await Promise.all([
+      const [telemetryData, eventData, metaData, overridesData, notesData] = await Promise.all([
         getSessionTelemetry(base, sessionId),
-        getSessionEvents(base, sessionId)
+        getSessionEvents(base, sessionId),
+        getSessionMeta(base, sessionId),
+        getEventOverrides(base, sessionId),
+        listSessionNotes(base, sessionId)
       ]);
       setTelemetry(telemetryData);
       setEvents(eventData);
       setPlayback((prev) => ({ ...prev, selectedSessionId: sessionId }));
       setCurrentSessionId(sessionId);
+      setQc({ meta: metaData, overrides: overridesData, notes: notesData });
       setAnalysis(null);
-      try {
-        const a = await getSessionAnalysis(analysisUrl, sessionId);
-        setAnalysis(a);
-      } catch (err) {
-        console.error("Failed to load analysis", err);
-      }
+      await refreshAnalysis(sessionId);
     } catch (err) {
       console.error("Failed to load session data", err);
     }
+  };
+
+  const refreshAnalysis = async (sessionId: string): Promise<void> => {
+    try {
+      const a = await getSessionAnalysis(analysisUrl, sessionId);
+      setAnalysis(a);
+    } catch (err) {
+      console.error("Failed to load analysis", err);
+    }
+  };
+
+  const handleSaveMeta = async (meta: import("@sim-corp/schemas").SessionMeta): Promise<void> => {
+    if (!playback.selectedSessionId) return;
+    const base = liveConfig.ingestionUrl.replace(/\/$/, "");
+    const stored = await saveSessionMeta(base, playback.selectedSessionId, meta);
+    setQc((prev) => ({ ...prev, meta: stored }));
+  };
+
+  const handleSaveOverrides = async (
+    overrides: import("@sim-corp/schemas").EventOverride[]
+  ): Promise<void> => {
+    if (!playback.selectedSessionId) return;
+    const base = liveConfig.ingestionUrl.replace(/\/$/, "");
+    const stored = await saveEventOverrides(base, playback.selectedSessionId, overrides);
+    setQc((prev) => ({ ...prev, overrides: stored }));
+    await refreshAnalysis(playback.selectedSessionId);
+  };
+
+  const handleAddNote = async (note: Partial<import("@sim-corp/schemas").SessionNote>): Promise<void> => {
+    if (!playback.selectedSessionId) return;
+    const base = liveConfig.ingestionUrl.replace(/\/$/, "");
+    const created = await addSessionNote(base, playback.selectedSessionId, note);
+    setQc((prev) => ({ ...prev, notes: [created, ...prev.notes] }));
   };
 
   const handleRun = async (): Promise<void> => {
@@ -343,7 +387,23 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
             selectedStepId={selectedStepId}
             onSelectStep={setSelectedStepId}
           />
-          {mode === "playback" ? <AnalysisPanel analysis={analysis} /> : <TraceViewer step={selectedStep} />}
+          {mode === "playback" ? (
+            <div className="stack">
+              <AnalysisPanel analysis={analysis} />
+              <QcPanel
+                sessionId={playback.selectedSessionId}
+                meta={qc.meta}
+                overrides={qc.overrides}
+                notes={qc.notes}
+                analysis={analysis}
+                onSaveMeta={handleSaveMeta}
+                onSaveOverrides={handleSaveOverrides}
+                onAddNote={handleAddNote}
+              />
+            </div>
+          ) : (
+            <TraceViewer step={selectedStep} />
+          )}
         </div>
       </div>
     </Layout>

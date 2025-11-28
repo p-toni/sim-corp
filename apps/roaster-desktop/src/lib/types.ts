@@ -1,4 +1,4 @@
-import { AgentTrace, AgentTraceEntry, Mission } from "@sim-corp/schemas";
+import { AgentTrace, AgentTraceEntry, EventOverride, Mission, SessionMeta, SessionNote } from "@sim-corp/schemas";
 
 export interface SimMissionParams {
   targetFirstCrackSeconds: number;
@@ -49,6 +49,12 @@ export interface PlaybackState {
     fcSeconds?: number;
     dropSeconds?: number;
   };
+}
+
+export interface QcState {
+  meta: SessionMeta | null;
+  overrides: EventOverride[];
+  notes: SessionNote[];
 }
 
 export interface AnalysisState {

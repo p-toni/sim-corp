@@ -46,3 +46,36 @@ CREATE TABLE IF NOT EXISTS events (
 
 CREATE INDEX IF NOT EXISTS idx_events_session_ts ON events (session_id, ts);
 CREATE INDEX IF NOT EXISTS idx_events_session_type ON events (session_id, type);
+
+CREATE TABLE IF NOT EXISTS session_meta (
+  session_id TEXT PRIMARY KEY,
+  meta_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS session_notes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  note_id TEXT NOT NULL UNIQUE,
+  session_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  author TEXT NULL,
+  note_json TEXT NOT NULL,
+  FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_notes_session_created ON session_notes (session_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS event_overrides (
+  session_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  elapsed_seconds REAL NOT NULL,
+  source TEXT NOT NULL,
+  author TEXT NULL,
+  reason TEXT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (session_id, event_type),
+  FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_overrides_session ON event_overrides (session_id);

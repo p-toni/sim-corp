@@ -1,6 +1,22 @@
 import type { Database } from "better-sqlite3";
-import { RoastEventSchema, RoastSessionSchema, RoastSessionSummarySchema, TelemetryPointSchema } from "@sim-corp/schemas";
-import type { RoastEvent, RoastSession, RoastSessionSummary, TelemetryPoint } from "@sim-corp/schemas";
+import {
+  EventOverrideSchema,
+  RoastEventSchema,
+  RoastSessionSchema,
+  RoastSessionSummarySchema,
+  SessionMetaSchema,
+  SessionNoteSchema,
+  TelemetryPointSchema
+} from "@sim-corp/schemas";
+import type {
+  EventOverride,
+  RoastEvent,
+  RoastSession,
+  RoastSessionSummary,
+  SessionMeta,
+  SessionNote,
+  TelemetryPoint
+} from "@sim-corp/schemas";
 
 export interface SessionFilters {
   orgId?: string;
@@ -43,6 +59,116 @@ export class IngestionRepository {
         maxBtC: parsed.maxBtC ?? null,
         createdAt: now
       });
+  }
+
+  getSessionMeta(sessionId: string): SessionMeta | null {
+    const row = this.db
+      .prepare(`SELECT meta_json, updated_at FROM session_meta WHERE session_id = @sessionId`)
+      .get({ sessionId });
+    if (!row) return null;
+    return SessionMetaSchema.parse(JSON.parse(row.meta_json));
+  }
+
+  upsertSessionMeta(sessionId: string, meta: SessionMeta): SessionMeta {
+    const parsed = SessionMetaSchema.parse(meta);
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO session_meta (session_id, meta_json, updated_at)
+         VALUES (@sessionId, @metaJson, @updatedAt)
+         ON CONFLICT(session_id) DO UPDATE SET meta_json=excluded.meta_json, updated_at=excluded.updated_at`
+      )
+      .run({
+        sessionId,
+        metaJson: JSON.stringify(parsed),
+        updatedAt: now
+      });
+    return parsed;
+  }
+
+  listSessionNotes(sessionId: string, limit = 50, offset = 0): SessionNote[] {
+    const rows = this.db
+      .prepare(
+        `SELECT note_json FROM session_notes WHERE session_id = @sessionId ORDER BY created_at DESC LIMIT @limit OFFSET @offset`
+      )
+      .all({ sessionId, limit, offset });
+    return rows.map((row) => SessionNoteSchema.parse(JSON.parse(row.note_json)));
+  }
+
+  addSessionNote(
+    sessionId: string,
+    input: Omit<SessionNote, "noteId" | "createdAt">
+  ): SessionNote {
+    const now = new Date().toISOString();
+    const noteId = `N-${sessionId}-${Math.random().toString(36).slice(2, 8)}-${Date.now()}`;
+    const note = SessionNoteSchema.parse({
+      ...input,
+      noteId,
+      createdAt: now
+    });
+    this.db
+      .prepare(
+        `INSERT INTO session_notes (note_id, session_id, created_at, author, note_json)
+         VALUES (@noteId, @sessionId, @createdAt, @author, @noteJson)`
+      )
+      .run({
+        noteId,
+        sessionId,
+        createdAt: note.createdAt,
+        author: note.author ?? null,
+        noteJson: JSON.stringify(note)
+      });
+    return note;
+  }
+
+  getEventOverrides(sessionId: string): EventOverride[] {
+    const rows = this.db
+      .prepare(
+        `SELECT event_type, elapsed_seconds, source, author, reason, updated_at FROM event_overrides WHERE session_id = @sessionId`
+      )
+      .all({ sessionId });
+    return rows.map((row) =>
+      EventOverrideSchema.parse({
+        eventType: row.event_type,
+        elapsedSeconds: row.elapsed_seconds,
+        source: row.source,
+        author: row.author ?? undefined,
+        reason: row.reason ?? undefined,
+        updatedAt: row.updated_at
+      })
+    );
+  }
+
+  upsertEventOverrides(sessionId: string, overrides: EventOverride[]): EventOverride[] {
+    const parsedOverrides = overrides.map((o) =>
+      EventOverrideSchema.parse({
+        ...o,
+        updatedAt: o.updatedAt ?? new Date().toISOString()
+      })
+    );
+    const stmt = this.db.prepare(
+      `INSERT INTO event_overrides (session_id, event_type, elapsed_seconds, source, author, reason, updated_at)
+       VALUES (@sessionId, @eventType, @elapsedSeconds, @source, @author, @reason, @updatedAt)
+       ON CONFLICT(session_id, event_type) DO UPDATE SET
+         elapsed_seconds=excluded.elapsed_seconds,
+         source=excluded.source,
+         author=excluded.author,
+         reason=excluded.reason,
+         updated_at=excluded.updated_at`
+    );
+    const now = new Date().toISOString();
+    for (const override of parsedOverrides) {
+      stmt.run({
+        sessionId,
+        eventType: override.eventType,
+        elapsedSeconds: override.elapsedSeconds,
+        source: override.source ?? "HUMAN",
+        author: override.author ?? null,
+        reason: override.reason ?? null,
+        updatedAt: override.updatedAt ?? now
+      });
+    }
+    return this.getEventOverrides(sessionId);
   }
 
   appendTelemetry(sessionId: string, point: TelemetryPoint): void {
@@ -179,5 +305,16 @@ export class IngestionRepository {
       .prepare(`SELECT raw_json FROM events WHERE session_id = @sessionId ORDER BY ts ASC`)
       .all({ sessionId });
     return rows.map((row) => RoastEventSchema.parse(JSON.parse(row.raw_json)));
+  }
+
+  getLastTelemetryElapsed(sessionId: string): number | null {
+    const row = this.db
+      .prepare(
+        `SELECT elapsed_seconds FROM telemetry_points WHERE session_id = @sessionId ORDER BY elapsed_seconds DESC LIMIT 1`
+      )
+      .get({ sessionId });
+    if (!row) return null;
+    const value = Number(row.elapsed_seconds);
+    return Number.isFinite(value) ? value : null;
   }
 }

@@ -14,6 +14,7 @@ import { PersistencePipeline } from "./core/persist";
 import { registerSessionRoutes } from "./routes/sessions";
 import { EnvelopeStream } from "./core/envelope-stream";
 import { registerEnvelopeStreamRoutes } from "./routes/stream-envelopes";
+import { registerSessionQcRoutes } from "./routes/sessions-qc";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -58,6 +59,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   registerEventRoutes(app, { eventStore });
   registerStreamRoutes(app, { telemetryStore, eventStore });
   registerSessionRoutes(app, { repo });
+  registerSessionQcRoutes(app, { repo });
   registerEnvelopeStreamRoutes(app, { envelopeStream });
 
   return app;

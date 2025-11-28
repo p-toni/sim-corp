@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { RoastEventTypeSchema } from "./roaster";
+import { SessionMetaSchema } from "./qc";
 
 export const RoastPhaseSchema = z.enum(["DRYING", "MAILLARD", "DEVELOPMENT"]);
 export type RoastPhase = z.infer<typeof RoastPhaseSchema>;
@@ -60,6 +62,9 @@ export const RoastAnalysisSchema = z.object({
     flickAtSeconds: z.number().optional(),
     details: z.record(z.unknown()).default({})
   }),
+  eventTimeSource: z.record(RoastEventTypeSchema, z.enum(["INFERRED", "OVERRIDDEN"])).default({}),
+  overrideDeltasSeconds: z.record(RoastEventTypeSchema, z.number()).default({}),
+  meta: SessionMetaSchema.optional(),
   warnings: z.array(AnalysisWarningSchema).default([]),
   recommendations: z.array(RecommendationSchema).default([]),
   config: z.record(z.unknown()).default({})

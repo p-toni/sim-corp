@@ -8,3 +8,4 @@ export * from "./kernel/eval";
 export * from "./kernel/telemetry-envelope";
 export * from "./domain/session";
 export * from "./domain/roast-analysis";
+export * from "./domain/qc";

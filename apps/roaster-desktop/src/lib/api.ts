@@ -11,6 +11,12 @@ import {
   TelemetryPointSchema,
   RoastAnalysis,
   RoastAnalysisSchema,
+  SessionMeta,
+  SessionMetaSchema,
+  SessionNote,
+  SessionNoteSchema,
+  EventOverride,
+  EventOverrideSchema,
   type Mission
 } from "@sim-corp/schemas";
 import { AgentRuntime } from "@sim-corp/agent-runtime";
@@ -258,4 +264,79 @@ export async function getSessionSummary(baseUrl: string, sessionId: string): Pro
 export async function getSessionAnalysis(analyticsUrl: string, sessionId: string): Promise<RoastAnalysis> {
   const url = `${analyticsUrl.replace(/\/$/, "")}/analysis/session/${sessionId}`;
   return fetchJson(url, RoastAnalysisSchema);
+}
+
+export async function getSessionMeta(baseUrl: string, sessionId: string): Promise<SessionMeta> {
+  const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/meta`;
+  return fetchJson(url, SessionMetaSchema);
+}
+
+export async function saveSessionMeta(baseUrl: string, sessionId: string, meta: SessionMeta): Promise<SessionMeta> {
+  const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/meta`;
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(meta)
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to save meta ${res.status}`);
+  }
+  const json = await res.json();
+  const parsed = SessionMetaSchema.safeParse(json);
+  if (!parsed.success) {
+    throw new Error("Failed to validate saved meta");
+  }
+  return parsed.data;
+}
+
+export async function listSessionNotes(baseUrl: string, sessionId: string): Promise<SessionNote[]> {
+  const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/notes`;
+  return fetchJson(url, SessionNoteSchema.array());
+}
+
+export async function addSessionNote(baseUrl: string, sessionId: string, note: Partial<SessionNote>): Promise<SessionNote> {
+  const payload = { ...note };
+  delete (payload as Record<string, unknown>).noteId;
+  delete (payload as Record<string, unknown>).createdAt;
+  const res = await fetch(`${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/notes`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to add note ${res.status}`);
+  }
+  const json = await res.json();
+  const parsed = SessionNoteSchema.safeParse(json);
+  if (!parsed.success) {
+    throw new Error("Failed to parse added note");
+  }
+  return parsed.data;
+}
+
+export async function getEventOverrides(baseUrl: string, sessionId: string): Promise<EventOverride[]> {
+  const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/events/overrides`;
+  return fetchJson(url, EventOverrideSchema.array());
+}
+
+export async function saveEventOverrides(
+  baseUrl: string,
+  sessionId: string,
+  overrides: EventOverride[]
+): Promise<EventOverride[]> {
+  const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/events/overrides`;
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ overrides })
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to save overrides ${res.status}`);
+  }
+  const json = await res.json();
+  const parsed = EventOverrideSchema.array().safeParse(json);
+  if (!parsed.success) {
+    throw new Error("Failed to parse overrides response");
+  }
+  return parsed.data;
 }

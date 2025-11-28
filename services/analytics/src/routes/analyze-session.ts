@@ -1,8 +1,10 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { analyzeSession } from "../core/analyze";
 import {
+  fetchEventOverrides,
   fetchSession,
   fetchSessionEvents,
+  fetchSessionMeta,
   fetchSessionTelemetry
 } from "../lib/ingestion-client";
 
@@ -12,10 +14,12 @@ export function registerAnalyzeRoute(app: FastifyInstance): void {
     async (request: FastifyRequest<{ Params: { sessionId: string } }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
       try {
-        const [session, telemetry, events] = await Promise.all([
+        const [session, telemetry, events, meta, overrides] = await Promise.all([
           fetchSession(sessionId),
           fetchSessionTelemetry(sessionId),
-          fetchSessionEvents(sessionId)
+          fetchSessionEvents(sessionId),
+          fetchSessionMeta(sessionId),
+          fetchEventOverrides(sessionId)
         ]);
         const analysis = analyzeSession({
           sessionId,
@@ -23,7 +27,9 @@ export function registerAnalyzeRoute(app: FastifyInstance): void {
           siteId: session.siteId,
           machineId: session.machineId,
           telemetry,
-          events
+          events,
+          meta: meta ?? undefined,
+          overrides
         });
         return analysis;
       } catch (error) {
