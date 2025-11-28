@@ -9,9 +9,12 @@ import { PolicyEngine } from "./core/policy";
 import { TraceStore } from "./core/traces";
 import { MissionStore } from "./core/mission-store";
 import { registerMissionRoutes } from "./routes/missions";
+import { openKernelDatabase } from "./db/connection";
+import { MissionRepository } from "./db/repo";
 
 interface BuildServerOptions {
   missionStore?: MissionStore;
+  dbPath?: string;
 }
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -20,7 +23,9 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   const registry = new Registry();
   const policy = new PolicyEngine(registry);
   const traces = new TraceStore();
-  const missions = options.missionStore ?? new MissionStore();
+  const db = openKernelDatabase(options.dbPath ?? process.env.KERNEL_DB_PATH, app.log);
+  const missionRepo = new MissionRepository(db);
+  const missions = options.missionStore ?? new MissionStore(missionRepo);
 
   await registerHealthRoutes(app);
   await registerAgentRoutes(app, { registry });

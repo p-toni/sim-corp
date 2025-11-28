@@ -1,17 +1,28 @@
 import type { FastifyInstance } from "fastify";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildServer } from "../src/server";
 import { MissionStore } from "../src/core/mission-store";
+import { openKernelDatabase } from "../src/db/connection";
+import { MissionRepository } from "../src/db/repo";
 
 describe("mission routes", () => {
   let server: FastifyInstance;
+  let dbPath: string;
 
   beforeEach(async () => {
-    server = await buildServer({ missionStore: new MissionStore({ baseBackoffMs: 1 }) });
+    dbPath = path.join(os.tmpdir(), `kernel-test-${Date.now()}.db`);
+    const db = openKernelDatabase(dbPath);
+    server = await buildServer({ missionStore: new MissionStore(new MissionRepository(db), { baseBackoffMs: 1 }), dbPath });
   });
 
   afterEach(async () => {
     await server.close();
+    if (dbPath && fs.existsSync(dbPath)) {
+      fs.rmSync(dbPath, { force: true });
+    }
   });
 
   it("creates and lists missions", async () => {
@@ -79,7 +90,7 @@ describe("mission routes", () => {
       payload: { error: "boom", retryable: true, leaseId: claimed.leaseId }
     });
     expect(fail.statusCode).toBe(200);
-    expect(fail.json().status).toBe("PENDING");
+    expect(fail.json().status).toBe("RETRY");
 
     await new Promise((resolve) => setTimeout(resolve, 5));
 
@@ -91,5 +102,17 @@ describe("mission routes", () => {
     expect(reclaim.statusCode).toBe(200);
     const retryMission = reclaim.json() as { missionId: string; attempts: number };
     expect(retryMission.attempts).toBeGreaterThan(0);
+  });
+
+  it("fetches mission by id", async () => {
+    const create = await server.inject({
+      method: "POST",
+      url: "/missions",
+      payload: { goal: "generate-roast-report", params: { sessionId: "s1" } }
+    });
+    const missionId = (create.json() as { missionId: string }).missionId;
+    const get = await server.inject({ method: "GET", url: `/missions/${missionId}` });
+    expect(get.statusCode).toBe(200);
+    expect((get.json() as { missionId: string }).missionId).toBe(missionId);
   });
 });

@@ -40,6 +40,14 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
     return missions.listMissions({ status, goal, agent, sessionId });
   });
 
+  app.get("/missions/:id", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const mission = missions.getMission(request.params.id);
+    if (!mission) {
+      return reply.status(404).send({ error: "Mission not found" });
+    }
+    return mission;
+  });
+
   app.post("/missions/claim", async (request: MissionClaimRequest, reply: FastifyReply) => {
     const agentName = request.body?.agentName;
     if (!agentName) {
