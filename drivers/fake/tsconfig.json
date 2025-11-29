@@ -2,7 +2,8 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true,
+    "composite": true,
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
     "lib": ["ES2022"]
   },
   "include": ["src", "tests"],
