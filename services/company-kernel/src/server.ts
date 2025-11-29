@@ -11,6 +11,10 @@ import { MissionStore } from "./core/mission-store";
 import { registerMissionRoutes } from "./routes/missions";
 import { openKernelDatabase } from "./db/connection";
 import { MissionRepository } from "./db/repo";
+import { GovernorConfigStore } from "./core/governor/config";
+import { RateLimiter } from "./core/governor/rate-limit";
+import { GovernorEngine } from "./core/governor/engine";
+import { registerGovernorRoutes } from "./routes/governor";
 
 interface BuildServerOptions {
   missionStore?: MissionStore;
@@ -26,13 +30,17 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   const db = openKernelDatabase(options.dbPath ?? process.env.KERNEL_DB_PATH, app.log);
   const missionRepo = new MissionRepository(db);
   const missions = options.missionStore ?? new MissionStore(missionRepo);
+  const governorConfig = new GovernorConfigStore(db);
+  const rateLimiter = new RateLimiter(db);
+  const governor = new GovernorEngine(governorConfig, rateLimiter);
 
   await registerHealthRoutes(app);
   await registerAgentRoutes(app, { registry });
   await registerToolRoutes(app, { registry });
   await registerPolicyRoutes(app, { policy });
   await registerTraceRoutes(app, { traces });
-  await registerMissionRoutes(app, { missions });
+  await registerMissionRoutes(app, { missions, governor });
+  await registerGovernorRoutes(app, { config: governorConfig });
 
   return app;
 }

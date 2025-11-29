@@ -2,6 +2,10 @@ CREATE TABLE IF NOT EXISTS missions (
   id TEXT PRIMARY KEY,
   goal TEXT NOT NULL,
   status TEXT NOT NULL,
+  subject_id TEXT NULL,
+  context_json TEXT NULL,
+  signals_json TEXT NULL,
+  governance_json TEXT NULL,
   params_json TEXT NOT NULL,
   idempotency_key TEXT NOT NULL UNIQUE,
   attempts INTEGER NOT NULL DEFAULT 0,
@@ -23,3 +27,17 @@ CREATE TABLE IF NOT EXISTS missions (
 CREATE INDEX IF NOT EXISTS idx_missions_status_retry_created ON missions (status, next_retry_at, created_at);
 CREATE INDEX IF NOT EXISTS idx_missions_goal_status ON missions (goal, status);
 CREATE INDEX IF NOT EXISTS idx_missions_claimed_status ON missions (claimed_by, status);
+CREATE INDEX IF NOT EXISTS idx_missions_subject_goal_status ON missions (subject_id, goal, status);
+CREATE INDEX IF NOT EXISTS idx_missions_status_goal_created ON missions (status, goal, created_at);
+
+CREATE TABLE IF NOT EXISTS kernel_settings (
+  key TEXT PRIMARY KEY,
+  value_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS rate_limit_buckets (
+  key TEXT PRIMARY KEY,
+  tokens REAL NOT NULL,
+  updated_at TEXT NOT NULL
+);

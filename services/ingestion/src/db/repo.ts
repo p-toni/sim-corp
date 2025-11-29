@@ -327,6 +327,31 @@ export class IngestionRepository {
     return Number.isFinite(value) ? value : null;
   }
 
+  getTelemetryStats(sessionId: string): { count: number; hasBT: boolean; hasET: boolean; lastElapsedSeconds: number | null } {
+    const row = this.db
+      .prepare(
+        `SELECT
+           COUNT(*) as count,
+           SUM(CASE WHEN bt_c IS NOT NULL THEN 1 ELSE 0 END) as bt_count,
+           SUM(CASE WHEN et_c IS NOT NULL THEN 1 ELSE 0 END) as et_count,
+           MAX(elapsed_seconds) as last_elapsed
+         FROM telemetry_points
+         WHERE session_id = @sessionId`
+      )
+      .get({ sessionId }) as { count?: number; bt_count?: number; et_count?: number; last_elapsed?: number | null } | undefined;
+
+    if (!row) {
+      return { count: 0, hasBT: false, hasET: false, lastElapsedSeconds: null };
+    }
+
+    return {
+      count: Number(row.count ?? 0),
+      hasBT: Number(row.bt_count ?? 0) > 0,
+      hasET: Number(row.et_count ?? 0) > 0,
+      lastElapsedSeconds: typeof row.last_elapsed === "number" ? row.last_elapsed : null
+    };
+  }
+
   createSessionReport(sessionId: string, report: RoastReport, traceId?: string): SessionReportResult {
     const baseId = report.reportId ?? this.generateReportId(sessionId);
     const createdAt = report.createdAt ?? new Date().toISOString();

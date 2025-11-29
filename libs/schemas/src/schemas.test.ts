@@ -20,7 +20,9 @@ import {
   RoastReportSchema,
   TelemetryPointSchema,
   TelemetryEnvelopeSchema,
-  SessionClosedEventSchema
+  SessionClosedEventSchema,
+  MissionSignalsSchema,
+  GovernanceDecisionSchema
 } from "./index";
 
 const baseTelemetry = {
@@ -303,6 +305,9 @@ describe("kernel schemas", () => {
     expect(mission.priority).toBe("MEDIUM");
     expect(mission.constraints).toHaveLength(0);
     expect(mission.params).toEqual({});
+    expect(mission.context).toEqual({});
+    expect(mission.signals).toBeUndefined();
+    expect(mission.governance).toBeUndefined();
   });
 
   it("allows overriding mission params", () => {
@@ -362,6 +367,21 @@ describe("kernel schemas", () => {
     const entry = trace.entries[0];
     expect(entry).toBeDefined();
     expect(entry?.step).toBe("THINK");
+  });
+
+  it("applies defaults for mission signals", () => {
+    const signals = MissionSignalsSchema.parse({});
+    expect(signals.session).toEqual({});
+  });
+
+  it("applies defaults for governance decision", () => {
+    const decision = GovernanceDecisionSchema.parse({
+      action: "ALLOW",
+      decidedAt: "2025-01-01T00:00:00.000Z"
+    });
+    expect(decision.confidence).toBe("LOW");
+    expect(decision.reasons).toEqual([]);
+    expect(decision.decidedBy).toBe("KERNEL_GOVERNOR");
   });
 
   it("validates eval artifacts", () => {

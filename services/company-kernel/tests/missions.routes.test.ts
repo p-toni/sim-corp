@@ -11,6 +11,7 @@ import { MissionRepository } from "../src/db/repo";
 describe("mission routes", () => {
   let server: FastifyInstance;
   let dbPath: string;
+  const healthySignals = { session: { telemetryPoints: 120, durationSec: 200, hasBT: true } };
 
   beforeEach(async () => {
     dbPath = path.join(os.tmpdir(), `kernel-test-${Date.now()}.db`);
@@ -31,7 +32,8 @@ describe("mission routes", () => {
       url: "/missions",
       payload: {
         goal: "generate-roast-report",
-        params: { sessionId: "s1" }
+        params: { sessionId: "s1" },
+        signals: healthySignals
       }
     });
 
@@ -51,7 +53,12 @@ describe("mission routes", () => {
   });
 
   it("dedupes mission creation by idempotencyKey", async () => {
-    const payload = { goal: "generate-roast-report", params: { sessionId: "s1" }, idempotencyKey: "report-s1" };
+    const payload = {
+      goal: "generate-roast-report",
+      params: { sessionId: "s1" },
+      signals: healthySignals,
+      idempotencyKey: "report-s1"
+    };
     const first = await server.inject({ method: "POST", url: "/missions", payload });
     const second = await server.inject({ method: "POST", url: "/missions", payload });
 
@@ -64,7 +71,7 @@ describe("mission routes", () => {
     const create = await server.inject({
       method: "POST",
       url: "/missions",
-      payload: { goal: "generate-roast-report", params: { sessionId: "s1" } }
+      payload: { goal: "generate-roast-report", params: { sessionId: "s1" }, signals: healthySignals }
     });
     expect(create.statusCode).toBe(201);
 
@@ -108,11 +115,97 @@ describe("mission routes", () => {
     const create = await server.inject({
       method: "POST",
       url: "/missions",
-      payload: { goal: "generate-roast-report", params: { sessionId: "s1" } }
+      payload: { goal: "generate-roast-report", params: { sessionId: "s1" }, signals: healthySignals }
     });
     const missionId = (create.json() as { missionId: string }).missionId;
     const get = await server.inject({ method: "GET", url: `/missions/${missionId}` });
     expect(get.statusCode).toBe(200);
     expect((get.json() as { missionId: string }).missionId).toBe(missionId);
+  });
+
+  it("quarantines missions with weak signals", async () => {
+    const response = await server.inject({
+      method: "POST",
+      url: "/missions",
+      payload: {
+        goal: "generate-roast-report",
+        params: { sessionId: "weak" },
+        signals: { session: { telemetryPoints: 5, durationSec: 10, hasBT: false } }
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    const body = response.json() as { status: string; governance?: { reasons?: Array<{ code?: string }> } };
+    expect(body.status).toBe("QUARANTINED");
+    expect(body.governance?.reasons?.[0]?.code).toBe("LOW_TELEMETRY_POINTS");
+  });
+
+  it("quarantines missions missing signals", async () => {
+    const response = await server.inject({
+      method: "POST",
+      url: "/missions",
+      payload: {
+        goal: "generate-roast-report",
+        params: { sessionId: "missing-signals" }
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    const body = response.json() as { status: string; governance?: { reasons?: Array<{ code?: string }> } };
+    expect(body.status).toBe("QUARANTINED");
+    expect(body.governance?.reasons?.[0]?.code).toBe("MISSING_SIGNALS");
+  });
+
+  it("approves quarantined missions", async () => {
+    const create = await server.inject({
+      method: "POST",
+      url: "/missions",
+      payload: {
+        goal: "generate-roast-report",
+        params: { sessionId: "to-approve" },
+        signals: { session: { telemetryPoints: 1, durationSec: 5 } }
+      }
+    });
+    const missionId = (create.json() as { missionId: string }).missionId;
+    const approve = await server.inject({ method: "POST", url: `/missions/${missionId}/approve`, payload: { note: "looks fine" } });
+    expect(approve.statusCode).toBe(200);
+    const body = approve.json() as { status: string; governance?: { decidedBy?: string } };
+    expect(body.status).toBe("PENDING");
+    expect(body.governance?.decidedBy).toBe("HUMAN");
+  });
+
+  it("rate limits missions when bucket is empty", async () => {
+    const config = {
+      rateLimits: { "generate-roast-report": { capacity: 1, refillPerSec: 0.001 } },
+      gates: {
+        "generate-roast-report": {
+          minTelemetryPoints: 10,
+          minDurationSec: 10,
+          requireBTorET: true,
+          quarantineOnMissingSignals: true,
+          quarantineOnSilenceClose: true
+        }
+      },
+      policy: { allowedGoals: ["generate-roast-report"] }
+    };
+    await server.inject({ method: "PUT", url: "/governor/config", payload: config });
+
+    const first = await server.inject({
+      method: "POST",
+      url: "/missions",
+      payload: { goal: "generate-roast-report", params: { sessionId: "rate-1" }, signals: healthySignals }
+    });
+    expect(first.statusCode).toBe(201);
+    expect((first.json() as { status: string }).status).toBe("PENDING");
+
+    const second = await server.inject({
+      method: "POST",
+      url: "/missions",
+      payload: { goal: "generate-roast-report", params: { sessionId: "rate-2" }, signals: healthySignals }
+    });
+    const body = second.json() as { status: string; nextRetryAt?: string; governance?: { reasons?: Array<{ code?: string }> } };
+    expect(body.status).toBe("RETRY");
+    expect(body.nextRetryAt).toBeTruthy();
+    expect(body.governance?.reasons?.[0]?.code).toBe("RATE_LIMITED");
   });
 });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AgentTrace, RoastEvent, TelemetryEnvelope, TelemetryPoint } from "@sim-corp/schemas";
+import type { AgentTrace, RoastEvent, TelemetryEnvelope, TelemetryPoint, MissionSignals } from "@sim-corp/schemas";
 import { Controls } from "./components/Controls";
 import { CurveChart } from "./components/CurveChart";
 import { Layout } from "./components/Layout";
@@ -20,6 +20,8 @@ import {
   saveEventOverrides,
   getLatestSessionReport,
   enqueueReportMission,
+  listMissionsBySubject,
+  approveMission,
   postTraceToKernel,
   runSelfContainedMission
 } from "./lib/api";
@@ -30,6 +32,7 @@ import {
   PlaybackTab,
   PlaybackState,
   ReportState,
+  MissionStatusView,
   SimMissionParams,
   appendWithLimit,
   buildMissionFromParams,
@@ -62,7 +65,10 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     report: null,
     loading: false,
     error: null,
-    queuedMessage: null
+    queuedMessage: null,
+    mission: null,
+    missionError: null,
+    approving: false
   });
   const [playbackTab, setPlaybackTab] = useState<PlaybackTab>("qc");
   const [trace, setTrace] = useState<AgentTrace | null>(null);
@@ -114,7 +120,7 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     }
     if (nextMode !== "playback") {
       setQc({ meta: null, overrides: [], notes: [] });
-      setReportState({ report: null, loading: false, error: null, queuedMessage: null });
+      setReportState({ report: null, loading: false, error: null, queuedMessage: null, mission: null, missionError: null, approving: false });
     }
   };
 
@@ -263,7 +269,15 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
   const handleSelectSession = async (sessionId: string): Promise<void> => {
     if (!sessionId) return;
     const base = liveConfig.ingestionUrl.replace(/\/$/, "");
-    setReportState({ report: null, loading: true, error: null, queuedMessage: null });
+    setReportState({
+      report: null,
+      loading: true,
+      error: null,
+      queuedMessage: null,
+      mission: null,
+      missionError: null,
+      approving: false
+    });
     try {
       const [telemetryData, eventData, metaData, overridesData, notesData] = await Promise.all([
         getSessionTelemetry(base, sessionId),
@@ -295,14 +309,64 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     }
   };
 
+  const describeMissionStatus = (mission: MissionStatusView | null): string | null => {
+    if (!mission?.status) return null;
+    if (mission.status === "QUARANTINED") return "Mission quarantined; needs approval";
+    if (mission.status === "BLOCKED") return "Mission blocked by policy";
+    if (mission.status === "RETRY") {
+      return mission.nextRetryAt ? `Rate limited; retry at ${mission.nextRetryAt}` : "Rate limited; retrying";
+    }
+    if (mission.status === "PENDING") return "Mission queued";
+    if (mission.status === "RUNNING") return "Mission running";
+    return mission.status;
+  };
+
+  const fetchMissionForSession = async (sessionId: string): Promise<MissionStatusView | null> => {
+    try {
+      const missions = await listMissionsBySubject(sessionId, "generate-roast-report");
+      if (!missions.length) return null;
+      const latest = missions[missions.length - 1];
+      return {
+        missionId: latest.missionId ?? latest.id,
+        status: latest.status,
+        governance: latest.governance ?? null,
+        nextRetryAt: latest.nextRetryAt ?? null
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load mission";
+      setReportState((prev) => ({ ...prev, missionError: message }));
+      return null;
+    }
+  };
+
   const refreshReport = async (sessionId: string): Promise<void> => {
-    setReportState((prev) => ({ ...prev, loading: true, error: null }));
+    setReportState((prev) => ({
+      ...prev,
+      loading: true,
+      error: null,
+      missionError: null,
+      mission: null,
+      queuedMessage: null
+    }));
     const base = liveConfig.ingestionUrl.replace(/\/$/, "");
     try {
       const latest = await getLatestSessionReport(base, sessionId);
+      if (latest) {
+        setReportState((prev) => ({
+          ...prev,
+          report: latest,
+          mission: null,
+          queuedMessage: null,
+          loading: false
+        }));
+        return;
+      }
+      const mission = await fetchMissionForSession(sessionId);
       setReportState((prev) => ({
         ...prev,
-        report: latest,
+        report: null,
+        mission,
+        queuedMessage: describeMissionStatus(mission),
         loading: false
       }));
     } catch (err) {
@@ -335,15 +399,85 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     setQc((prev) => ({ ...prev, notes: [created, ...prev.notes] }));
   };
 
+  const buildLocalSignals = (): MissionSignals | undefined => {
+    if (!playback.selectedSessionId) return undefined;
+    const telemetryPoints = telemetry.length;
+    const elapsedValues = telemetry
+      .map((t) => t.elapsedSeconds)
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+    const lastElapsed = elapsedValues.length ? Math.max(...elapsedValues) : undefined;
+    const dropElapsed = events.reduce<number | undefined>((acc, evt) => {
+      const delta = (evt as { payload?: { elapsedSeconds?: number } }).payload?.elapsedSeconds;
+      if (evt.type === "DROP" && typeof delta === "number") {
+        return typeof acc === "number" ? Math.max(acc, delta) : delta;
+      }
+      return acc;
+    }, undefined);
+    const durationSec = lastElapsed ?? dropElapsed;
+    const hasBT = telemetry.some((t) => typeof t.btC === "number");
+    const hasET = telemetry.some((t) => typeof (t as { etC?: number }).etC === "number");
+    const closeReason = events.some((evt) => evt.type === "DROP") ? "DROP" : "SILENCE_CLOSE";
+    const lastTelemetryDeltaSec =
+      typeof lastElapsed === "number" && typeof durationSec === "number"
+        ? Math.max(0, durationSec - lastElapsed)
+        : undefined;
+
+    return {
+      session: {
+        sessionId: playback.selectedSessionId,
+        telemetryPoints,
+        durationSec,
+        hasBT,
+        hasET,
+        closeReason,
+        lastTelemetryDeltaSec
+      }
+    };
+  };
+
   const handleGenerateReport = async (): Promise<void> => {
     if (!playback.selectedSessionId) return;
-    setReportState((prev) => ({ ...prev, queuedMessage: "Queuing mission…", error: null }));
+    setReportState((prev) => ({ ...prev, queuedMessage: "Queuing mission…", error: null, missionError: null }));
     try {
-      await enqueueReportMission(playback.selectedSessionId);
-      setReportState((prev) => ({ ...prev, queuedMessage: "Report mission queued" }));
+      const signals = buildLocalSignals();
+      await enqueueReportMission(playback.selectedSessionId, {
+        orgId: liveConfig.orgId,
+        siteId: liveConfig.siteId,
+        machineId: liveConfig.machineId
+      }, signals);
+      const mission = await fetchMissionForSession(playback.selectedSessionId);
+      setReportState((prev) => ({
+        ...prev,
+        queuedMessage: describeMissionStatus(mission) ?? "Report mission queued",
+        mission
+      }));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to enqueue mission";
-      setReportState((prev) => ({ ...prev, error: message, queuedMessage: null }));
+      setReportState((prev) => ({ ...prev, error: message, queuedMessage: null, missionError: message }));
+    }
+  };
+
+  const handleApproveMission = async (): Promise<void> => {
+    const missionId = reportState.mission?.missionId;
+    if (!missionId) return;
+    setReportState((prev) => ({ ...prev, approving: true, missionError: null }));
+    try {
+      const updated = await approveMission(missionId);
+      const mission: MissionStatusView = {
+        missionId: updated.missionId ?? updated.id,
+        status: updated.status,
+        governance: updated.governance ?? null,
+        nextRetryAt: updated.nextRetryAt ?? null
+      };
+      setReportState((prev) => ({
+        ...prev,
+        mission,
+        approving: false,
+        queuedMessage: describeMissionStatus(mission)
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to approve mission";
+      setReportState((prev) => ({ ...prev, approving: false, missionError: message }));
     }
   };
 
@@ -469,8 +603,12 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
                   loading={reportState.loading}
                   error={reportState.error}
                   queuedMessage={reportState.queuedMessage}
+                  mission={reportState.mission}
+                  missionError={reportState.missionError}
+                  approving={reportState.approving}
                   onRefresh={() => playback.selectedSessionId ? refreshReport(playback.selectedSessionId) : Promise.resolve()}
                   onGenerate={handleGenerateReport}
+                  onApprove={handleApproveMission}
                 />
               )}
             </div>

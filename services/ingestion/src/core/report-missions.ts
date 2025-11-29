@@ -30,13 +30,14 @@ export class ReportMissionEnqueuer {
       return;
     }
 
+    const signals = this.buildSessionSignals(session);
     const opsEnabled = this.isOpsEventsEnabled();
     if (opsEnabled) {
-      await this.tryPublishOpsEvent(session);
+      await this.tryPublishOpsEvent(session, signals);
     }
 
     if (this.shouldEnqueueDirect(opsEnabled)) {
-      await this.enqueueMission(session);
+      await this.enqueueMission(session, signals);
     }
   }
 
@@ -79,9 +80,9 @@ export class ReportMissionEnqueuer {
     return false;
   }
 
-  private async tryPublishOpsEvent(session: RoastSessionSummary): Promise<boolean> {
+  private async tryPublishOpsEvent(session: RoastSessionSummary, signals: ReturnType<ReportMissionEnqueuer["buildSessionSignals"]>): Promise<boolean> {
     if (!this.deps.opsPublisher) return false;
-    const event = this.buildSessionClosedEvent(session);
+    const event = this.buildSessionClosedEvent(session, signals);
     try {
       await this.deps.opsPublisher.publishSessionClosed(event);
       this.publishWarnedSessions.delete(session.sessionId);
@@ -92,7 +93,11 @@ export class ReportMissionEnqueuer {
     }
   }
 
-  private buildSessionClosedEvent(session: RoastSessionSummary): SessionClosedEvent {
+  private buildSessionClosedEvent(
+    session: RoastSessionSummary,
+    signals: ReturnType<ReportMissionEnqueuer["buildSessionSignals"]>
+  ): SessionClosedEvent {
+    const sessionSignals = signals.session ?? {};
     return SessionClosedEventSchema.parse({
       type: "session.closed",
       version: 1,
@@ -103,11 +108,19 @@ export class ReportMissionEnqueuer {
       sessionId: session.sessionId,
       reportKind: DEFAULT_REPORT_KIND,
       dropSeconds: session.dropSeconds,
-      reason: session.dropSeconds ? "DROP" : "SILENCE_CLOSE"
+      reason: session.dropSeconds ? "DROP" : "SILENCE_CLOSE",
+      telemetryPoints: sessionSignals.telemetryPoints,
+      durationSec: sessionSignals.durationSec,
+      hasBT: sessionSignals.hasBT,
+      hasET: sessionSignals.hasET,
+      lastTelemetryDeltaSec: sessionSignals.lastTelemetryDeltaSec
     });
   }
 
-  private async enqueueMission(session: RoastSessionSummary): Promise<void> {
+  private async enqueueMission(
+    session: RoastSessionSummary,
+    signals: ReturnType<ReportMissionEnqueuer["buildSessionSignals"]>
+  ): Promise<void> {
     try {
       const response = await fetch(this.buildKernelUrl("/missions"), {
         method: "POST",
@@ -116,11 +129,13 @@ export class ReportMissionEnqueuer {
           goal: "generate-roast-report",
           idempotencyKey: this.buildIdempotencyKey(session.sessionId),
           params: { sessionId: session.sessionId, reportKind: DEFAULT_REPORT_KIND },
+          subjectId: session.sessionId,
           context: {
             orgId: session.orgId,
             siteId: session.siteId,
             machineId: session.machineId
-          }
+          },
+          signals
         })
       });
       if (!response.ok) {
@@ -154,5 +169,25 @@ export class ReportMissionEnqueuer {
     if (this.publishWarnedSessions.has(sessionId)) return;
     this.publishWarnedSessions.add(sessionId);
     this.deps.logger?.warn(meta, message);
+  }
+
+  private buildSessionSignals(session: RoastSessionSummary) {
+    const stats = this.deps.repo.getTelemetryStats(session.sessionId);
+    const durationSec = session.durationSeconds ?? session.dropSeconds ?? stats.lastElapsedSeconds ?? undefined;
+    const lastTelemetryDeltaSec =
+      typeof stats.lastElapsedSeconds === "number" && typeof durationSec === "number"
+        ? Math.max(0, durationSec - stats.lastElapsedSeconds)
+        : undefined;
+    return {
+      session: {
+        sessionId: session.sessionId,
+        closeReason: session.dropSeconds ? "DROP" : "SILENCE_CLOSE",
+        durationSec,
+        telemetryPoints: stats.count,
+        hasBT: stats.hasBT,
+        hasET: stats.hasET,
+        lastTelemetryDeltaSec
+      }
+    };
   }
 }

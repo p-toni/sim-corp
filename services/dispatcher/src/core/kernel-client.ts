@@ -12,6 +12,9 @@ export interface MissionRequest {
   params: Record<string, unknown>;
   idempotencyKey: string;
   maxAttempts?: number;
+  subjectId?: string;
+  context?: Record<string, unknown>;
+  signals?: Record<string, unknown>;
 }
 
 export class KernelClient implements KernelClientLike {

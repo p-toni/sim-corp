@@ -78,7 +78,10 @@ export class Dispatcher {
       goal: this.goals[0] ?? "generate-roast-report",
       params: { sessionId: event.sessionId, reportKind: event.reportKind },
       idempotencyKey: this.buildIdempotencyKey(event),
-      maxAttempts: this.maxAttempts
+      maxAttempts: this.maxAttempts,
+      subjectId: event.sessionId,
+      context: { orgId: event.orgId, siteId: event.siteId, machineId: event.machineId },
+      signals: this.buildSignals(event)
     };
 
     try {
@@ -113,5 +116,20 @@ export class Dispatcher {
 
   private buildIdempotencyKey(event: SessionClosedEvent): string {
     return `generate-roast-report:${event.reportKind}:${event.sessionId}`;
+  }
+
+  private buildSignals(event: SessionClosedEvent): Record<string, unknown> {
+    const closeReason = event.reason ?? (typeof event.dropSeconds === "number" ? "DROP" : "SILENCE_CLOSE");
+    return {
+      session: {
+        sessionId: event.sessionId,
+        closeReason,
+        durationSec: event.durationSec ?? event.dropSeconds,
+        telemetryPoints: event.telemetryPoints,
+        hasBT: event.hasBT,
+        hasET: event.hasET,
+        lastTelemetryDeltaSec: event.lastTelemetryDeltaSec
+      }
+    };
   }
 }

@@ -1,5 +1,5 @@
-import type { Mission } from "@sim-corp/schemas";
-import { MissionRepository, type MissionRecord, type MissionStatus } from "../db/repo";
+import type { GovernanceDecision, Mission } from "@sim-corp/schemas";
+import { MissionRepository, type MissionCreateInput, type MissionRecord, type MissionStatus } from "../db/repo";
 
 export type { MissionStatus };
 interface MissionFilters {
@@ -7,6 +7,7 @@ interface MissionFilters {
   goal?: string;
   agent?: string;
   sessionId?: string;
+  subjectId?: string;
 }
 
 interface MissionStoreOptions {
@@ -33,8 +34,8 @@ export class MissionStore {
     this.backoffMs = options.baseBackoffMs ?? DEFAULT_BACKOFF_MS;
   }
 
-  createMission(mission: Mission): MissionCreateResult {
-    return this.repo.createMission(mission as Mission & { idempotencyKey?: string; maxAttempts?: number });
+  createMission(mission: MissionCreateInput): MissionCreateResult {
+    return this.repo.createMission(mission);
   }
 
   listMissions(filter: MissionFilters = {}): MissionRecord[] {
@@ -42,11 +43,16 @@ export class MissionStore {
       status: filter.status,
       goal: filter.goal,
       agent: filter.agent,
+      subjectId: filter.subjectId,
       limit: 100,
       offset: 0
     });
     if (filter.sessionId) {
-      return missions.filter((m) => (m.params as { sessionId?: string } | undefined)?.sessionId === filter.sessionId);
+      return missions.filter(
+        (m) =>
+          m.subjectId === filter.sessionId ||
+          (m.params as { sessionId?: string } | undefined)?.sessionId === filter.sessionId
+      );
     }
     return missions;
   }
@@ -92,7 +98,15 @@ export class MissionStore {
     return this.repo.getMission(id);
   }
 
-  metrics(): Record<MissionStatus, number> & { total: number } {
+  approveMission(id: string, decision: GovernanceDecision): MissionRecord {
+    return this.repo.approveMission(id, decision, new Date().toISOString());
+  }
+
+  cancelMission(id: string): MissionRecord {
+    return this.repo.cancelMission(id, new Date().toISOString());
+  }
+
+  metrics(): ReturnType<MissionRepository["metrics"]> {
     return this.repo.metrics();
   }
 }

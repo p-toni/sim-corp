@@ -15,7 +15,8 @@
     "@sim-corp/sim-roast-runner": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "recharts": "^2.10.3"
+    "recharts": "^2.10.3",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@testing-library/react": "^16.1.0",

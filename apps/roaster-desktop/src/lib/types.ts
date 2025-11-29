@@ -1,4 +1,13 @@
-import { AgentTrace, AgentTraceEntry, EventOverride, Mission, RoastReport, SessionMeta, SessionNote } from "@sim-corp/schemas";
+import {
+  AgentTrace,
+  AgentTraceEntry,
+  EventOverride,
+  GovernanceDecision,
+  Mission,
+  RoastReport,
+  SessionMeta,
+  SessionNote
+} from "@sim-corp/schemas";
 
 export interface SimMissionParams {
   targetFirstCrackSeconds: number;
@@ -63,6 +72,16 @@ export interface ReportState {
   loading: boolean;
   error: string | null;
   queuedMessage?: string | null;
+  mission: MissionStatusView | null;
+  approving?: boolean;
+  missionError?: string | null;
+}
+
+export interface MissionStatusView {
+  missionId?: string;
+  status?: string;
+  governance?: GovernanceDecision | null;
+  nextRetryAt?: string | null;
 }
 
 export interface AnalysisState {

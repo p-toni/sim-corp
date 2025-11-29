@@ -36,6 +36,8 @@ describe("Dispatcher", () => {
 
     expect(kernel.calls).toHaveLength(1);
     expect(kernel.calls[0]?.idempotencyKey).toBe("generate-roast-report:POST_ROAST_V1:sess-1");
+    expect(kernel.calls[0]?.subjectId).toBe(baseEvent.sessionId);
+    expect((kernel.calls[0]?.signals as { session?: { closeReason?: string } })?.session?.closeReason).toBe("SILENCE_CLOSE");
     const status = dispatcher.getStatus();
     expect(status.counters.missionsCreated).toBe(1);
   });

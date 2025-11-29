@@ -7,7 +7,7 @@ const ClaimRequestSchema = z.object({
 });
 
 const MissionRecordSchema = MissionSchema.extend({
-  status: z.enum(["PENDING", "RUNNING", "DONE", "FAILED"]),
+  status: z.enum(["PENDING", "RUNNING", "DONE", "FAILED", "RETRY", "QUARANTINED", "BLOCKED", "CANCELED"]),
   createdAt: z.string(),
   updatedAt: z.string(),
   attempts: z.number(),

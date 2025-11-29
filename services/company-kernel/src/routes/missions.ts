@@ -1,14 +1,17 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { Mission } from "@sim-corp/schemas";
+import type { GovernanceDecision, Mission } from "@sim-corp/schemas";
+import type { MissionCreateInput } from "../db/repo";
 import { MissionStore, type MissionStatus } from "../core/mission-store";
+import { GovernorEngine } from "../core/governor/engine";
 
 interface MissionRouteDeps {
   missions: MissionStore;
+  governor: GovernorEngine;
 }
 
-type MissionCreateRequest = FastifyRequest<{ Body: Mission | (Mission & { goal?: string; idempotencyKey?: string; maxAttempts?: number }) }>;
+type MissionCreateRequest = FastifyRequest<{ Body: MissionCreateInput }>;
 type MissionListRequest = FastifyRequest<{
-  Querystring: { status?: MissionStatus; goal?: string; agent?: string; sessionId?: string };
+  Querystring: { status?: MissionStatus; goal?: string; agent?: string; sessionId?: string; subjectId?: string };
 }>;
 type MissionClaimRequest = FastifyRequest<{ Body: { agentName?: string; goals?: string[] } }>;
 type MissionUpdateRequest = FastifyRequest<{ Params: { id: string }; Body: { summary?: Record<string, unknown>; leaseId?: string } }>;
@@ -22,11 +25,27 @@ type MissionHeartbeatRequest = FastifyRequest<{
 }>;
 
 export async function registerMissionRoutes(app: FastifyInstance, deps: MissionRouteDeps): Promise<void> {
-  const { missions } = deps;
+  const { missions, governor } = deps;
 
   app.post("/missions", async (request: MissionCreateRequest, reply: FastifyReply) => {
     try {
-      const { mission, created } = missions.createMission(request.body as Mission);
+      const missionInput = { ...(request.body as MissionCreateInput) };
+      const normalizedGoal = normalizeGoal(missionInput.goal);
+      if (!missionInput.subjectId && normalizedGoal === "generate-roast-report") {
+        const sessionId = (missionInput.params as { sessionId?: string } | undefined)?.sessionId;
+        if (sessionId) {
+          missionInput.subjectId = sessionId;
+        }
+      }
+      missionInput.context = missionInput.context ?? {};
+
+      const evaluation = governor.evaluateMission(missionInput as Mission);
+      const { mission, created } = missions.createMission({
+        ...missionInput,
+        status: evaluation.status,
+        governance: evaluation.decision,
+        nextRetryAt: evaluation.nextRetryAt
+      });
       reply.status(created ? 201 : 200);
       return mission;
     } catch (err) {
@@ -36,8 +55,8 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
   });
 
   app.get("/missions", async (request: MissionListRequest) => {
-    const { status, goal, agent, sessionId } = request.query;
-    return missions.listMissions({ status, goal, agent, sessionId });
+    const { status, goal, agent, sessionId, subjectId } = request.query;
+    return missions.listMissions({ status, goal, agent, sessionId, subjectId });
   });
 
   app.get("/missions/:id", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
@@ -104,5 +123,52 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
     }
   });
 
+  app.post("/missions/:id/approve", async (request: FastifyRequest<{ Params: { id: string }; Body: { note?: string } }>, reply: FastifyReply) => {
+    try {
+      const mission = missions.getMission(request.params.id);
+      if (!mission) {
+        return reply.status(404).send({ error: "Mission not found" });
+      }
+      const decision: GovernanceDecision = {
+        action: "ALLOW",
+        confidence: mission.governance?.confidence ?? "MED",
+        reasons: [
+          {
+            code: "HUMAN_APPROVAL",
+            message: request.body?.note ?? "Approved by human",
+            details: { previousStatus: mission.status }
+          }
+        ],
+        decidedAt: new Date().toISOString(),
+        decidedBy: "HUMAN"
+      };
+      const updated = missions.approveMission(request.params.id, decision);
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to approve mission";
+      const status = /not quarantined/i.test(message) ? 409 : 400;
+      return reply.status(status).send({ error: message });
+    }
+  });
+
+  app.post("/missions/:id/cancel", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    try {
+      const updated = missions.cancelMission(request.params.id);
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to cancel mission";
+      const status = message === "Mission not found" ? 404 : 400;
+      return reply.status(status).send({ error: message });
+    }
+  });
+
   app.get("/missions/metrics", async () => missions.metrics());
+}
+
+function normalizeGoal(goal: Mission["goal"]): string {
+  if (typeof goal === "string") return goal;
+  if (goal && typeof goal === "object" && "title" in goal) {
+    return (goal as { title: string }).title;
+  }
+  return "unknown";
 }

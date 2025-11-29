@@ -86,6 +86,8 @@ describe("ReportMissionEnqueuer ops events", () => {
 
     expect(publisher.calls).toBe(1);
     expect(publisher.lastEvent?.sessionId).toBe(closedSession.sessionId);
+    expect(publisher.lastEvent?.telemetryPoints).toBe(0);
+    expect(publisher.lastEvent?.durationSec).toBe(closedSession.dropSeconds);
     expect(publisher.lastTopic).toBe(
       `ops/${closedSession.orgId}/${closedSession.siteId}/${closedSession.machineId}/session/closed`
     );
@@ -108,6 +110,10 @@ describe("ReportMissionEnqueuer ops events", () => {
     expect(body.goal).toBe("generate-roast-report");
     expect(body.idempotencyKey).toBe(`generate-roast-report:${DEFAULT_REPORT_KIND}:${closedSession.sessionId}`);
     expect(body.params).toEqual({ sessionId: closedSession.sessionId, reportKind: DEFAULT_REPORT_KIND });
+    expect(body.subjectId).toBe(closedSession.sessionId);
+    expect(body.context).toEqual({ orgId: closedSession.orgId, siteId: closedSession.siteId, machineId: closedSession.machineId });
+    expect(body.signals?.session?.durationSec).toBe(closedSession.dropSeconds);
+    expect(body.signals?.session?.telemetryPoints).toBe(0);
   });
 
   it("skips direct enqueue when fallback disabled and publish succeeds", async () => {
