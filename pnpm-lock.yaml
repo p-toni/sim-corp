@@ -173,6 +173,25 @@ importers:
         specifier: ^2.1.3
         version: 2.1.9(@types/node@24.10.1)(jsdom@24.1.3)
 
+  drivers/tcp-line:
+    dependencies:
+      '@sim-corp/driver-core':
+        specifier: workspace:*
+        version: link:../core
+      '@sim-corp/schemas':
+        specifier: workspace:*
+        version: link:../../libs/schemas
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.10.1
+      vitest:
+        specifier: ^2.1.3
+        version: 2.1.9(@types/node@24.10.1)(jsdom@24.1.3)
+
   libs/agent-runtime:
     dependencies:
       '@sim-corp/schemas':
@@ -273,6 +292,9 @@ importers:
       '@sim-corp/driver-fake':
         specifier: workspace:*
         version: link:../../drivers/fake
+      '@sim-corp/driver-tcp-line':
+        specifier: workspace:*
+        version: link:../../drivers/tcp-line
       '@sim-corp/schemas':
         specifier: workspace:*
         version: link:../../libs/schemas

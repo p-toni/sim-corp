@@ -15,6 +15,7 @@
     { "path": "services/driver-bridge/tsconfig.json" },
     { "path": "services/event-inference/tsconfig.json" },
     { "path": "services/dispatcher/tsconfig.json" },
+    { "path": "drivers/tcp-line/tsconfig.json" },
     { "path": "agents/sim-roast-runner/tsconfig.json" },
     { "path": "agents/roast-report-agent/tsconfig.json" },
     { "path": "services/report-worker/tsconfig.json" }

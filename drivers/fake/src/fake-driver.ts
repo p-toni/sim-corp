@@ -62,7 +62,8 @@ export class FakeDriver implements Driver {
       elapsedSeconds: Number(this.elapsedSeconds.toFixed(2)),
       btC: Number(btC.toFixed(2)),
       etC: Number(etC.toFixed(2)),
-      rorCPerMin: Number(rorCPerMin.toFixed(2))
+      rorCPerMin: Number(rorCPerMin.toFixed(2)),
+      extras: {}
     };
 
     this.elapsedSeconds += this.sampleIntervalSeconds;

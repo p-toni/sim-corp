@@ -18,10 +18,11 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   const app = Fastify({ logger: options.logger ?? true });
 
   const mqttPublisher = options.mqttPublisher ?? new RealMqttPublisher();
+  const driverKind = process.env.DRIVER_KIND ?? "fake";
   const bridge =
     options.bridge ??
     new DriverBridge({
-      driverFactory: options.driverFactory ?? loadDriver("fake"),
+      driverFactory: options.driverFactory ?? loadDriver(driverKind),
       mqttPublisher
     });
 

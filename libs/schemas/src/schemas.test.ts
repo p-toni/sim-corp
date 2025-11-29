@@ -36,6 +36,7 @@ describe("roaster schemas", () => {
   it("validates telemetry points", () => {
     const parsed = TelemetryPointSchema.parse(baseTelemetry);
     expect(parsed.machineId).toBe("machine-1");
+    expect(parsed.extras).toEqual({});
   });
 
   it("rejects invalid gas percentage", () => {

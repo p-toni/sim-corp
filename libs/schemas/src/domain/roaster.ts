@@ -19,7 +19,8 @@ export const TelemetryPointSchema = z.object({
   gasPct: BoundedPercentageSchema.optional(),
   fanPct: BoundedPercentageSchema.optional(),
   drumRpm: z.number().optional(),
-  ambientC: z.number().optional()
+  ambientC: z.number().optional(),
+  extras: z.record(z.union([z.number(), z.string()])).default({})
 });
 
 export type TelemetryPoint = z.infer<typeof TelemetryPointSchema>;

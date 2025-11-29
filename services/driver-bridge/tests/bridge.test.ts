@@ -12,7 +12,8 @@ class FakeDriver implements Driver {
       ts: new Date(0).toISOString(),
       machineId: this.cfg.machineId,
       elapsedSeconds: 0,
-      btC: 180
+      btC: 180,
+      extras: {}
     };
   }
   async disconnect(): Promise<void> {}

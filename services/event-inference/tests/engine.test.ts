@@ -15,7 +15,8 @@ describe("InferenceEngine", () => {
         ts: new Date(0).toISOString(),
         machineId: key.machineId,
         elapsedSeconds: 0,
-        btC: 180
+        btC: 180,
+        extras: {}
       }
     };
 
@@ -29,7 +30,8 @@ describe("InferenceEngine", () => {
         ...base.payload,
         ts: new Date(350_000).toISOString(),
         elapsedSeconds: 350,
-        btC: 198
+        btC: 198,
+        extras: {}
       }
     };
     const events2 = engine.handleTelemetry(fcEnvelope);

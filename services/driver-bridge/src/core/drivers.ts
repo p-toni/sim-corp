@@ -1,8 +1,10 @@
 import type { DriverFactory } from "@sim-corp/driver-core";
 import { createFakeDriver } from "@sim-corp/driver-fake";
+import { createTcpLineDriver } from "@sim-corp/driver-tcp-line";
 
 const DRIVER_MAP: Record<string, DriverFactory> = {
-  fake: createFakeDriver
+  fake: createFakeDriver,
+  "tcp-line": createTcpLineDriver
 };
 
 export function loadDriver(name: string): DriverFactory {

@@ -13,8 +13,10 @@ const DriverConfigSchema = z.object({
 });
 
 const StartBodySchema = z.object({
-  driverName: z.string(),
-  config: DriverConfigSchema
+  driverName: z.string().optional(),
+  config: DriverConfigSchema.extend({
+    connection: z.record(z.string(), z.unknown()).default({})
+  })
 });
 
 interface StartDeps {
@@ -33,11 +35,34 @@ export function registerStartRoute(app: FastifyInstance, deps: StartDeps): void 
         return reply.status(400).send({ error: "Invalid start request", issues: parsed.error.issues });
       }
 
-      const { driverName, config } = parsed.data;
+      const driverName = parsed.data.driverName ?? process.env.DRIVER_KIND ?? "fake";
+      const config = parsed.data.config as DriverConfig;
+      config.connection = mergeConnection(driverName, config.connection);
+
       const driverFactory = loadDriverFn(driverName);
-      const session = await bridge.start(config as DriverConfig, driverFactory);
+      const session = await bridge.start(config, driverFactory);
 
       return { sessionId: session.id, stats: session.stats };
     }
   );
+}
+
+function mergeConnection(driverName: string, provided: Record<string, unknown>): Record<string, unknown> {
+  if (driverName.toLowerCase() !== "tcp-line") return provided;
+  let envConfig: Record<string, unknown> = {};
+  if (process.env.DRIVER_TCP_LINE_CONFIG_JSON) {
+    try {
+      envConfig = JSON.parse(process.env.DRIVER_TCP_LINE_CONFIG_JSON);
+    } catch {
+      envConfig = {};
+    }
+  }
+  const merged = { ...envConfig, ...provided };
+  const emitIntervalMs =
+    typeof merged.emitIntervalMs === "number" ? merged.emitIntervalMs : 1000;
+  if (typeof merged.sampleIntervalSeconds !== "number") {
+    merged.sampleIntervalSeconds = emitIntervalMs / 1000;
+  }
+  merged.emitIntervalMs = emitIntervalMs;
+  return merged;
 }

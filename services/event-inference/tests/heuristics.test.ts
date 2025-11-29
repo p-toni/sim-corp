@@ -15,9 +15,9 @@ describe("heuristics", () => {
   it("detects turning point via local minimum", () => {
     const session = baseSession();
     session.telemetry = [
-      { ts: new Date(0).toISOString(), machineId: "m", elapsedSeconds: 0, btC: 180 },
-      { ts: new Date(2000).toISOString(), machineId: "m", elapsedSeconds: 2, btC: 175 },
-      { ts: new Date(4000).toISOString(), machineId: "m", elapsedSeconds: 4, btC: 176 }
+      { ts: new Date(0).toISOString(), machineId: "m", elapsedSeconds: 0, btC: 180, extras: {} },
+      { ts: new Date(2000).toISOString(), machineId: "m", elapsedSeconds: 2, btC: 175, extras: {} },
+      { ts: new Date(4000).toISOString(), machineId: "m", elapsedSeconds: 4, btC: 176, extras: {} }
     ];
     const tp = detectTurningPoint({ session, config: DEFAULT_CONFIG });
     expect(tp?.type).toBe("TP");
@@ -27,7 +27,7 @@ describe("heuristics", () => {
   it("detects FC after min time and threshold", () => {
     const session = baseSession();
     session.telemetry = [
-      { ts: new Date(0).toISOString(), machineId: "m", elapsedSeconds: 350, btC: 197, rorCPerMin: 10 }
+      { ts: new Date(0).toISOString(), machineId: "m", elapsedSeconds: 350, btC: 197, rorCPerMin: 10, extras: {} }
     ];
     const fc = detectFirstCrack({ session, config: DEFAULT_CONFIG });
     expect(fc?.type).toBe("FC");
@@ -36,7 +36,7 @@ describe("heuristics", () => {
   it("does not detect FC before min time even if hot", () => {
     const session = baseSession();
     session.telemetry = [
-      { ts: new Date(0).toISOString(), machineId: "m", elapsedSeconds: 100, btC: 210 }
+      { ts: new Date(0).toISOString(), machineId: "m", elapsedSeconds: 100, btC: 210, extras: {} }
     ];
     const fc = detectFirstCrack({ session, config: DEFAULT_CONFIG });
     expect(fc).toBeNull();
@@ -45,7 +45,13 @@ describe("heuristics", () => {
   it("detects drop after silence", () => {
     const session = baseSession();
     session.lastSeenAtIso = new Date(0).toISOString();
-    session.lastTelemetry = { ts: new Date(0).toISOString(), machineId: "m", elapsedSeconds: 50, btC: 200 };
+    session.lastTelemetry = {
+      ts: new Date(0).toISOString(),
+      machineId: "m",
+      elapsedSeconds: 50,
+      btC: 200,
+      extras: {}
+    };
     const drop = detectDropDueToSilence(
       { session, config: { ...DEFAULT_CONFIG, dropSilenceSeconds: 5 } },
       new Date(7000).toISOString()

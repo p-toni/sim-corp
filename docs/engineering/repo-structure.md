@@ -65,6 +65,7 @@ export interface TelemetryPoint {
   fanPct?: number;
   drumRpm?: number;
   ambientC?: number;
+  extras?: Record<string, number | string>;
 }
 
 export type RoastEventType =

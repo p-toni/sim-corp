@@ -11,6 +11,7 @@ export interface Driver {
   connect(): Promise<void>;
   readTelemetry(): Promise<TelemetryPoint>;
   disconnect(): Promise<void>;
+  getStatus?(): unknown;
 }
 
 export type DriverFactory = (cfg: DriverConfig) => Driver;

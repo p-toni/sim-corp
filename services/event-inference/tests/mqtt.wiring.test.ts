@@ -34,7 +34,8 @@ describe("MQTT wiring", () => {
         ts: new Date(0).toISOString(),
         machineId: "m",
         elapsedSeconds: 0,
-        btC: 180
+        btC: 180,
+        extras: {}
       }
     });
 

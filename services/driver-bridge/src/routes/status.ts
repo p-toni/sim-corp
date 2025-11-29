@@ -12,7 +12,10 @@ export function registerStatusRoute(app: FastifyInstance, deps: StatusDeps): voi
     return bridge.list().map((session) => ({
       id: session.id,
       config: session.config,
-      stats: session.stats
+      stats: session.stats,
+      driverStatus: typeof (session.driver as { getStatus?: () => unknown }).getStatus === "function"
+        ? (session.driver as { getStatus: () => unknown }).getStatus()
+        : undefined
     }));
   });
 }
