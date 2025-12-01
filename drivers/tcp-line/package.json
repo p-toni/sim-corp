@@ -9,7 +9,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run",
+    "build:native": "node ./scripts/build-native.js",
+    "test": "pnpm run build:native && vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
