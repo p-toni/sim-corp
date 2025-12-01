@@ -3,11 +3,15 @@ import { MissionRepository, type MissionCreateInput, type MissionRecord, type Mi
 
 export type { MissionStatus };
 interface MissionFilters {
-  status?: MissionStatus;
+  status?: MissionStatus | MissionStatus[];
   goal?: string;
   agent?: string;
   sessionId?: string;
   subjectId?: string;
+  orgId?: string;
+  siteId?: string;
+  machineId?: string;
+  limit?: number;
 }
 
 interface MissionStoreOptions {
@@ -38,23 +42,28 @@ export class MissionStore {
     return this.repo.createMission(mission);
   }
 
-  listMissions(filter: MissionFilters = {}): MissionRecord[] {
+  listMissions(filter: MissionFilters = {}): { items: MissionRecord[] } {
     const missions = this.repo.listMissions({
-      status: filter.status,
+      statuses: Array.isArray(filter.status) ? filter.status : filter.status ? [filter.status] : undefined,
       goal: filter.goal,
       agent: filter.agent,
       subjectId: filter.subjectId,
-      limit: 100,
+      orgId: filter.orgId,
+      siteId: filter.siteId,
+      machineId: filter.machineId,
+      limit: filter.limit ?? 50,
       offset: 0
     });
     if (filter.sessionId) {
-      return missions.filter(
-        (m) =>
-          m.subjectId === filter.sessionId ||
-          (m.params as { sessionId?: string } | undefined)?.sessionId === filter.sessionId
-      );
+      return {
+        items: missions.filter(
+          (m) =>
+            m.subjectId === filter.sessionId ||
+            (m.params as { sessionId?: string } | undefined)?.sessionId === filter.sessionId
+        )
+      };
     }
-    return missions;
+    return { items: missions };
   }
 
   claimNext(agentName: string, goals?: string[], now: Date = new Date()): MissionRecord | null {
@@ -104,6 +113,10 @@ export class MissionStore {
 
   cancelMission(id: string): MissionRecord {
     return this.repo.cancelMission(id, new Date().toISOString());
+  }
+
+  retryNowMission(id: string): MissionRecord {
+    return this.repo.retryNowMission(id, new Date().toISOString());
   }
 
   metrics(): ReturnType<MissionRepository["metrics"]> {

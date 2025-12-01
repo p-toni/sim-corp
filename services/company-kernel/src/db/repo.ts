@@ -141,18 +141,25 @@ export class MissionRepository {
   }
 
   listMissions(filters: {
-    status?: MissionStatus;
+    statuses?: MissionStatus[];
     goal?: string;
     agent?: string;
     subjectId?: string;
+    orgId?: string;
+    siteId?: string;
+    machineId?: string;
     limit?: number;
     offset?: number;
   } = {}): MissionRecord[] {
     const conditions: string[] = [];
     const params: Record<string, unknown> = {};
-    if (filters.status) {
-      conditions.push("status = @status");
-      params.status = filters.status;
+    const statuses = Array.isArray(filters.statuses) ? filters.statuses.filter(Boolean) : [];
+    if (statuses.length > 0) {
+      const placeholders = statuses.map((_, idx) => `@status${idx}`);
+      conditions.push(`status IN (${placeholders.join(",")})`);
+      statuses.forEach((status, idx) => {
+        params[`status${idx}`] = status;
+      });
     }
     if (filters.goal) {
       conditions.push("goal = @goal");
@@ -166,13 +173,26 @@ export class MissionRepository {
       conditions.push("subject_id = @subjectId");
       params.subjectId = filters.subjectId;
     }
+    if (filters.orgId) {
+      conditions.push("json_extract(context_json, '$.orgId') = @orgId");
+      params.orgId = filters.orgId;
+    }
+    if (filters.siteId) {
+      conditions.push("json_extract(context_json, '$.siteId') = @siteId");
+      params.siteId = filters.siteId;
+    }
+    if (filters.machineId) {
+      conditions.push("json_extract(context_json, '$.machineId') = @machineId");
+      params.machineId = filters.machineId;
+    }
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-    const limit = Number.isInteger(filters.limit) ? (filters.limit as number) : 100;
+    const requestedLimit = Number.isInteger(filters.limit) ? (filters.limit as number) : 50;
+    const limit = Math.min(Math.max(requestedLimit, 1), 200);
     const offset = Number.isInteger(filters.offset) ? (filters.offset as number) : 0;
     const rows = this.db
       .prepare(
         `SELECT * FROM missions ${where}
-         ORDER BY created_at ASC
+         ORDER BY created_at DESC
          LIMIT @limit OFFSET @offset`
       )
       .all({ ...params, limit, offset }) as MissionRow[];
@@ -394,6 +414,41 @@ export class MissionRepository {
          WHERE id=@id`
       )
       .run({ id: missionId, now: nowIso });
+    const row = this.getMissionRowById(missionId);
+    if (!row) throw new Error("Mission not found");
+    return this.mapRow(row);
+  }
+
+  retryNowMission(missionId: string, nowIso: string): MissionRecord {
+    const mission = this.getMissionRowById(missionId);
+    if (!mission) throw new Error("Mission not found");
+    if (mission.status !== "RETRY") {
+      throw new Error("Mission is not retryable now");
+    }
+
+    const governance = mission.governance_json ? (JSON.parse(mission.governance_json) as GovernanceDecision) : undefined;
+    const reasons = governance?.reasons ?? [];
+    const updatedGovernance: GovernanceDecision | undefined = {
+      action: governance?.action ?? "ALLOW",
+      confidence: governance?.confidence ?? "MED",
+      reasons: [...reasons, { code: "MANUAL_RETRY_NOW", message: "Manual retry requested" }],
+      decidedAt: governance?.decidedAt ?? nowIso,
+      decidedBy: governance?.decidedBy ?? "HUMAN"
+    };
+
+    this.db
+      .prepare(
+        `UPDATE missions
+         SET next_retry_at=@now,
+             governance_json=@governance,
+             updated_at=@now
+         WHERE id=@id AND status='RETRY'`
+      )
+      .run({
+        id: missionId,
+        now: nowIso,
+        governance: JSON.stringify(updatedGovernance)
+      });
     const row = this.getMissionRowById(missionId);
     if (!row) throw new Error("Mission not found");
     return this.mapRow(row);

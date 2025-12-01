@@ -44,6 +44,7 @@ import {
 import "./app.css";
 import { QcPanel } from "./components/QcPanel";
 import { ReportPanel } from "./components/ReportPanel";
+import { OpsPanel } from "./components/OpsPanel";
 
 interface AppProps {
   runMission?: MissionRunner;
@@ -118,9 +119,20 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
       void refreshSessions();
       setPlaybackTab("qc");
     }
+    if (nextMode === "ops") {
+      stopLive();
+    }
     if (nextMode !== "playback") {
       setQc({ meta: null, overrides: [], notes: [] });
-      setReportState({ report: null, loading: false, error: null, queuedMessage: null, mission: null, missionError: null, approving: false });
+      setReportState({
+        report: null,
+        loading: false,
+        error: null,
+        queuedMessage: null,
+        mission: null,
+        missionError: null,
+        approving: false
+      });
     }
   };
 
@@ -553,70 +565,74 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
         />
       }
     >
-      <div className="stack">
-        {mode !== "batch" ? (
-          <div className="muted small-text">
-            {currentSessionId ? `Current session: ${currentSessionId}` : "No session detected"}
-          </div>
-        ) : null}
-        <CurveChart telemetry={telemetry} events={events} phases={analysis?.phases} />
-        <div className="split">
-          <LoopTimeline
-            trace={trace}
-            selectedStepId={selectedStepId}
-            onSelectStep={setSelectedStepId}
-          />
-          {mode === "playback" ? (
-            <div className="stack">
-              <AnalysisPanel analysis={analysis} />
-              <div className="tab-switcher">
-                <button
-                  type="button"
-                  className={`chip ${playbackTab === "qc" ? "active" : ""}`}
-                  onClick={() => setPlaybackTab("qc")}
-                >
-                  QC
-                </button>
-                <button
-                  type="button"
-                  className={`chip ${playbackTab === "report" ? "active" : ""}`}
-                  onClick={() => setPlaybackTab("report")}
-                >
-                  Report
-                </button>
-              </div>
-              {playbackTab === "qc" ? (
-                <QcPanel
-                  sessionId={playback.selectedSessionId}
-                  meta={qc.meta}
-                  overrides={qc.overrides}
-                  notes={qc.notes}
-                  analysis={analysis}
-                  onSaveMeta={handleSaveMeta}
-                  onSaveOverrides={handleSaveOverrides}
-                  onAddNote={handleAddNote}
-                />
-              ) : (
-                <ReportPanel
-                  sessionId={playback.selectedSessionId}
-                  report={reportState.report}
-                  loading={reportState.loading}
-                  error={reportState.error}
-                  queuedMessage={reportState.queuedMessage}
-                  mission={reportState.mission}
-                  missionError={reportState.missionError}
-                  approving={reportState.approving}
-                  onRefresh={() => playback.selectedSessionId ? refreshReport(playback.selectedSessionId) : Promise.resolve()}
-                  onGenerate={handleGenerateReport}
-                  onApprove={handleApproveMission}
-                />
-              )}
+      {mode === "ops" ? (
+        <OpsPanel />
+      ) : (
+        <div className="stack">
+          {mode !== "batch" ? (
+            <div className="muted small-text">
+              {currentSessionId ? `Current session: ${currentSessionId}` : "No session detected"}
             </div>
-          ) : (
-            <TraceViewer step={selectedStep} />
-          )}
+          ) : null}
+          <CurveChart telemetry={telemetry} events={events} phases={analysis?.phases} />
+          <div className="split">
+            <LoopTimeline
+              trace={trace}
+              selectedStepId={selectedStepId}
+              onSelectStep={setSelectedStepId}
+            />
+            {mode === "playback" ? (
+              <div className="stack">
+                <AnalysisPanel analysis={analysis} />
+                <div className="tab-switcher">
+                  <button
+                    type="button"
+                    className={`chip ${playbackTab === "qc" ? "active" : ""}`}
+                    onClick={() => setPlaybackTab("qc")}
+                  >
+                    QC
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip ${playbackTab === "report" ? "active" : ""}`}
+                    onClick={() => setPlaybackTab("report")}
+                  >
+                    Report
+                  </button>
+                </div>
+                {playbackTab === "qc" ? (
+                  <QcPanel
+                    sessionId={playback.selectedSessionId}
+                    meta={qc.meta}
+                    overrides={qc.overrides}
+                    notes={qc.notes}
+                    analysis={analysis}
+                    onSaveMeta={handleSaveMeta}
+                    onSaveOverrides={handleSaveOverrides}
+                    onAddNote={handleAddNote}
+                  />
+                ) : (
+                  <ReportPanel
+                    sessionId={playback.selectedSessionId}
+                    report={reportState.report}
+                    loading={reportState.loading}
+                    error={reportState.error}
+                    queuedMessage={reportState.queuedMessage}
+                    mission={reportState.mission}
+                    missionError={reportState.missionError}
+                    approving={reportState.approving}
+                    onRefresh={() => playback.selectedSessionId ? refreshReport(playback.selectedSessionId) : Promise.resolve()}
+                    onGenerate={handleGenerateReport}
+                    onApprove={handleApproveMission}
+                  />
+                )}
+              </div>
+            ) : (
+              <TraceViewer step={selectedStep} />
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </Layout>
   );
 }

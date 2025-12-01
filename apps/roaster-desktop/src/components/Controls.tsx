@@ -87,6 +87,13 @@ export function Controls({
         >
           Playback
         </button>
+        <button
+          type="button"
+          className={mode === "ops" ? "chip active" : "chip"}
+          onClick={() => onModeChange("ops")}
+        >
+          Ops
+        </button>
       </div>
       <h2 className="panel-title">Mission Parameters</h2>
       <div className="form-grid">
