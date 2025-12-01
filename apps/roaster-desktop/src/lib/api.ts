@@ -22,7 +22,12 @@ import {
   RoastReportSchema,
   GovernanceDecisionSchema,
   MissionSignalsSchema,
-  MissionSchema
+  MissionSchema,
+  RoastProfile,
+  RoastProfileSchema,
+  RoastProfileVersion,
+  RoastProfileVersionSchema,
+  RoastProfileExportBundleSchema
 } from "@sim-corp/schemas";
 import { AgentRuntime } from "@sim-corp/agent-runtime";
 import { SimRoastRequestSchema, simulateRoast } from "@sim-corp/sim-twin";
@@ -61,6 +66,16 @@ export interface MissionListFilters {
   orgId?: string;
   siteId?: string;
   machineId?: string;
+  limit?: number;
+}
+
+export interface ProfileListFilters {
+  orgId: string;
+  siteId?: string;
+  machineModel?: string;
+  q?: string;
+  tag?: string;
+  includeArchived?: boolean;
   limit?: number;
 }
 
@@ -477,6 +492,114 @@ export async function retryNowMission(missionId: string): Promise<KernelMissionR
   const json = await res.json();
   const parsed = KernelMissionRecordSchema.safeParse(json);
   if (!parsed.success) throw new Error("Response validation failed");
+  return parsed.data;
+}
+
+export async function listProfiles(baseUrl: string, filters: ProfileListFilters): Promise<RoastProfile[]> {
+  const base = baseUrl.replace(/\/$/, "");
+  const params = new URLSearchParams();
+  params.set("orgId", filters.orgId);
+  if (filters.siteId) params.set("siteId", filters.siteId);
+  if (filters.machineModel) params.set("machineModel", filters.machineModel);
+  if (filters.q) params.set("q", filters.q);
+  if (filters.tag) params.set("tag", filters.tag);
+  if (filters.includeArchived) params.set("includeArchived", "true");
+  if (typeof filters.limit === "number") params.set("limit", String(filters.limit));
+  const res = await fetch(`${base}/profiles?${params.toString()}`);
+  const json = await res.json();
+  const parsed = RoastProfileSchema.array().safeParse(json);
+  if (!parsed.success) {
+    throw new Error("Failed to parse profiles");
+  }
+  return parsed.data;
+}
+
+export async function getProfile(baseUrl: string, orgId: string, profileId: string): Promise<RoastProfile> {
+  const base = baseUrl.replace(/\/$/, "");
+  const res = await fetch(`${base}/profiles/${profileId}?orgId=${orgId}`);
+  const json = await res.json();
+  const parsed = RoastProfileSchema.safeParse(json);
+  if (!parsed.success) throw new Error("Failed to parse profile");
+  return parsed.data;
+}
+
+export async function listProfileVersions(
+  baseUrl: string,
+  orgId: string,
+  profileId: string
+): Promise<RoastProfileVersion[]> {
+  const base = baseUrl.replace(/\/$/, "");
+  const res = await fetch(`${base}/profiles/${profileId}/versions?orgId=${orgId}`);
+  const json = await res.json();
+  const parsed = RoastProfileVersionSchema.array().safeParse(json);
+  if (!parsed.success) throw new Error("Failed to parse profile versions");
+  return parsed.data;
+}
+
+export async function createProfile(
+  baseUrl: string,
+  profile: Partial<RoastProfile>,
+  changeNote?: string
+): Promise<RoastProfile> {
+  const base = baseUrl.replace(/\/$/, "");
+  const res = await fetch(`${base}/profiles`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ profile, changeNote })
+  });
+  const json = await res.json();
+  const parsed = RoastProfileSchema.safeParse(json);
+  if (!parsed.success) throw new Error("Failed to parse created profile");
+  return parsed.data;
+}
+
+export async function createProfileVersion(
+  baseUrl: string,
+  profileId: string,
+  profile: Partial<RoastProfile>,
+  changeNote?: string
+): Promise<RoastProfile> {
+  const base = baseUrl.replace(/\/$/, "");
+  const res = await fetch(`${base}/profiles/${profileId}/new-version`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ profile, changeNote })
+  });
+  const json = await res.json();
+  const parsed = RoastProfileSchema.safeParse(json);
+  if (!parsed.success) throw new Error("Failed to parse profile version");
+  return parsed.data;
+}
+
+export async function toggleArchiveProfile(
+  baseUrl: string,
+  orgId: string,
+  profileId: string,
+  archived: boolean
+): Promise<RoastProfile> {
+  const base = baseUrl.replace(/\/$/, "");
+  const path = archived ? "archive" : "unarchive";
+  const res = await fetch(`${base}/profiles/${profileId}/${path}?orgId=${orgId}`, { method: "POST" });
+  const json = await res.json();
+  const parsed = RoastProfileSchema.safeParse(json);
+  if (!parsed.success) throw new Error("Failed to parse archived profile");
+  return parsed.data;
+}
+
+export async function exportProfile(
+  baseUrl: string,
+  orgId: string,
+  profileId: string,
+  format: "json" | "csv"
+): Promise<RoastProfileExportBundle | string> {
+  const base = baseUrl.replace(/\/$/, "");
+  const res = await fetch(`${base}/profiles/${profileId}/export?orgId=${orgId}&format=${format}`);
+  if (format === "csv") {
+    return res.text();
+  }
+  const json = await res.json();
+  const parsed = RoastProfileExportBundleSchema.safeParse(json);
+  if (!parsed.success) throw new Error("Failed to parse export bundle");
   return parsed.data;
 }
 

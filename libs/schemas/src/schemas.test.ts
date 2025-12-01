@@ -22,7 +22,9 @@ import {
   TelemetryEnvelopeSchema,
   SessionClosedEventSchema,
   MissionSignalsSchema,
-  GovernanceDecisionSchema
+  GovernanceDecisionSchema,
+  RoastProfileSchema,
+  RoastProfileVersionSchema
 } from "./index";
 
 const baseTelemetry = {
@@ -213,6 +215,65 @@ describe("qc schemas", () => {
       updatedAt: "2025-01-01T00:10:00.000Z"
     });
     expect(override.source).toBe("HUMAN");
+  });
+});
+
+describe("roast profile schemas", () => {
+  const baseProfile = {
+    profileId: "P-123",
+    name: "House Blend",
+    version: 1,
+    createdAt: "2025-01-01T00:00:00.000Z",
+    updatedAt: "2025-01-01T00:00:00.000Z",
+    orgId: "org-1",
+    targets: {
+      chargeTempC: 200,
+      turningPointTempC: 100,
+      firstCrackTempC: 200,
+      dropTempC: 210,
+      targetDevRatio: 0.2,
+      targetTimeToFCSeconds: 500,
+      targetDropSeconds: 650
+    },
+    tags: ["house"],
+    source: { kind: "MANUAL" as const }
+  };
+
+  it("parses roast profiles with optional curve", () => {
+    const parsed = RoastProfileSchema.parse({
+      ...baseProfile,
+      curve: {
+        points: [
+          { elapsedSeconds: 0, btC: 180 },
+          { elapsedSeconds: 60, btC: 190, rorCPerMin: 12 }
+        ],
+        tolerance: { btC: 3 }
+      }
+    });
+
+    expect(parsed.name).toBe("House Blend");
+    expect(parsed.curve?.points.length).toBe(2);
+  });
+
+  it("rejects invalid dev ratio", () => {
+    const result = RoastProfileSchema.safeParse({
+      ...baseProfile,
+      targets: { ...baseProfile.targets, targetDevRatio: 2 }
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("parses profile versions", () => {
+    const version = RoastProfileVersionSchema.parse({
+      profileId: baseProfile.profileId,
+      version: 1,
+      createdAt: baseProfile.createdAt,
+      snapshot: baseProfile,
+      changeNote: "Initial"
+    });
+
+    expect(version.snapshot.profileId).toBe("P-123");
+    expect(version.changeNote).toBe("Initial");
   });
 });
 

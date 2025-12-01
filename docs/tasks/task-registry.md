@@ -188,8 +188,12 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 - `pnpm --filter @sim-corp/roaster-desktop test`
 
 ### T-023 — Profile library v1 (import/export + versioning)
-**Status:** PLANNED  
+**Status:** DONE
 **Milestone:** M1
+**Evidence:**
+- `pnpm --filter @sim-corp/schemas test`
+- `pnpm --filter @sim-corp/ingestion test`
+- `pnpm --filter @sim-corp/roaster-desktop test`
 
 ### T-024 — Predictive assist v1 (ETA + read-only deltas)
 **Status:** PLANNED  

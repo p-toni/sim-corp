@@ -7,7 +7,11 @@ import {
   RoastReportSchema,
   SessionMetaSchema,
   SessionNoteSchema,
-  TelemetryPointSchema
+  TelemetryPointSchema,
+  RoastProfileSchema,
+  RoastProfileVersionSchema,
+  RoastProfileExportBundleSchema,
+  RoastProfileCsvRowSchema
 } from "@sim-corp/schemas";
 import type {
   EventOverride,
@@ -17,7 +21,11 @@ import type {
   RoastReport,
   SessionMeta,
   SessionNote,
-  TelemetryPoint
+  TelemetryPoint,
+  RoastProfile,
+  RoastProfileVersion,
+  RoastProfileExportBundle,
+  RoastProfileCsvRow
 } from "@sim-corp/schemas";
 
 export const DEFAULT_REPORT_KIND = "POST_ROAST_V1";
@@ -34,6 +42,23 @@ export interface SessionFilters {
   status?: "ACTIVE" | "CLOSED";
   limit?: number;
   offset?: number;
+}
+
+export interface ProfileFilters {
+  orgId: string;
+  siteId?: string;
+  machineModel?: string;
+  q?: string;
+  tag?: string;
+  includeArchived?: boolean;
+  limit?: number;
+}
+
+export interface ProfileImportSummary {
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
 }
 
 export class IngestionRepository {
@@ -431,9 +456,320 @@ export class IngestionRepository {
     return RoastReportSchema.parse(JSON.parse(row.report_json));
   }
 
+  listProfiles(filters: ProfileFilters): RoastProfile[] {
+    const conditions = ["org_id = @orgId"];
+    const params: Record<string, unknown> = { orgId: filters.orgId };
+    if (filters.siteId) {
+      conditions.push("site_id = @siteId");
+      params.siteId = filters.siteId;
+    }
+    if (filters.machineModel) {
+      conditions.push("machine_model = @machineModel");
+      params.machineModel = filters.machineModel;
+    }
+    if (filters.q) {
+      conditions.push("(name LIKE @q OR notes LIKE @q)");
+      params.q = `%${filters.q}%`;
+    }
+    if (!filters.includeArchived) {
+      conditions.push("is_archived = 0");
+    }
+    if (filters.tag) {
+      conditions.push("tags_json LIKE @tagFilter");
+      params.tagFilter = `%"${filters.tag}"%`;
+    }
+
+    const where = `WHERE ${conditions.join(" AND ")}`;
+    const limit = typeof filters.limit === "number" ? filters.limit : 50;
+    const rows = this.db
+      .prepare(`SELECT profile_json FROM roast_profiles ${where} ORDER BY updated_at DESC LIMIT @limit`)
+      .all({ ...params, limit });
+
+    return rows.map((row) => RoastProfileSchema.parse(JSON.parse(row.profile_json)));
+  }
+
+  getProfile(orgId: string, profileId: string): RoastProfile | null {
+    const row = this.db
+      .prepare(`SELECT profile_json FROM roast_profiles WHERE org_id = @orgId AND profile_id = @profileId LIMIT 1`)
+      .get({ orgId, profileId });
+    if (!row) return null;
+    return RoastProfileSchema.parse(JSON.parse(row.profile_json));
+  }
+
+  createProfile(profile: Partial<RoastProfile>, changeNote?: string): RoastProfile {
+    const now = new Date().toISOString();
+    const parsed = RoastProfileSchema.parse({
+      ...profile,
+      profileId: profile.profileId ?? generateProfileId(),
+      version: profile.version && profile.version >= 1 ? profile.version : 1,
+      createdAt: profile.createdAt ?? now,
+      updatedAt: profile.updatedAt ?? now,
+      isArchived: profile.isArchived ?? false,
+      source: profile.source ?? { kind: "MANUAL" }
+    });
+
+    const tx = this.db.transaction(() => {
+      this.persistProfile(parsed);
+      this.insertVersion(parsed, changeNote);
+    });
+    tx();
+    return parsed;
+  }
+
+  addProfileVersion(
+    orgId: string,
+    profileId: string,
+    profile: Partial<RoastProfile>,
+    changeNote?: string
+  ): RoastProfile {
+    const existing = this.getProfile(orgId, profileId);
+    if (!existing) {
+      throw new Error(`Profile ${profileId} not found for org ${orgId}`);
+    }
+    const now = new Date().toISOString();
+    const merged: RoastProfile = {
+      ...existing,
+      ...profile,
+      orgId,
+      profileId,
+      version: existing.version + 1,
+      createdAt: existing.createdAt ?? now,
+      updatedAt: now,
+      source: profile.source ?? existing.source,
+      isArchived: profile.isArchived ?? existing.isArchived ?? false
+    };
+    const parsed = RoastProfileSchema.parse(merged);
+
+    const tx = this.db.transaction(() => {
+      this.persistProfile(parsed);
+      this.insertVersion(parsed, changeNote);
+    });
+    tx();
+    return parsed;
+  }
+
+  setProfileArchived(orgId: string, profileId: string, isArchived: boolean): RoastProfile | null {
+    const existing = this.getProfile(orgId, profileId);
+    if (!existing) return null;
+    const updated: RoastProfile = {
+      ...existing,
+      isArchived,
+      updatedAt: new Date().toISOString()
+    };
+    this.persistProfile(updated);
+    return updated;
+  }
+
+  listProfileVersions(orgId: string, profileId: string): RoastProfileVersion[] {
+    const rows = this.db
+      .prepare(
+        `SELECT snapshot_json, change_note, created_at, version, created_by FROM roast_profile_versions
+         WHERE org_id = @orgId AND profile_id = @profileId
+         ORDER BY version DESC`
+      )
+      .all({ orgId, profileId });
+    return rows.map((row) =>
+      RoastProfileVersionSchema.parse({
+        profileId,
+        orgId,
+        version: row.version,
+        createdAt: row.created_at,
+        createdBy: row.created_by ?? undefined,
+        snapshot: JSON.parse(row.snapshot_json),
+        changeNote: row.change_note ?? undefined
+      })
+    );
+  }
+
+  exportProfileBundle(orgId: string, profileId?: string): RoastProfileExportBundle {
+    if (profileId) {
+      const profile = this.getProfile(orgId, profileId);
+      if (!profile) {
+        return { profiles: [] };
+      }
+      return RoastProfileExportBundleSchema.parse({ profiles: [profile] });
+    }
+    return RoastProfileExportBundleSchema.parse({
+      profiles: this.listProfiles({ orgId, includeArchived: true })
+    });
+  }
+
+  importProfiles(orgId: string, bundle: RoastProfileExportBundle): ProfileImportSummary {
+    const parsedBundle = RoastProfileExportBundleSchema.parse(bundle);
+    const summary: ProfileImportSummary = { created: 0, updated: 0, skipped: 0, errors: [] };
+    for (const profile of parsedBundle.profiles) {
+      const now = new Date().toISOString();
+      const candidate = RoastProfileSchema.parse({
+        ...profile,
+        orgId: profile.orgId ?? orgId,
+        profileId: profile.profileId ?? generateProfileId(),
+        createdAt: profile.createdAt ?? now,
+        updatedAt: profile.updatedAt ?? now,
+        version: profile.version ?? 1,
+        source: profile.source ?? { kind: "IMPORT" },
+        isArchived: profile.isArchived ?? false
+      });
+      try {
+        const existing = this.getProfile(candidate.orgId, candidate.profileId);
+        if (!existing) {
+          this.createProfile(candidate, "Imported");
+          summary.created += 1;
+          continue;
+        }
+        if (profilesEqual(existing, candidate)) {
+          summary.skipped += 1;
+          continue;
+        }
+        this.addProfileVersion(candidate.orgId, candidate.profileId, candidate, "Imported new version");
+        summary.updated += 1;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        summary.errors.push(message);
+      }
+    }
+    return summary;
+  }
+
+  importCsvProfiles(orgId: string, rows: RoastProfileCsvRow[]): ProfileImportSummary {
+    const summary: ProfileImportSummary = { created: 0, updated: 0, skipped: 0, errors: [] };
+    const now = new Date().toISOString();
+    for (const row of rows) {
+      const parsedRow = RoastProfileCsvRowSchema.parse(row);
+      const targets: RoastProfile["targets"] = {
+        chargeTempC: parsedRow.chargeTempC,
+        turningPointTempC: parsedRow.turningPointTempC,
+        firstCrackTempC: parsedRow.firstCrackTempC,
+        dropTempC: parsedRow.dropTempC,
+        targetDevRatio: parsedRow.targetDevRatio,
+        targetTimeToFCSeconds: parsedRow.targetTimeToFCSeconds,
+        targetDropSeconds: parsedRow.targetDropSeconds
+      };
+      const profile = RoastProfileSchema.parse({
+        profileId: generateProfileId(),
+        name: parsedRow.name,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+        orgId,
+        machineModel: parsedRow.machineModel,
+        batchSizeGrams: parsedRow.batchSizeGrams,
+        targets,
+        tags: parsedRow.tags ? parsedRow.tags.split(",").map((t) => t.trim()).filter(Boolean) : undefined,
+        notes: parsedRow.notes,
+        source: { kind: "IMPORT" }
+      });
+      try {
+        const existing = this.getProfile(profile.orgId, profile.profileId);
+        if (!existing) {
+          this.createProfile(profile, "Imported CSV");
+          summary.created += 1;
+          continue;
+        }
+        if (profilesEqual(existing, profile)) {
+          summary.skipped += 1;
+          continue;
+        }
+        this.addProfileVersion(profile.orgId, profile.profileId, profile, "Imported CSV");
+        summary.updated += 1;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        summary.errors.push(message);
+      }
+    }
+    return summary;
+  }
+
+  private persistProfile(profile: RoastProfile): void {
+    this.db
+      .prepare(`
+        INSERT INTO roast_profiles (
+          profile_id, org_id, name, version, site_id, machine_model, batch_size_grams,
+          targets_json, curve_json, tags_json, notes, source_json, is_archived, created_at, updated_at, profile_json
+        ) VALUES (
+          @profileId, @orgId, @name, @version, @siteId, @machineModel, @batchSizeGrams,
+          @targetsJson, @curveJson, @tagsJson, @notes, @sourceJson, @isArchived, @createdAt, @updatedAt, @profileJson
+        )
+        ON CONFLICT(org_id, profile_id) DO UPDATE SET
+          name=excluded.name,
+          version=excluded.version,
+          site_id=excluded.site_id,
+          machine_model=excluded.machine_model,
+          batch_size_grams=excluded.batch_size_grams,
+          targets_json=excluded.targets_json,
+          curve_json=excluded.curve_json,
+          tags_json=excluded.tags_json,
+          notes=excluded.notes,
+          source_json=excluded.source_json,
+          is_archived=excluded.is_archived,
+          updated_at=excluded.updated_at,
+          profile_json=excluded.profile_json
+      `)
+      .run({
+        profileId: profile.profileId,
+        orgId: profile.orgId,
+        name: profile.name,
+        version: profile.version,
+        siteId: profile.siteId ?? null,
+        machineModel: profile.machineModel ?? null,
+        batchSizeGrams: profile.batchSizeGrams ?? null,
+        targetsJson: JSON.stringify(profile.targets),
+        curveJson: profile.curve ? JSON.stringify(profile.curve) : null,
+        tagsJson: profile.tags ? JSON.stringify(profile.tags) : null,
+        notes: profile.notes ?? null,
+        sourceJson: JSON.stringify(profile.source),
+        isArchived: profile.isArchived ? 1 : 0,
+        createdAt: profile.createdAt,
+        updatedAt: profile.updatedAt,
+        profileJson: JSON.stringify(profile)
+      });
+  }
+
+  private insertVersion(profile: RoastProfile, changeNote?: string): RoastProfileVersion {
+    const record = RoastProfileVersionSchema.parse({
+      profileId: profile.profileId,
+      version: profile.version,
+      createdAt: profile.updatedAt,
+      snapshot: profile,
+      changeNote
+    });
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO roast_profile_versions (profile_id, org_id, version, created_at, created_by, change_note, snapshot_json)
+         VALUES (@profileId, @orgId, @version, @createdAt, @createdBy, @changeNote, @snapshotJson)`
+      )
+      .run({
+        profileId: profile.profileId,
+        orgId: profile.orgId,
+        version: record.version,
+        createdAt: record.createdAt,
+        createdBy: record.createdBy ?? null,
+        changeNote: record.changeNote ?? null,
+        snapshotJson: JSON.stringify(record.snapshot)
+      });
+    return record;
+  }
+
   private generateReportId(sessionId: string): string {
     const ts = new Date().toISOString().replace(/[-:.]/g, "").slice(0, 15);
     const rand = Math.random().toString(36).slice(2, 8);
     return `R-${sessionId}-${ts}-${rand}`;
   }
+}
+
+function generateProfileId(): string {
+  const ts = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 12);
+  const rand = Math.random().toString(36).slice(2, 6);
+  return `P-${ts}-${rand}`;
+}
+
+function canonicalizeProfile(profile: RoastProfile): Record<string, unknown> {
+  const { version: _v, createdAt: _c, updatedAt: _u, ...rest } = profile;
+  return {
+    ...rest,
+    tags: profile.tags ? [...profile.tags].sort() : undefined
+  };
+}
+
+function profilesEqual(a: RoastProfile, b: RoastProfile): boolean {
+  return JSON.stringify(canonicalizeProfile(a)) === JSON.stringify(canonicalizeProfile(b));
 }

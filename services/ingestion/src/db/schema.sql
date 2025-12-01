@@ -98,3 +98,40 @@ CREATE TABLE IF NOT EXISTS session_reports (
 CREATE INDEX IF NOT EXISTS idx_session_reports_session_created ON session_reports (session_id, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_session_reports_session_kind ON session_reports (session_id, report_kind);
 CREATE INDEX IF NOT EXISTS idx_session_reports_report_id ON session_reports (report_id);
+
+CREATE TABLE IF NOT EXISTS roast_profiles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  profile_id TEXT NOT NULL,
+  org_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  site_id TEXT NULL,
+  machine_model TEXT NULL,
+  batch_size_grams REAL NULL,
+  targets_json TEXT NOT NULL,
+  curve_json TEXT NULL,
+  tags_json TEXT NULL,
+  notes TEXT NULL,
+  source_json TEXT NOT NULL,
+  is_archived INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  profile_json TEXT NOT NULL,
+  UNIQUE(org_id, profile_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_roast_profiles_org_name ON roast_profiles (org_id, name);
+CREATE INDEX IF NOT EXISTS idx_roast_profiles_org_site ON roast_profiles (org_id, site_id);
+CREATE INDEX IF NOT EXISTS idx_roast_profiles_org_machine ON roast_profiles (org_id, machine_model);
+
+CREATE TABLE IF NOT EXISTS roast_profile_versions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  profile_id TEXT NOT NULL,
+  org_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  created_by TEXT NULL,
+  change_note TEXT NULL,
+  snapshot_json TEXT NOT NULL,
+  UNIQUE(org_id, profile_id, version)
+);
