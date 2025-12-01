@@ -196,8 +196,12 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 - `pnpm --filter @sim-corp/roaster-desktop test`
 
 ### T-024 — Predictive assist v1 (ETA + read-only deltas)
-**Status:** PLANNED  
+**Status:** DONE
 **Milestone:** M1
+**Evidence:** Node 20 suites:
+- `pnpm --filter @sim-corp/schemas test`
+- `pnpm --filter @sim-corp/analytics test`
+- `pnpm --filter @sim-corp/roaster-desktop test`
 
 ### T-025 — Tauri packaging v1
 **Status:** PLANNED  

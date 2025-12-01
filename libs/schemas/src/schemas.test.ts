@@ -24,7 +24,8 @@ import {
   MissionSignalsSchema,
   GovernanceDecisionSchema,
   RoastProfileSchema,
-  RoastProfileVersionSchema
+  RoastProfileVersionSchema,
+  RoastPredictionSchema
 } from "./index";
 
 const baseTelemetry = {
@@ -443,6 +444,40 @@ describe("kernel schemas", () => {
     expect(decision.confidence).toBe("LOW");
     expect(decision.reasons).toEqual([]);
     expect(decision.decidedBy).toBe("KERNEL_GOVERNOR");
+  });
+
+  it("parses roast predictions with suggestions", () => {
+    const prediction = RoastPredictionSchema.parse({
+      sessionId: "session-1",
+      atTs: "2025-01-01T00:10:00.000Z",
+      phase: "MAILLARD",
+      inputs: { pointsUsed: 24, channelsAvailable: ["btC", "rorCPerMin"], profileId: "profile-1" },
+      etaSeconds: { toFC: 60, toDrop: 300 },
+      predictedTimes: { fcAtElapsedSeconds: 420, dropAtElapsedSeconds: 720 },
+      predictedDevRatio: 0.18,
+      confidence: {
+        overall: 0.72,
+        components: { dataQuality: 0.8, modelFit: 0.7, phaseFit: 0.8, profileFit: 0.6 },
+        reasons: ["Stable RoR", "Profile targets present"]
+      },
+      suggestions: [
+        {
+          kind: "TIMING",
+          title: "Trending late vs target",
+          detail: "Projected drop is 20s after target",
+          severity: "WARN",
+          requiresApproval: false
+        }
+      ],
+      explain: {
+        method: "HEURISTIC_V1",
+        features: { slope: 2.1, volatility: 0.5 },
+        lastObserved: { elapsedSeconds: 420, btC: 190, rorCPerMin: 12 }
+      }
+    });
+
+    expect(prediction.inputs.pointsUsed).toBe(24);
+    expect(prediction.suggestions[0]?.requiresApproval).toBe(false);
   });
 
   it("validates eval artifacts", () => {
