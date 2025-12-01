@@ -94,6 +94,13 @@ export function Controls({
         >
           Ops
         </button>
+        <button
+          type="button"
+          className={mode === "profiles" ? "chip active" : "chip"}
+          onClick={() => onModeChange("profiles")}
+        >
+          Profiles
+        </button>
       </div>
       <h2 className="panel-title">Mission Parameters</h2>
       <div className="form-grid">

@@ -18,6 +18,7 @@ import { registerSessionQcRoutes } from "./routes/sessions-qc";
 import { registerSessionReportRoutes } from "./routes/session-reports";
 import { ReportMissionEnqueuer } from "./core/report-missions";
 import { MqttOpsEventPublisher, type OpsEventPublisher } from "./ops/publisher";
+import { registerProfileRoutes } from "./routes/profiles";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -84,6 +85,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   registerSessionRoutes(app, { repo });
   registerSessionQcRoutes(app, { repo });
   registerSessionReportRoutes(app, { repo });
+  registerProfileRoutes(app, { repo });
   registerEnvelopeStreamRoutes(app, { envelopeStream });
 
   return app;

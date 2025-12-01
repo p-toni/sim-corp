@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AgentTrace, RoastEvent, TelemetryEnvelope, TelemetryPoint, MissionSignals } from "@sim-corp/schemas";
+import type {
+  AgentTrace,
+  RoastEvent,
+  TelemetryEnvelope,
+  TelemetryPoint,
+  MissionSignals,
+  RoastProfile,
+  RoastProfileVersion
+} from "@sim-corp/schemas";
 import { Controls } from "./components/Controls";
 import { CurveChart } from "./components/CurveChart";
 import { Layout } from "./components/Layout";
@@ -23,7 +31,14 @@ import {
   listMissionsBySubject,
   approveMission,
   postTraceToKernel,
-  runSelfContainedMission
+  runSelfContainedMission,
+  listProfiles,
+  getProfile,
+  listProfileVersions,
+  createProfile,
+  createProfileVersion,
+  toggleArchiveProfile,
+  exportProfile
 } from "./lib/api";
 import {
   AppMode,
@@ -45,6 +60,7 @@ import "./app.css";
 import { QcPanel } from "./components/QcPanel";
 import { ReportPanel } from "./components/ReportPanel";
 import { OpsPanel } from "./components/OpsPanel";
+import { ProfilesPanel } from "./components/ProfilesPanel";
 
 interface AppProps {
   runMission?: MissionRunner;
@@ -81,6 +97,11 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
   const [kernelStatus, setKernelStatus] = useState<string>("Disabled");
   const [liveStatus, setLiveStatus] = useState<string>("Disconnected");
   const [liveError, setLiveError] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<RoastProfile[]>([]);
+  const [selectedProfile, setSelectedProfile] = useState<RoastProfile | null>(null);
+  const [profileVersions, setProfileVersions] = useState<RoastProfileVersion[]>([]);
+  const [profileFilters, setProfileFilters] = useState({ q: "", tag: "", machineModel: "", includeArchived: false });
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const telemetrySourceRef = useRef<EventSource | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -97,6 +118,12 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
       stopLive();
     };
   }, []);
+
+  useEffect(() => {
+    if (mode === "profiles") {
+      void refreshProfiles();
+    }
+  }, [mode, profileFilters]);
 
   const selectedStep = useMemo(() => {
     if (!trace || !selectedStepId) return null;
@@ -121,6 +148,10 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     }
     if (nextMode === "ops") {
       stopLive();
+    }
+    if (nextMode === "profiles") {
+      stopLive();
+      void refreshProfiles();
     }
     if (nextMode !== "playback") {
       setQc({ meta: null, overrides: [], notes: [] });
@@ -278,6 +309,87 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     }
   };
 
+  const refreshProfiles = async (): Promise<void> => {
+    const base = liveConfig.ingestionUrl.replace(/\/$/, "");
+    try {
+      const items = await listProfiles(base, { orgId: liveConfig.orgId, ...profileFilters });
+      setProfiles(items);
+      if (selectedProfile) {
+        await handleSelectProfile(selectedProfile.profileId);
+      }
+    } catch (err) {
+      console.error("Failed to load profiles", err);
+    }
+  };
+
+  const handleSelectProfile = async (profileId: string): Promise<void> => {
+    const base = liveConfig.ingestionUrl.replace(/\/$/, "");
+    try {
+      const [profile, versions] = await Promise.all([
+        getProfile(base, liveConfig.orgId, profileId),
+        listProfileVersions(base, liveConfig.orgId, profileId)
+      ]);
+      setSelectedProfile(profile);
+      setProfileVersions(versions);
+    } catch (err) {
+      console.error("Failed to load profile", err);
+    }
+  };
+
+  const handleCreateProfile = async (input: Partial<RoastProfile>): Promise<void> => {
+    const base = liveConfig.ingestionUrl.replace(/\/$/, "");
+    try {
+      const created = await createProfile(base, {
+        ...input,
+        orgId: liveConfig.orgId,
+        siteId: liveConfig.siteId,
+        source: input.source ?? { kind: "MANUAL" }
+      });
+      setProfileMessage(`Created profile ${created.name}`);
+      await refreshProfiles();
+    } catch (err) {
+      console.error("Failed to create profile", err);
+    }
+  };
+
+  const handleNewProfileVersion = async (
+    profileId: string,
+    input: Partial<RoastProfile>
+  ): Promise<void> => {
+    const base = liveConfig.ingestionUrl.replace(/\/$/, "");
+    try {
+      await createProfileVersion(base, profileId, { ...input, orgId: liveConfig.orgId });
+      setProfileMessage("Saved new version");
+      await handleSelectProfile(profileId);
+    } catch (err) {
+      console.error("Failed to save profile version", err);
+    }
+  };
+
+  const handleArchiveProfile = async (profileId: string, archived: boolean): Promise<void> => {
+    const base = liveConfig.ingestionUrl.replace(/\/$/, "");
+    try {
+      await toggleArchiveProfile(base, liveConfig.orgId, profileId, archived);
+      await refreshProfiles();
+    } catch (err) {
+      console.error("Failed to toggle archive", err);
+    }
+  };
+
+  const handleExportProfile = async (profileId: string, format: "json" | "csv"): Promise<void> => {
+    const base = liveConfig.ingestionUrl.replace(/\/$/, "");
+    try {
+      await exportProfile(base, liveConfig.orgId, profileId, format);
+      setProfileMessage(`Exported profile ${profileId} as ${format}`);
+    } catch (err) {
+      console.error("Failed to export profile", err);
+    }
+  };
+
+  const handleProfileFilterChange = (next: Partial<typeof profileFilters>): void => {
+    setProfileFilters((prev) => ({ ...prev, ...next }));
+  };
+
   const handleSelectSession = async (sessionId: string): Promise<void> => {
     if (!sessionId) return;
     const base = liveConfig.ingestionUrl.replace(/\/$/, "");
@@ -409,6 +521,46 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     const base = liveConfig.ingestionUrl.replace(/\/$/, "");
     const created = await addSessionNote(base, playback.selectedSessionId, note);
     setQc((prev) => ({ ...prev, notes: [created, ...prev.notes] }));
+  };
+
+  const handleSaveProfileFromSession = async (): Promise<void> => {
+    if (!playback.selectedSessionId) return;
+    const base = liveConfig.ingestionUrl.replace(/\/$/, "");
+    const tp = events.find((evt) => evt.type === "TP");
+    const fc = events.find((evt) => evt.type === "FC");
+    const drop = events.find((evt) => evt.type === "DROP");
+    const fcSeconds = (fc as { payload?: { elapsedSeconds?: number } })?.payload?.elapsedSeconds;
+    const dropSeconds = (drop as { payload?: { elapsedSeconds?: number } })?.payload?.elapsedSeconds;
+    const devRatio =
+      typeof fcSeconds === "number" && typeof dropSeconds === "number" && dropSeconds > 0
+        ? (dropSeconds - fcSeconds) / dropSeconds
+        : undefined;
+    const profile: Partial<RoastProfile> = {
+      orgId: liveConfig.orgId,
+      siteId: liveConfig.siteId,
+      machineModel: liveConfig.machineId,
+      name: playback.selectedSessionId,
+      targets: {
+        chargeTempC: undefined,
+        turningPointTempC: readTemp(tp, telemetry),
+        firstCrackTempC: readTemp(fc, telemetry),
+        dropTempC: readTemp(drop, telemetry),
+        targetDevRatio: devRatio,
+        targetTimeToFCSeconds: fcSeconds,
+        targetDropSeconds: dropSeconds
+      },
+      curve: downsampleCurve(telemetry),
+      tags: qc.meta?.tags,
+      notes: qc.meta?.beanName,
+      source: { kind: "FROM_SESSION", sessionId: playback.selectedSessionId }
+    };
+    try {
+      await createProfile(base, profile, "Saved from session");
+      setProfileMessage("Saved profile from session");
+      await refreshProfiles();
+    } catch (err) {
+      console.error("Failed to save profile from session", err);
+    }
   };
 
   const buildLocalSignals = (): MissionSignals | undefined => {
@@ -567,6 +719,21 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     >
       {mode === "ops" ? (
         <OpsPanel />
+      ) : mode === "profiles" ? (
+        <ProfilesPanel
+          profiles={profiles}
+          selectedProfile={selectedProfile}
+          versions={profileVersions}
+          filters={profileFilters}
+          message={profileMessage}
+          onRefresh={refreshProfiles}
+          onFilterChange={handleProfileFilterChange}
+          onSelect={handleSelectProfile}
+          onCreate={handleCreateProfile}
+          onNewVersion={handleNewProfileVersion}
+          onArchiveToggle={handleArchiveProfile}
+          onExport={handleExportProfile}
+        />
       ) : (
         <div className="stack">
           {mode !== "batch" ? (
@@ -598,6 +765,9 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
                     onClick={() => setPlaybackTab("report")}
                   >
                     Report
+                  </button>
+                  <button type="button" className="secondary" onClick={handleSaveProfileFromSession}>
+                    Save as Profile
                   </button>
                 </div>
                 {playbackTab === "qc" ? (
@@ -638,3 +808,33 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
 }
 
 export default App;
+
+function readTemp(event: RoastEvent | undefined, telemetry: TelemetryPoint[]): number | undefined {
+  const elapsed = (event as { payload?: { elapsedSeconds?: number } })?.payload?.elapsedSeconds;
+  if (typeof elapsed !== "number") return undefined;
+  const nearest = telemetry
+    .filter((t) => typeof t.elapsedSeconds === "number")
+    .map((t) => ({ ...t, delta: Math.abs((t.elapsedSeconds ?? 0) - elapsed) }))
+    .sort((a, b) => a.delta - b.delta)[0];
+  return nearest?.btC;
+}
+
+function downsampleCurve(points: TelemetryPoint[]): RoastProfile["curve"] | undefined {
+  const buckets = new Map<number, TelemetryPoint>();
+  for (const point of points) {
+    if (typeof point.elapsedSeconds !== "number") continue;
+    const bucket = Math.floor(point.elapsedSeconds / 5);
+    if (!buckets.has(bucket)) {
+      buckets.set(bucket, point);
+    }
+  }
+  const curvePoints = Array.from(buckets.values()).map((p) => ({
+    elapsedSeconds: p.elapsedSeconds ?? 0,
+    btC: p.btC,
+    // @ts-expect-error legacy typing for ET on telemetry
+    etC: (p as { etC?: number }).etC,
+    rorCPerMin: p.rorCPerMin
+  }));
+  if (!curvePoints.length) return undefined;
+  return { points: curvePoints };
+}

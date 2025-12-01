@@ -13,3 +13,4 @@ export * from "./domain/session";
 export * from "./domain/roast-analysis";
 export * from "./domain/qc";
 export * from "./domain/roast-report";
+export * from "./domain/roast-profile";
