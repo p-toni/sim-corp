@@ -1,6 +1,6 @@
 # TCP Line Driver (T-020 shadow-mode)
 
-This driver ingests newline-delimited telemetry over TCP (no native deps) and publishes the usual MQTT telemetry envelopes. Use it to shadow real hardware via a serial→TCP bridge (e.g. `socat`) without touching actuation. Driver state/metrics are exposed at `/bridge/status` via driver-bridge.
+This driver ingests newline-delimited telemetry over TCP using a Rust N-API addon plus a thin TS adapter and publishes the usual MQTT telemetry envelopes. Use it to shadow real hardware via a serial→TCP bridge (e.g. `socat`) without touching actuation. Packaging ships the compiled `index.node` (or requires a Rust toolchain to build); driver state/metrics are exposed at `/bridge/status` via driver-bridge.
 
 ## Protocol
 
