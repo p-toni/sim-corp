@@ -14,6 +14,7 @@ import { Layout } from "./components/Layout";
 import { LoopTimeline } from "./components/LoopTimeline";
 import { TraceViewer } from "./components/TraceViewer";
 import { AnalysisPanel } from "./components/AnalysisPanel";
+import { PredictionPanel } from "./components/PredictionPanel";
 import {
   extractSimOutputs,
   getSessionEvents,
@@ -102,6 +103,7 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
   const [profileVersions, setProfileVersions] = useState<RoastProfileVersion[]>([]);
   const [profileFilters, setProfileFilters] = useState({ q: "", tag: "", machineModel: "", includeArchived: false });
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [predictionProfileId, setPredictionProfileId] = useState<string | null>(null);
   const telemetrySourceRef = useRef<EventSource | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -124,6 +126,12 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
       void refreshProfiles();
     }
   }, [mode, profileFilters]);
+
+  useEffect(() => {
+    if ((mode === "playback" || mode === "live") && profiles.length === 0) {
+      void refreshProfiles();
+    }
+  }, [mode, profiles.length]);
 
   const selectedStep = useMemo(() => {
     if (!trace || !selectedStepId) return null;
@@ -688,6 +696,8 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     }
   };
 
+  const latestElapsedSeconds = telemetry[telemetry.length - 1]?.elapsedSeconds ?? null;
+
   return (
     <Layout
       sidebar={
@@ -751,6 +761,14 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
             {mode === "playback" ? (
               <div className="stack">
                 <AnalysisPanel analysis={analysis} />
+                <PredictionPanel
+                  sessionId={playback.selectedSessionId}
+                  orgId={liveConfig.orgId}
+                  analysisUrl={analysisUrl}
+                  profiles={profiles}
+                  selectedProfileId={predictionProfileId}
+                  onSelectProfile={setPredictionProfileId}
+                />
                 <div className="tab-switcher">
                   <button
                     type="button"
@@ -796,6 +814,20 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
                     onApprove={handleApproveMission}
                   />
                 )}
+              </div>
+            ) : mode === "live" ? (
+              <div className="stack">
+                <PredictionPanel
+                  sessionId={currentSessionId}
+                  orgId={liveConfig.orgId}
+                  analysisUrl={analysisUrl}
+                  profiles={profiles}
+                  selectedProfileId={predictionProfileId}
+                  onSelectProfile={setPredictionProfileId}
+                  live
+                  refreshToken={latestElapsedSeconds}
+                />
+                <TraceViewer step={selectedStep} />
               </div>
             ) : (
               <TraceViewer step={selectedStep} />

@@ -503,6 +503,33 @@ button.primary:not(:disabled):hover {
   gap: 8px;
 }
 
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.progress {
+  background: #f3f4f6;
+  border-radius: 6px;
+  height: 8px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  background: linear-gradient(90deg, #4f46e5, #22c55e);
+  height: 100%;
+}
+
+.suggestion-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
 .warnings ul,
 .recommendations ul {
   margin: 0;

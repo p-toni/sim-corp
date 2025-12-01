@@ -27,7 +27,9 @@ import {
   RoastProfileSchema,
   RoastProfileVersion,
   RoastProfileVersionSchema,
-  RoastProfileExportBundleSchema
+  RoastProfileExportBundleSchema,
+  RoastPrediction,
+  RoastPredictionSchema
 } from "@sim-corp/schemas";
 import { AgentRuntime } from "@sim-corp/agent-runtime";
 import { SimRoastRequestSchema, simulateRoast } from "@sim-corp/sim-twin";
@@ -324,6 +326,17 @@ export async function getSessionSummary(baseUrl: string, sessionId: string): Pro
 export async function getSessionAnalysis(analyticsUrl: string, sessionId: string): Promise<RoastAnalysis> {
   const url = `${analyticsUrl.replace(/\/$/, "")}/analysis/session/${sessionId}`;
   return fetchJson(url, RoastAnalysisSchema);
+}
+
+export async function getPrediction(
+  analyticsUrl: string,
+  sessionId: string,
+  params: { orgId: string; profileId?: string }
+): Promise<RoastPrediction> {
+  const qs = new URLSearchParams({ orgId: params.orgId });
+  if (params.profileId) qs.set("profileId", params.profileId);
+  const url = `${analyticsUrl.replace(/\/$/, "")}/prediction/session/${sessionId}?${qs.toString()}`;
+  return fetchJson(url, RoastPredictionSchema);
 }
 
 export async function getSessionMeta(baseUrl: string, sessionId: string): Promise<SessionMeta> {

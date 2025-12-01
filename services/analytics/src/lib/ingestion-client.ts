@@ -6,13 +6,15 @@ import {
   EventOverrideSchema,
   TelemetryPointSchema,
   SessionNoteSchema,
+  RoastProfileSchema,
   type RoastEvent,
   type RoastSession,
   type RoastSessionSummary,
   type SessionMeta,
   type EventOverride,
   type SessionNote,
-  type TelemetryPoint
+  type TelemetryPoint,
+  type RoastProfile
 } from "@sim-corp/schemas";
 
 const DEFAULT_INGESTION_URL = "http://127.0.0.1:4001";
@@ -65,4 +67,8 @@ export async function fetchSessionNotes(sessionId: string): Promise<SessionNote[
 
 export async function fetchEventOverrides(sessionId: string): Promise<EventOverride[]> {
   return fetchJson(`/sessions/${sessionId}/events/overrides`, EventOverrideSchema.array());
+}
+
+export async function fetchProfile(orgId: string, profileId: string): Promise<RoastProfile> {
+  return fetchJson(`/profiles/${profileId}?orgId=${orgId}`, RoastProfileSchema);
 }
