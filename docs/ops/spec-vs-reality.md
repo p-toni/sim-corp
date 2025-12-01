@@ -23,9 +23,11 @@ We have a functioning autonomy pipeline:
 - analytics + QC ground truth + report generation
 - dispatcher from ops event `session.closed` plus fallback semantics
 - governor gates: confidence quarantine, approvals, rate limits
-- real telemetry on-ramp: tcp-line shadow driver
+- real telemetry on-ramp: native-backed tcp-line shadow driver (Rust N-API build or prebuilt index.node)
 
 See: `tasks/task-registry.md`
+
+Real tcp-line deployments need Node 20 plus a Rust toolchain during build (or a prebuilt `native/index.node` baked into the image).
 
 ---
 
@@ -36,7 +38,7 @@ See: `tasks/task-registry.md`
 - [x] QC module linked to roasts (meta/notes + overrides persisted and applied) - `services/analytics`, `services/ingestion`
 - [x] Variance/analysis outputs (analytics phase detection; warnings; recommendations) - `services/analytics`
 - [x] Read-only guidance loop via reports (agent-generated report + next actions) - `agents/roast-report-agent`, `services/report-worker`
-- [x] Shadow real telemetry path (tcp-line) and session-close automation - `drivers/tcp-line`, `services/dispatcher`
+- [x] Shadow real telemetry path (tcp-line, Rust addon + TS adapter) and session-close automation - `drivers/tcp-line`, `services/dispatcher`
 
 ### Partial
 - [~] RoR stabilization aids (some analysis exists; not a dedicated RoR assistant UX) - `services/analytics`

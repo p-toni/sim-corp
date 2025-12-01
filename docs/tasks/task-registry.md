@@ -157,10 +157,11 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 **Manual evidence:** dispatcher down + broker down scenarios verified (post-fix)
 
 ### T-020 — Real hardware shadow P0 (tcp-line driver)
-**Status:** DONE  
-**Primary artifacts:** `drivers/tcp-line`, driver-bridge wiring, schema `extras`, docs  
-**Evidence:**  
-- `pnpm --filter @sim-corp/driver-tcp-line test` (Node 20)  
+**Status:** DONE
+**Primary artifacts:** Rust N-API module + TS adapter in `drivers/tcp-line`, driver-bridge wiring, schema `extras`, docs
+**Evidence:**
+- `pnpm --filter @sim-corp/driver-tcp-line test` (Node 20; builds Rust addon via `build:native`)
+- `pnpm --filter @sim-corp/driver-tcp-line run build:native` (Rust toolchain available or prebuilt binary baked)
 - `pnpm --filter @sim-corp/driver-bridge test` (Node 20)
 
 ### T-021 — Governor gates (confidence + rate limits + approval)
