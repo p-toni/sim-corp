@@ -7,3 +7,5 @@ coverage/
 .idea/
 .DS_Store
 *.log
+drivers/tcp-line/native/target/
+drivers/tcp-line/native/index.node
