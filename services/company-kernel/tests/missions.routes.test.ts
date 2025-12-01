@@ -44,8 +44,8 @@ describe("mission routes", () => {
 
     const list = await server.inject({ method: "GET", url: "/missions" });
     expect(list.statusCode).toBe(200);
-    const missions = list.json() as Array<{ missionId: string }>;
-    expect(missions.length).toBeGreaterThan(0);
+    const missions = list.json() as { items: Array<{ missionId: string }> };
+    expect(missions.items.length).toBeGreaterThan(0);
 
     const metrics = await server.inject({ method: "GET", url: "/missions/metrics" });
     expect(metrics.statusCode).toBe(200);
@@ -172,6 +172,50 @@ describe("mission routes", () => {
     const body = approve.json() as { status: string; governance?: { decidedBy?: string } };
     expect(body.status).toBe("PENDING");
     expect(body.governance?.decidedBy).toBe("HUMAN");
+  });
+
+  it("supports filtering by subjectId and machineId", async () => {
+    const repo = new MissionRepository(openKernelDatabase(dbPath));
+    const store = new MissionStore(repo, { baseBackoffMs: 1 });
+    await store.createMission({
+      goal: "generate-roast-report",
+      subjectId: "target-subject",
+      context: { machineId: "mx-1" }
+    });
+    await store.createMission({
+      goal: "generate-roast-report",
+      subjectId: "other",
+      context: { machineId: "mx-2" }
+    });
+
+    const bySubject = await server.inject({ method: "GET", url: "/missions?subjectId=target-subject" });
+    expect(bySubject.statusCode).toBe(200);
+    const subjectItems = (bySubject.json() as { items: Array<{ subjectId?: string }> }).items;
+    expect(subjectItems.every((m) => m.subjectId === "target-subject")).toBe(true);
+
+    const byMachine = await server.inject({ method: "GET", url: "/missions?machineId=mx-1" });
+    expect(byMachine.statusCode).toBe(200);
+    const machineItems = (byMachine.json() as { items: Array<{ context?: { machineId?: string } }> }).items;
+    expect(machineItems.length).toBe(1);
+    expect(machineItems[0]?.context?.machineId).toBe("mx-1");
+  });
+
+  it("supports retryNow for retryable missions", async () => {
+    const repo = new MissionRepository(openKernelDatabase(dbPath));
+    const store = new MissionStore(repo, { baseBackoffMs: 1 });
+    const { mission } = store.createMission({
+      goal: "generate-roast-report",
+      status: "RETRY",
+      nextRetryAt: new Date(Date.now() + 60_000).toISOString()
+    });
+
+    const response = await server.inject({ method: "POST", url: `/missions/${mission.missionId}/retryNow` });
+    expect(response.statusCode).toBe(200);
+    const updated = response.json() as { status: string; nextRetryAt?: string; governance?: { reasons?: Array<{ code?: string }> } };
+    expect(updated.status).toBe("RETRY");
+    expect(updated.nextRetryAt).toBeTruthy();
+    expect(new Date(updated.nextRetryAt ?? 0).getTime()).toBeLessThanOrEqual(Date.now());
+    expect(updated.governance?.reasons?.some((r) => r.code === "MANUAL_RETRY_NOW")).toBe(true);
   });
 
   it("rate limits missions when bucket is empty", async () => {

@@ -46,8 +46,23 @@ const KernelMissionRecordSchema = MissionSchema.extend({
   signals: MissionSignalsSchema.optional()
 });
 
+const KernelMissionListSchema = z.object({
+  items: KernelMissionRecordSchema.array(),
+  nextCursor: z.string().optional()
+});
+
 export type KernelMissionRecord = z.infer<typeof KernelMissionRecordSchema>;
 type MissionSignals = z.infer<typeof MissionSignalsSchema>;
+
+export interface MissionListFilters {
+  status?: string | string[];
+  goal?: string;
+  subjectId?: string;
+  orgId?: string;
+  siteId?: string;
+  machineId?: string;
+  limit?: number;
+}
 
 export function extractSimOutputs(trace: AgentTrace): SimOutputs {
   const telemetry: TelemetryPoint[] = [];
@@ -401,13 +416,29 @@ export async function enqueueReportMission(
   }
 }
 
-export async function listMissionsBySubject(subjectId: string, goal = "generate-roast-report"): Promise<KernelMissionRecord[]> {
+export async function listMissions(filters: MissionListFilters = {}): Promise<z.infer<typeof KernelMissionListSchema>> {
   const url = new URL("/missions", resolveKernelUrl());
-  url.searchParams.set("subjectId", subjectId);
-  if (goal) {
-    url.searchParams.set("goal", goal);
+  if (filters.status) {
+    const statusValue = Array.isArray(filters.status) ? filters.status.join(",") : filters.status;
+    url.searchParams.set("status", statusValue);
   }
-  return fetchJson(url.toString(), KernelMissionRecordSchema.array());
+  if (filters.goal) url.searchParams.set("goal", filters.goal);
+  if (filters.subjectId) url.searchParams.set("subjectId", filters.subjectId);
+  if (filters.orgId) url.searchParams.set("orgId", filters.orgId);
+  if (filters.siteId) url.searchParams.set("siteId", filters.siteId);
+  if (filters.machineId) url.searchParams.set("machineId", filters.machineId);
+  if (typeof filters.limit === "number") url.searchParams.set("limit", String(filters.limit));
+  return fetchJson(url.toString(), KernelMissionListSchema);
+}
+
+export async function getMission(missionId: string): Promise<KernelMissionRecord> {
+  const url = new URL(`/missions/${missionId}`, resolveKernelUrl()).toString();
+  return fetchJson(url, KernelMissionRecordSchema);
+}
+
+export async function listMissionsBySubject(subjectId: string, goal = "generate-roast-report"): Promise<KernelMissionRecord[]> {
+  const list = await listMissions({ subjectId, goal });
+  return list.items;
 }
 
 export async function approveMission(missionId: string): Promise<KernelMissionRecord> {
@@ -421,4 +452,35 @@ export async function approveMission(missionId: string): Promise<KernelMissionRe
   const parsed = KernelMissionRecordSchema.safeParse(json);
   if (!parsed.success) throw new Error("Response validation failed");
   return parsed.data;
+}
+
+export async function cancelMission(missionId: string): Promise<KernelMissionRecord> {
+  const url = new URL(`/missions/${missionId}/cancel`, resolveKernelUrl()).toString();
+  const res = await fetch(url, { method: "POST" });
+  if (!res.ok) {
+    const message = await res.text().catch(() => "unknown error");
+    throw new HttpError(message || "Cancel failed", res.status);
+  }
+  const json = await res.json();
+  const parsed = KernelMissionRecordSchema.safeParse(json);
+  if (!parsed.success) throw new Error("Response validation failed");
+  return parsed.data;
+}
+
+export async function retryNowMission(missionId: string): Promise<KernelMissionRecord> {
+  const url = new URL(`/missions/${missionId}/retryNow`, resolveKernelUrl()).toString();
+  const res = await fetch(url, { method: "POST" });
+  if (!res.ok) {
+    const message = await res.text().catch(() => "unknown error");
+    throw new HttpError(message || "Retry failed", res.status);
+  }
+  const json = await res.json();
+  const parsed = KernelMissionRecordSchema.safeParse(json);
+  if (!parsed.success) throw new Error("Response validation failed");
+  return parsed.data;
+}
+
+export async function getGovernorConfig(): Promise<unknown> {
+  const url = new URL("/governor/config", resolveKernelUrl()).toString();
+  return fetchJson(url);
 }

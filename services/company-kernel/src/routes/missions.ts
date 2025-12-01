@@ -11,7 +11,17 @@ interface MissionRouteDeps {
 
 type MissionCreateRequest = FastifyRequest<{ Body: MissionCreateInput }>;
 type MissionListRequest = FastifyRequest<{
-  Querystring: { status?: MissionStatus; goal?: string; agent?: string; sessionId?: string; subjectId?: string };
+  Querystring: {
+    status?: MissionStatus | MissionStatus[] | string | string[];
+    goal?: string;
+    agent?: string;
+    sessionId?: string;
+    subjectId?: string;
+    orgId?: string;
+    siteId?: string;
+    machineId?: string;
+    limit?: number;
+  };
 }>;
 type MissionClaimRequest = FastifyRequest<{ Body: { agentName?: string; goals?: string[] } }>;
 type MissionUpdateRequest = FastifyRequest<{ Params: { id: string }; Body: { summary?: Record<string, unknown>; leaseId?: string } }>;
@@ -55,8 +65,9 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
   });
 
   app.get("/missions", async (request: MissionListRequest) => {
-    const { status, goal, agent, sessionId, subjectId } = request.query;
-    return missions.listMissions({ status, goal, agent, sessionId, subjectId });
+    const { goal, agent, sessionId, subjectId, orgId, siteId, machineId, limit } = request.query;
+    const statuses = normalizeStatuses(request.query.status);
+    return missions.listMissions({ status: statuses, goal, agent, sessionId, subjectId, orgId, siteId, machineId, limit });
   });
 
   app.get("/missions/:id", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
@@ -162,7 +173,44 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
     }
   });
 
+  app.post("/missions/:id/retryNow", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    try {
+      const mission = missions.getMission(request.params.id);
+      if (!mission) {
+        return reply.status(404).send({ error: "Mission not found" });
+      }
+      if (mission.status !== "RETRY") {
+        return reply.status(409).send({ error: "Mission is not in retry state" });
+      }
+      const updated = missions.retryNowMission(request.params.id);
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to retry mission";
+      const status = /not retryable/i.test(message) ? 409 : 400;
+      return reply.status(status).send({ error: message });
+    }
+  });
+
   app.get("/missions/metrics", async () => missions.metrics());
+}
+
+function normalizeStatuses(status?: MissionStatus | MissionStatus[] | string | string[]): MissionStatus[] | undefined {
+  if (!status) return undefined;
+  const values = Array.isArray(status) ? status.flatMap((item) => String(item).split(",")) : String(status).split(",");
+  const allowed: MissionStatus[] = [
+    "PENDING",
+    "RUNNING",
+    "RETRY",
+    "DONE",
+    "FAILED",
+    "QUARANTINED",
+    "BLOCKED",
+    "CANCELED"
+  ];
+  const normalized = values
+    .map((v) => v.trim().toUpperCase())
+    .filter((v): v is MissionStatus => (allowed as string[]).includes(v));
+  return normalized.length ? normalized : undefined;
 }
 
 function normalizeGoal(goal: Mission["goal"]): string {

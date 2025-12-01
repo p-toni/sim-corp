@@ -179,9 +179,12 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 ## Next tasks (Roadmap placeholders)
 
 ### T-022 — Mission Inbox / Ops panel (Desktop)
-**Status:** NEXT  
-**Milestone:** M1  
+**Status:** DONE
+**Milestone:** M1
 **Scope:** mission list/filter, approve/cancel/retry, show governance reasons/signals, basic governor config read-only
+**Evidence:** Node 20 suites:
+- `pnpm --filter @sim-corp/company-kernel test`
+- `pnpm --filter @sim-corp/roaster-desktop test`
 
 ### T-023 — Profile library v1 (import/export + versioning)
 **Status:** PLANNED  
