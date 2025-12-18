@@ -92,6 +92,12 @@ body {
   gap: 10px;
 }
 
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
 .form-field {
   display: flex;
   flex-direction: column;
@@ -186,6 +192,13 @@ button.primary:not(:disabled):hover {
   display: flex;
   gap: 8px;
   margin-bottom: 10px;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 
 .chip {

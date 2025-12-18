@@ -26,10 +26,15 @@ Services:
 - dispatcher: 4010
 
 ## Start roaster-desktop (optional UI)
-```bash
-pnpm --filter @sim-corp/roaster-desktop dev
-# open http://127.0.0.1:5173 (or Vite dev port)
-```
+- Packaged desktop (Tauri):
+  - Build artifacts: `pnpm --filter @sim-corp/roaster-desktop tauri:build` (Node 20 + Rust toolchain)
+  - Install the generated bundle from `apps/roaster-desktop/src-tauri/target`.
+  - Open the **Settings** tab and confirm endpoints (defaults: ingestion `http://127.0.0.1:4001`, kernel `http://127.0.0.1:4000`, analytics `http://127.0.0.1:4006`, optional dispatcher `http://127.0.0.1:4010`).
+- Dev server (Vite):
+  ```bash
+  pnpm --filter @sim-corp/roaster-desktop dev
+  # open http://127.0.0.1:5173 (or Vite dev port)
+  ```
 
 ## Publish a simulated roast
 ```bash

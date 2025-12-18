@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.tauri.app/config/1",
+  "build": {
+    "beforeBuildCommand": "pnpm --filter @sim-corp/roaster-desktop build",
+    "beforeDevCommand": "pnpm --filter @sim-corp/roaster-desktop dev --host --port 5173",
+    "devPath": "http://localhost:5173",
+    "distDir": "../dist"
+  },
+  "package": {
+    "productName": "Artisan.ts",
+    "version": "0.0.1"
+  },
+  "tauri": {
+    "bundle": {
+      "active": true,
+      "identifier": "com.sim-corp.artisan"
+    },
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:* http://localhost:*"
+    },
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false
+      },
+      "http": {
+        "all": false,
+        "scope": [
+          "http://127.0.0.1/*",
+          "http://127.0.0.1:*/*",
+          "http://localhost/*",
+          "http://localhost:*/*"
+        ]
+      },
+      "protocol": {
+        "assetScope": ["**"]
+      }
+    },
+    "windows": [
+      {
+        "title": "Artisan.ts",
+        "width": 1280,
+        "height": 720,
+        "resizable": true
+      }
+    ]
+  }
+}

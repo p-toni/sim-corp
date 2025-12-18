@@ -25,7 +25,7 @@ export const defaultMissionParams: SimMissionParams = {
   sampleIntervalSeconds: 2
 };
 
-export type AppMode = "batch" | "live" | "playback" | "ops" | "profiles";
+export type AppMode = "batch" | "live" | "playback" | "ops" | "profiles" | "settings";
 export type PlaybackMode = "playback";
 export type PlaybackTab = "qc" | "report";
 

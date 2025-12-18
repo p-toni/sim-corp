@@ -15,6 +15,7 @@ import { LoopTimeline } from "./components/LoopTimeline";
 import { TraceViewer } from "./components/TraceViewer";
 import { AnalysisPanel } from "./components/AnalysisPanel";
 import { PredictionPanel } from "./components/PredictionPanel";
+import { SettingsPanel } from "./components/SettingsPanel";
 import {
   extractSimOutputs,
   getSessionEvents,
@@ -57,6 +58,12 @@ import {
   defaultMissionParams,
   stepIdForEntry
 } from "./lib/types";
+import {
+  defaultEndpointSettings,
+  EndpointSettings,
+  loadEndpointSettings,
+  saveEndpointSettings
+} from "./lib/settings";
 import "./app.css";
 import { QcPanel } from "./components/QcPanel";
 import { ReportPanel } from "./components/ReportPanel";
@@ -67,16 +74,16 @@ interface AppProps {
   runMission?: MissionRunner;
 }
 
-// TODO(@human): wrap this Vite UI with a Tauri shell once the skeleton stabilizes.
 export function App({ runMission = runSelfContainedMission }: AppProps) {
   const [mode, setMode] = useState<AppMode>("batch");
   const [params, setParams] = useState<SimMissionParams>(defaultMissionParams);
   const [liveConfig, setLiveConfig] = useState<LiveConfig>(defaultLiveConfig);
+  const [endpoints, setEndpoints] = useState<EndpointSettings>(defaultEndpointSettings);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [telemetry, setTelemetry] = useState<TelemetryPoint[]>([]);
   const [events, setEvents] = useState<RoastEvent[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [playback, setPlayback] = useState<PlaybackState>({ sessions: [], selectedSessionId: null });
-  const [analysisUrl, setAnalysisUrl] = useState<string>("http://127.0.0.1:4006");
   const [analysis, setAnalysis] = useState<import("@sim-corp/schemas").RoastAnalysis | null>(null);
   const [qc, setQc] = useState<QcState>({ meta: null, overrides: [], notes: [] });
   const [reportState, setReportState] = useState<ReportState>({
@@ -106,6 +113,20 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
   const [predictionProfileId, setPredictionProfileId] = useState<string | null>(null);
   const telemetrySourceRef = useRef<EventSource | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      const loaded = await loadEndpointSettings();
+      setEndpoints(loaded);
+      setLiveConfig((prev) => ({ ...prev, ingestionUrl: loaded.ingestionUrl }));
+      setSettingsLoaded(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    setLiveConfig((prev) => ({ ...prev, ingestionUrl: endpoints.ingestionUrl }));
+  }, [endpoints.ingestionUrl, settingsLoaded]);
 
   useEffect(() => {
     if (trace?.entries?.length) {
@@ -161,6 +182,9 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
       stopLive();
       void refreshProfiles();
     }
+    if (nextMode === "settings") {
+      stopLive();
+    }
     if (nextMode !== "playback") {
       setQc({ meta: null, overrides: [], notes: [] });
       setReportState({
@@ -173,6 +197,22 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
         approving: false
       });
     }
+  };
+
+  const persistSettings = async (update: EndpointSettings | Partial<EndpointSettings>): Promise<EndpointSettings> => {
+    const merged = await saveEndpointSettings(update);
+    setEndpoints(merged);
+    setLiveConfig((prev) => ({ ...prev, ingestionUrl: merged.ingestionUrl }));
+    return merged;
+  };
+
+  const handleSettingsChange = (next: EndpointSettings): void => {
+    setEndpoints(next);
+    setLiveConfig((prev) => ({ ...prev, ingestionUrl: next.ingestionUrl }));
+  };
+
+  const handleAnalyticsUrlChange = (url: string): void => {
+    void persistSettings({ analyticsUrl: url });
   };
 
   const handleLiveConfigChange = (next: Partial<LiveConfig>): void => {
@@ -434,7 +474,7 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
 
   const refreshAnalysis = async (sessionId: string): Promise<void> => {
     try {
-      const a = await getSessionAnalysis(analysisUrl, sessionId);
+      const a = await getSessionAnalysis(endpoints.analyticsUrl, sessionId);
       setAnalysis(a);
     } catch (err) {
       console.error("Failed to load analysis", err);
@@ -722,12 +762,14 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
           playback={playback}
           onSelectSession={handleSelectSession}
           onRefreshSessions={refreshSessions}
-          analyticsUrl={analysisUrl}
-          onChangeAnalyticsUrl={setAnalysisUrl}
+          analyticsUrl={endpoints.analyticsUrl}
+          onChangeAnalyticsUrl={handleAnalyticsUrlChange}
         />
       }
     >
-      {mode === "ops" ? (
+      {mode === "settings" ? (
+        <SettingsPanel settings={endpoints} onSave={persistSettings} onChange={handleSettingsChange} />
+      ) : mode === "ops" ? (
         <OpsPanel />
       ) : mode === "profiles" ? (
         <ProfilesPanel
@@ -761,14 +803,14 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
             {mode === "playback" ? (
               <div className="stack">
                 <AnalysisPanel analysis={analysis} />
-                <PredictionPanel
-                  sessionId={playback.selectedSessionId}
-                  orgId={liveConfig.orgId}
-                  analysisUrl={analysisUrl}
-                  profiles={profiles}
-                  selectedProfileId={predictionProfileId}
-                  onSelectProfile={setPredictionProfileId}
-                />
+                  <PredictionPanel
+                    sessionId={playback.selectedSessionId}
+                    orgId={liveConfig.orgId}
+                  analysisUrl={endpoints.analyticsUrl}
+                    profiles={profiles}
+                    selectedProfileId={predictionProfileId}
+                    onSelectProfile={setPredictionProfileId}
+                  />
                 <div className="tab-switcher">
                   <button
                     type="button"
@@ -817,14 +859,14 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
               </div>
             ) : mode === "live" ? (
               <div className="stack">
-                <PredictionPanel
-                  sessionId={currentSessionId}
-                  orgId={liveConfig.orgId}
-                  analysisUrl={analysisUrl}
-                  profiles={profiles}
-                  selectedProfileId={predictionProfileId}
-                  onSelectProfile={setPredictionProfileId}
-                  live
+                  <PredictionPanel
+                    sessionId={currentSessionId}
+                    orgId={liveConfig.orgId}
+                  analysisUrl={endpoints.analyticsUrl}
+                    profiles={profiles}
+                    selectedProfileId={predictionProfileId}
+                    onSelectProfile={setPredictionProfileId}
+                    live
                   refreshToken={latestElapsedSeconds}
                 />
                 <TraceViewer step={selectedStep} />

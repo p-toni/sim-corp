@@ -63,45 +63,65 @@ export function Controls({
       onLiveConfigChange({ [key]: event.target.value });
     };
 
+  const modeToggle = (
+    <div className="mode-toggle">
+      <button
+        type="button"
+        className={mode === "batch" ? "chip active" : "chip"}
+        onClick={() => onModeChange("batch")}
+      >
+        Batch Mode
+      </button>
+      <button
+        type="button"
+        className={mode === "live" ? "chip active" : "chip"}
+        onClick={() => onModeChange("live")}
+      >
+        Live Mode
+      </button>
+      <button
+        type="button"
+        className={mode === "playback" ? "chip active" : "chip"}
+        onClick={() => onModeChange("playback")}
+      >
+        Playback
+      </button>
+      <button
+        type="button"
+        className={mode === "ops" ? "chip active" : "chip"}
+        onClick={() => onModeChange("ops")}
+      >
+        Ops
+      </button>
+      <button
+        type="button"
+        className={mode === "profiles" ? "chip active" : "chip"}
+        onClick={() => onModeChange("profiles")}
+      >
+        Profiles
+      </button>
+      <button
+        type="button"
+        className={mode === "settings" ? "chip active" : "chip"}
+        onClick={() => onModeChange("settings")}
+      >
+        Settings
+      </button>
+    </div>
+  );
+
+  if (mode === "settings") {
+    return (
+      <div className="panel">
+        {modeToggle}
+        <p className="muted small-text">Update endpoints in the Settings tab.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="panel">
-      <div className="mode-toggle">
-        <button
-          type="button"
-          className={mode === "batch" ? "chip active" : "chip"}
-          onClick={() => onModeChange("batch")}
-        >
-          Batch Mode
-        </button>
-        <button
-          type="button"
-          className={mode === "live" ? "chip active" : "chip"}
-          onClick={() => onModeChange("live")}
-        >
-          Live Mode
-        </button>
-        <button
-          type="button"
-          className={mode === "playback" ? "chip active" : "chip"}
-          onClick={() => onModeChange("playback")}
-        >
-          Playback
-        </button>
-        <button
-          type="button"
-          className={mode === "ops" ? "chip active" : "chip"}
-          onClick={() => onModeChange("ops")}
-        >
-          Ops
-        </button>
-        <button
-          type="button"
-          className={mode === "profiles" ? "chip active" : "chip"}
-          onClick={() => onModeChange("profiles")}
-        >
-          Profiles
-        </button>
-      </div>
+      {modeToggle}
       <h2 className="panel-title">Mission Parameters</h2>
       <div className="form-grid">
         <label className="form-field">
@@ -217,6 +237,7 @@ export function Controls({
               value={analyticsUrl}
               onChange={(event) => onChangeAnalyticsUrl(event.target.value)}
             />
+            <span className="muted small-text">Persisted in Settings.</span>
           </label>
           <button type="button" className="secondary" onClick={onRefreshSessions}>
             Refresh sessions

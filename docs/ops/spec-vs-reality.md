@@ -48,7 +48,7 @@ Real tcp-line deployments need Node 20 plus a Rust toolchain during build (or a 
 ### Missing (as written in canon)
 - [ ] Local-first runtime: "works offline, signed telemetry, reversible actions"
   - Signed telemetry is not yet implemented (T-027)
-  - Offline-first packaged runtime (Tauri + local services) is not complete (T-025)
+  - Packaged desktop UI shipped (T-025), but offline local services are still external and not bundled in the app
 - [ ] Profile library versioning + import/export UX (T-023)
 - [ ] Cupping & sensory forms with Agtron capture (partial implementation only)
 
@@ -104,7 +104,7 @@ Real tcp-line deployments need Node 20 plus a Rust toolchain during build (or a 
 - [x] Edge MQTT topology (local stack) - `infra/local/docker-compose.yaml`
 
 ### Not aligned yet
-- [ ] Tauri packaging (explicit in canon) (T-025)
+- [x] Tauri packaging (explicit in canon) (T-025)
 - [ ] Clerk auth (explicit in canon) (T-026)
 - [ ] Vendor drivers: Bullet R1 / Giesen W6 read-only (canon-specific) (T-029)
 
@@ -151,7 +151,7 @@ These map directly to roadmap milestones (see `tasks/roadmap.md`):
 - T-022 Mission Inbox / Ops panel
 - T-023 Profile library v1
 - T-024 Predictive assist v1
-- T-025 Tauri packaging v1
+- T-025 Tauri packaging v1 (delivered)
 - T-026 Clerk auth + tenancy + permissions
 - T-027 Device identity + signed telemetry
 - T-028 Eval harness + golden cases + promotion gates

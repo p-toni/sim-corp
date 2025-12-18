@@ -36,6 +36,7 @@ import { SimRoastRequestSchema, simulateRoast } from "@sim-corp/sim-twin";
 import { runSimRoastMission } from "@sim-corp/sim-roast-runner";
 import { simRoastReasoner } from "../../../../agents/sim-roast-runner/src/agent";
 import { z } from "zod";
+import { defaultEndpointSettings, getEndpointSettings } from "./settings";
 
 interface SimOutputs {
   telemetry: TelemetryPoint[];
@@ -111,8 +112,6 @@ export function extractSimOutputs(trace: AgentTrace): SimOutputs {
   return { telemetry, events };
 }
 
-const DEFAULT_KERNEL_URL = "http://127.0.0.1:3000";
-
 function getEnv(key: string): string | undefined {
   if (typeof process !== "undefined" && process?.env?.[key]) {
     return process.env[key];
@@ -131,7 +130,7 @@ function resolveSimTwinUrl(): string | undefined {
 }
 
 function resolveKernelUrl(): string {
-  return getEnv("KERNEL_URL") ?? DEFAULT_KERNEL_URL;
+  return getEndpointSettings().kernelUrl || defaultEndpointSettings.kernelUrl;
 }
 
 function isNodeLike(): boolean {
@@ -323,19 +322,21 @@ export async function getSessionSummary(baseUrl: string, sessionId: string): Pro
   return fetchJson(url, RoastSessionSchema);
 }
 
-export async function getSessionAnalysis(analyticsUrl: string, sessionId: string): Promise<RoastAnalysis> {
-  const url = `${analyticsUrl.replace(/\/$/, "")}/analysis/session/${sessionId}`;
+export async function getSessionAnalysis(analyticsUrl: string | undefined, sessionId: string): Promise<RoastAnalysis> {
+  const base = (analyticsUrl ?? getEndpointSettings().analyticsUrl ?? defaultEndpointSettings.analyticsUrl).replace(/\/$/, "");
+  const url = `${base}/analysis/session/${sessionId}`;
   return fetchJson(url, RoastAnalysisSchema);
 }
 
 export async function getPrediction(
-  analyticsUrl: string,
+  analyticsUrl: string | undefined,
   sessionId: string,
   params: { orgId: string; profileId?: string }
 ): Promise<RoastPrediction> {
   const qs = new URLSearchParams({ orgId: params.orgId });
   if (params.profileId) qs.set("profileId", params.profileId);
-  const url = `${analyticsUrl.replace(/\/$/, "")}/prediction/session/${sessionId}?${qs.toString()}`;
+  const base = (analyticsUrl ?? getEndpointSettings().analyticsUrl ?? defaultEndpointSettings.analyticsUrl).replace(/\/$/, "");
+  const url = `${base}/prediction/session/${sessionId}?${qs.toString()}`;
   return fetchJson(url, RoastPredictionSchema);
 }
 
@@ -619,4 +620,9 @@ export async function exportProfile(
 export async function getGovernorConfig(): Promise<unknown> {
   const url = new URL("/governor/config", resolveKernelUrl()).toString();
   return fetchJson(url);
+}
+
+export async function getDispatcherStatus(baseUrl: string): Promise<unknown> {
+  const base = baseUrl.replace(/\/$/, "");
+  return fetchJson(`${base}/status`);
 }
