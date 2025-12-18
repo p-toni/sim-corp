@@ -204,8 +204,19 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 - `pnpm --filter @sim-corp/roaster-desktop test`
 
 ### T-025 — Tauri packaging v1
-**Status:** PLANNED  
+**Status:** DONE
 **Milestone:** M1
+**Evidence:**
+- `pnpm --filter @sim-corp/roaster-desktop test`
+- `pnpm --filter @sim-corp/roaster-desktop build`
+**Manual validation:**
+- [ ] `tauri dev` opens a desktop window and loads the UI (blocked in CI)
+- [ ] Configure endpoints in Settings and persist
+- [ ] Playback loads sessions
+- [ ] Ops panel lists missions
+- [ ] Profiles list loads
+- [ ] Prediction panel loads
+- [ ] Report tab loads
 
 ### T-026 — Auth & tenancy (Clerk) + permissions
 **Status:** PLANNED  

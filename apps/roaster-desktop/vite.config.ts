@@ -7,10 +7,19 @@ const resolvePath = (p: string): string => path.resolve(__dirname, p);
 
 export default defineConfig({
   plugins: [tsconfigPaths(), react()],
+  envPrefix: ["VITE_", "TAURI_"],
+  server: {
+    port: 5173,
+    strictPort: true
+  },
+  preview: {
+    port: 4173,
+    strictPort: true
+  },
   resolve: {
     alias: {
       "@sim-corp/agent-runtime": resolvePath("../../libs/agent-runtime/src/index.ts"),
-      "@sim-corp/sim-twin": resolvePath("../../services/sim-twin/src/index.ts"),
+      "@sim-corp/sim-twin": resolvePath("../../services/sim-twin/src/browser.ts"),
       "@sim-corp/schemas": resolvePath("../../libs/schemas/src/index.ts"),
       "@sim-corp/sim-roast-runner": resolvePath("../../agents/sim-roast-runner/src/index.ts"),
       "@sim-corp/sim-roast-runner/src": resolvePath("../../agents/sim-roast-runner/src"),

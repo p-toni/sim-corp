@@ -22,3 +22,9 @@ In Docker, the local compose uses `node:20-*` images; ingestion mounts its DB at
 - Install the Rust toolchain (`rustup` or distro `rustc`/`cargo`) alongside Node 20.
 - Build locally with `pnpm --filter @sim-corp/driver-tcp-line run build:native` (runs `cargo build --release`).
 - For containers, use `node:20-bullseye` + `curl https://sh.rustup.rs -sSf | sh -s -- -y` (or distro cargo), then `pnpm i --frozen-lockfile` and `pnpm --filter @sim-corp/driver-tcp-line run build:native`; copy `native/index.node` into the final image or prebuild and bake it.
+
+## Tauri desktop builds
+
+- `apps/roaster-desktop` uses a Tauri shell plus the Vite UI assets; see `docs/ops/tauri-build.md` for the workflow.
+- Requires Node 20 and a Rust toolchain (for Tauri core + `tauri-plugin-store`).
+- The packaged app does **not** bundle driver binaries yet; keep tcp-line build steps in mind for future bundling.
