@@ -7,21 +7,34 @@ import { IngestionRepository } from "../src/db/repo";
 import { registerSessionReportRoutes } from "../src/routes/session-reports";
 import { registerSessionRoutes } from "../src/routes/sessions";
 import { RoastAnalysisSchema } from "@sim-corp/schemas";
+import { registerAuth } from "../src/auth";
 
 function buildTestServer() {
+  const prevAuth = process.env.AUTH_MODE;
+  const prevOrg = process.env.DEV_ORG_ID;
+  const prevUser = process.env.DEV_USER_ID;
+  process.env.AUTH_MODE = "dev";
+  process.env.DEV_ORG_ID = "o1";
+  process.env.DEV_USER_ID = "tester";
   const app = Fastify({ logger: false });
   const schema = fs.readFileSync(path.resolve(__dirname, "../src/db/schema.sql"), "utf-8");
   const db = new Database(":memory:");
   db.exec(schema);
   const repo = new IngestionRepository(db);
+  registerAuth(app);
   registerSessionRoutes(app, { repo });
   registerSessionReportRoutes(app, { repo });
-  return { app, repo };
+  const restoreEnv = () => {
+    process.env.AUTH_MODE = prevAuth;
+    process.env.DEV_ORG_ID = prevOrg;
+    process.env.DEV_USER_ID = prevUser;
+  };
+  return { app, repo, restoreEnv };
 }
 
 describe("session report routes", () => {
   it("creates and fetches session reports", async () => {
-    const { app, repo } = buildTestServer();
+    const { app, repo, restoreEnv } = buildTestServer();
 
     repo.upsertSession({
       sessionId: "s1",
@@ -70,10 +83,11 @@ describe("session report routes", () => {
     expect(getById.json().markdown).toContain("Report");
 
     await app.close();
+    restoreEnv();
   });
 
   it("is idempotent for post-roast reports", async () => {
-    const { app, repo } = buildTestServer();
+    const { app, repo, restoreEnv } = buildTestServer();
 
     repo.upsertSession({
       sessionId: "s1",
@@ -118,5 +132,6 @@ describe("session report routes", () => {
     expect((first.json() as { reportId: string }).reportId).toBe((second.json() as { reportId: string }).reportId);
 
     await app.close();
+    restoreEnv();
   });
 });

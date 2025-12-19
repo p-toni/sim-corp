@@ -1,4 +1,4 @@
-import type { GovernanceDecision, Mission } from "@sim-corp/schemas";
+import type { Actor, GovernanceDecision, Mission } from "@sim-corp/schemas";
 import { MissionRepository, type MissionCreateInput, type MissionRecord, type MissionStatus } from "../db/repo";
 
 export type { MissionStatus };
@@ -38,8 +38,8 @@ export class MissionStore {
     this.backoffMs = options.baseBackoffMs ?? DEFAULT_BACKOFF_MS;
   }
 
-  createMission(mission: MissionCreateInput): MissionCreateResult {
-    return this.repo.createMission(mission);
+  createMission(mission: MissionCreateInput, actor?: Actor): MissionCreateResult {
+    return this.repo.createMission(mission, actor);
   }
 
   listMissions(filter: MissionFilters = {}): { items: MissionRecord[] } {
@@ -107,16 +107,16 @@ export class MissionStore {
     return this.repo.getMission(id);
   }
 
-  approveMission(id: string, decision: GovernanceDecision): MissionRecord {
-    return this.repo.approveMission(id, decision, new Date().toISOString());
+  approveMission(id: string, decision: GovernanceDecision, actor?: Actor): MissionRecord {
+    return this.repo.approveMission(id, decision, new Date().toISOString(), actor);
   }
 
-  cancelMission(id: string): MissionRecord {
-    return this.repo.cancelMission(id, new Date().toISOString());
+  cancelMission(id: string, actor?: Actor): MissionRecord {
+    return this.repo.cancelMission(id, new Date().toISOString(), actor);
   }
 
-  retryNowMission(id: string): MissionRecord {
-    return this.repo.retryNowMission(id, new Date().toISOString());
+  retryNowMission(id: string, actor?: Actor): MissionRecord {
+    return this.repo.retryNowMission(id, new Date().toISOString(), actor);
   }
 
   metrics(): ReturnType<MissionRepository["metrics"]> {

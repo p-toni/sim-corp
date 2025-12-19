@@ -3,6 +3,12 @@ import { buildServer } from "../src/server";
 
 describe("profile routes", () => {
   it("creates and retrieves a profile", async () => {
+    const prevOrg = process.env.DEV_ORG_ID;
+    const prevUser = process.env.DEV_USER_ID;
+    const prevMode = process.env.AUTH_MODE;
+    process.env.AUTH_MODE = "dev";
+    process.env.DEV_ORG_ID = "org-1";
+    process.env.DEV_USER_ID = "dev-user";
     const server = await buildServer({ logger: false, mqttClient: null });
     const createRes = await server.inject({
       method: "POST",
@@ -56,5 +62,8 @@ describe("profile routes", () => {
     expect(csvImport.statusCode).toBe(200);
 
     await server.close();
+    process.env.DEV_ORG_ID = prevOrg;
+    process.env.DEV_USER_ID = prevUser;
+    process.env.AUTH_MODE = prevMode;
   });
 });

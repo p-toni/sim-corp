@@ -19,6 +19,7 @@ import { registerSessionReportRoutes } from "./routes/session-reports";
 import { ReportMissionEnqueuer } from "./core/report-missions";
 import { MqttOpsEventPublisher, type OpsEventPublisher } from "./ops/publisher";
 import { registerProfileRoutes } from "./routes/profiles";
+import { registerAuth } from "./auth";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -79,6 +80,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   });
 
   registerHealthRoutes(app);
+  registerAuth(app);
   registerTelemetryRoutes(app, { telemetryStore });
   registerEventRoutes(app, { eventStore });
   registerStreamRoutes(app, { telemetryStore, eventStore });

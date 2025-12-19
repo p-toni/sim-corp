@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { RoastEventTypeSchema } from "./roaster";
+import { ActorSchema } from "../common";
 
 export const SessionMetaSchema = z.object({
   beanName: z.string().optional(),
@@ -37,6 +38,7 @@ export const SessionNoteSchema = z.object({
   noteId: z.string(),
   createdAt: z.string(),
   author: z.string().optional(),
+  actor: ActorSchema.optional(),
   title: z.string().optional(),
   text: z.string().optional(),
   cuppingScore: z.number().min(0).max(100).optional(),
@@ -53,6 +55,7 @@ export const EventOverrideSchema = z.object({
   elapsedSeconds: z.number().nonnegative(),
   source: z.enum(["HUMAN", "DEVICE"]).default("HUMAN"),
   author: z.string().optional(),
+  actor: ActorSchema.optional(),
   reason: z.string().optional(),
   updatedAt: z.string()
 });

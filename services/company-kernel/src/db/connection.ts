@@ -61,6 +61,7 @@ function applyMigrations(db: Database.Database, logger?: FastifyBaseLogger): voi
   addColumn("context_json", "context_json TEXT NULL");
   addColumn("signals_json", "signals_json TEXT NULL");
   addColumn("governance_json", "governance_json TEXT NULL");
+  addColumn("actor_json", "actor_json TEXT NULL");
 
   db.exec(
     `CREATE INDEX IF NOT EXISTS idx_missions_subject_goal_status ON missions (subject_id, goal, status);

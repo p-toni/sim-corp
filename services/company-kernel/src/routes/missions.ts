@@ -3,6 +3,7 @@ import type { GovernanceDecision, Mission } from "@sim-corp/schemas";
 import type { MissionCreateInput } from "../db/repo";
 import { MissionStore, type MissionStatus } from "../core/mission-store";
 import { GovernorEngine } from "../core/governor/engine";
+import { ensureOrgAccess } from "../auth";
 
 interface MissionRouteDeps {
   missions: MissionStore;
@@ -40,6 +41,7 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
   app.post("/missions", async (request: MissionCreateRequest, reply: FastifyReply) => {
     try {
       const missionInput = { ...(request.body as MissionCreateInput) };
+      const actor = request.actor;
       const normalizedGoal = normalizeGoal(missionInput.goal);
       if (!missionInput.subjectId && normalizedGoal === "generate-roast-report") {
         const sessionId = (missionInput.params as { sessionId?: string } | undefined)?.sessionId;
@@ -49,13 +51,20 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
       }
       missionInput.context = missionInput.context ?? {};
 
+      if (!ensureOrgAccess(reply, actor, missionInput.context.orgId ?? actor?.orgId)) {
+        return reply;
+      }
+      if (!missionInput.context.orgId && actor?.orgId) {
+        missionInput.context.orgId = actor.orgId;
+      }
+
       const evaluation = governor.evaluateMission(missionInput as Mission);
       const { mission, created } = missions.createMission({
         ...missionInput,
         status: evaluation.status,
         governance: evaluation.decision,
         nextRetryAt: evaluation.nextRetryAt
-      });
+      }, actor);
       reply.status(created ? 201 : 200);
       return mission;
     } catch (err) {
@@ -66,14 +75,33 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
 
   app.get("/missions", async (request: MissionListRequest) => {
     const { goal, agent, sessionId, subjectId, orgId, siteId, machineId, limit } = request.query;
+    const actorOrg = request.actor?.orgId;
+    const effectiveOrgId = request.actor?.kind === "SYSTEM" ? orgId : actorOrg ?? orgId;
     const statuses = normalizeStatuses(request.query.status);
-    return missions.listMissions({ status: statuses, goal, agent, sessionId, subjectId, orgId, siteId, machineId, limit });
+    return missions.listMissions({
+      status: statuses,
+      goal,
+      agent,
+      sessionId,
+      subjectId,
+      orgId: effectiveOrgId,
+      siteId,
+      machineId,
+      limit
+    });
   });
 
   app.get("/missions/:id", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const mission = missions.getMission(request.params.id);
     if (!mission) {
       return reply.status(404).send({ error: "Mission not found" });
+    }
+    if (
+      !ensureOrgAccess(reply, request.actor, (mission.context as { orgId?: string } | undefined)?.orgId, {
+        requireMatch: request.actor?.kind !== "SYSTEM"
+      })
+    ) {
+      return reply;
     }
     return mission;
   });
@@ -140,6 +168,7 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
       if (!mission) {
         return reply.status(404).send({ error: "Mission not found" });
       }
+      if (!ensureUserActor(reply, request.actor, mission.context?.orgId)) return reply;
       const decision: GovernanceDecision = {
         action: "ALLOW",
         confidence: mission.governance?.confidence ?? "MED",
@@ -153,7 +182,7 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
         decidedAt: new Date().toISOString(),
         decidedBy: "HUMAN"
       };
-      const updated = missions.approveMission(request.params.id, decision);
+      const updated = missions.approveMission(request.params.id, decision, request.actor);
       return updated;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to approve mission";
@@ -164,7 +193,12 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
 
   app.post("/missions/:id/cancel", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
-      const updated = missions.cancelMission(request.params.id);
+      const mission = missions.getMission(request.params.id);
+      if (!mission) {
+        return reply.status(404).send({ error: "Mission not found" });
+      }
+      if (!ensureUserActor(reply, request.actor, mission.context?.orgId)) return reply;
+      const updated = missions.cancelMission(request.params.id, request.actor);
       return updated;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to cancel mission";
@@ -179,10 +213,11 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
       if (!mission) {
         return reply.status(404).send({ error: "Mission not found" });
       }
+      if (!ensureUserActor(reply, request.actor, mission.context?.orgId)) return reply;
       if (mission.status !== "RETRY") {
         return reply.status(409).send({ error: "Mission is not in retry state" });
       }
-      const updated = missions.retryNowMission(request.params.id);
+      const updated = missions.retryNowMission(request.params.id, request.actor);
       return updated;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to retry mission";
@@ -219,4 +254,13 @@ function normalizeGoal(goal: Mission["goal"]): string {
     return (goal as { title: string }).title;
   }
   return "unknown";
+}
+
+function ensureUserActor(reply: FastifyReply, actor: unknown, missionOrgId?: string): actor is { kind: string; orgId?: string } {
+  if (!ensureOrgAccess(reply, actor as any, missionOrgId)) return false;
+  if ((actor as any)?.kind !== "USER") {
+    reply.status(403).send({ error: "User actor required" });
+    return false;
+  }
+  return true;
 }

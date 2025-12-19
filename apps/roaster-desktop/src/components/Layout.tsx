@@ -5,13 +5,15 @@ interface LayoutProps {
   environment?: string;
   sidebar: ReactNode;
   children: ReactNode;
+  authSlot?: ReactNode;
 }
 
 export function Layout({
   title = "Roaster Desktop",
   environment = "SIM",
   sidebar,
-  children
+  children,
+  authSlot
 }: LayoutProps) {
   return (
     <div className="app-shell">
@@ -22,6 +24,7 @@ export function Layout({
         </div>
         <div className="app-env">
           <span className="badge">{environment}</span>
+          {authSlot ? <div className="auth-slot">{authSlot}</div> : null}
         </div>
       </header>
       <main className="app-main">

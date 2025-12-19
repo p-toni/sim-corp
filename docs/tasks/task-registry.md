@@ -219,8 +219,9 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 - [ ] Report tab loads
 
 ### T-026 — Auth & tenancy (Clerk) + permissions
-**Status:** PLANNED  
+**Status:** DONE
 **Milestone:** M2
+**Evidence:** `pnpm --filter @sim-corp/ingestion test`, `pnpm --filter @sim-corp/roaster-desktop test` (offline env: vitest missing)
 
 ### T-027 — Device identity + signed telemetry
 **Status:** PLANNED  

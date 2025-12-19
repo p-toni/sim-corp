@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import Database from "better-sqlite3";
-import type { GovernanceDecision, Mission, MissionSignals } from "@sim-corp/schemas";
+import type { Actor, GovernanceDecision, Mission, MissionSignals } from "@sim-corp/schemas";
 
 export type MissionStatus = "PENDING" | "RUNNING" | "RETRY" | "DONE" | "FAILED" | "QUARANTINED" | "BLOCKED" | "CANCELED";
 
@@ -47,6 +47,7 @@ export interface MissionRecord extends Mission {
   failedAt?: string;
   resultMeta?: Record<string, unknown>;
   lastError?: Record<string, unknown>;
+  actor?: Actor;
   governance?: GovernanceDecision;
   signals?: MissionSignals;
   updatedAt: string;
@@ -81,7 +82,7 @@ export interface FailOptions {
 export class MissionRepository {
   constructor(private readonly db: Database.Database) {}
 
-  createMission(input: MissionCreateInput): {
+  createMission(input: MissionCreateInput, actor?: Actor): {
     mission: MissionRecord;
     created: boolean;
   } {
@@ -98,8 +99,8 @@ export class MissionRepository {
     const maxAttempts = Number.isInteger(input.maxAttempts) && (input.maxAttempts as number) > 0 ? (input.maxAttempts as number) : 5;
 
     const stmt = this.db.prepare(
-      `INSERT INTO missions (id, goal, status, subject_id, context_json, signals_json, governance_json, params_json, idempotency_key, attempts, max_attempts, next_retry_at, created_at, updated_at, last_error_json, result_json)
-       VALUES (@id, @goal, @status, @subjectId, @contextJson, @signalsJson, @governanceJson, @paramsJson, @idempotencyKey, 0, @maxAttempts, @nextRetryAt, @createdAt, @updatedAt, @lastErrorJson, @resultJson)`
+      `INSERT INTO missions (id, goal, status, subject_id, context_json, signals_json, governance_json, params_json, idempotency_key, attempts, max_attempts, next_retry_at, created_at, updated_at, last_error_json, result_json, actor_json)
+       VALUES (@id, @goal, @status, @subjectId, @contextJson, @signalsJson, @governanceJson, @paramsJson, @idempotencyKey, 0, @maxAttempts, @nextRetryAt, @createdAt, @updatedAt, @lastErrorJson, @resultJson, @actorJson)`
     );
     try {
       stmt.run({
@@ -117,7 +118,8 @@ export class MissionRepository {
         createdAt: input.createdAt ?? now,
         updatedAt: now,
         lastErrorJson: null,
-        resultJson: null
+        resultJson: null,
+        actorJson: actor ? JSON.stringify(actor) : null
       });
       const row = this.getMissionRowById(id);
       if (!row) throw new Error("failed to fetch created mission");
@@ -367,7 +369,7 @@ export class MissionRepository {
     return this.mapRow(row);
   }
 
-  approveMission(missionId: string, decision: GovernanceDecision, nowIso: string): MissionRecord {
+  approveMission(missionId: string, decision: GovernanceDecision, nowIso: string, actor?: Actor): MissionRecord {
     const mission = this.getMissionRowById(missionId);
     if (!mission) throw new Error("Mission not found");
     if (mission.status !== "QUARANTINED") {
@@ -384,20 +386,22 @@ export class MissionRepository {
              lease_id=NULL,
              lease_expires_at=NULL,
              last_heartbeat_at=NULL,
-             updated_at=@now
+             updated_at=@now,
+             actor_json=@actorJson
          WHERE id=@id`
       )
       .run({
         id: missionId,
         governanceJson: JSON.stringify(decision),
-        now: nowIso
+        now: nowIso,
+        actorJson: actor ? JSON.stringify(actor) : null
       });
     const row = this.getMissionRowById(missionId);
     if (!row) throw new Error("Mission not found");
     return this.mapRow(row);
   }
 
-  cancelMission(missionId: string, nowIso: string): MissionRecord {
+  cancelMission(missionId: string, nowIso: string, actor?: Actor): MissionRecord {
     const mission = this.getMissionRowById(missionId);
     if (!mission) throw new Error("Mission not found");
     this.db
@@ -410,16 +414,17 @@ export class MissionRepository {
              lease_id=NULL,
              lease_expires_at=NULL,
              last_heartbeat_at=NULL,
-             updated_at=@now
+             updated_at=@now,
+             actor_json=@actorJson
          WHERE id=@id`
       )
-      .run({ id: missionId, now: nowIso });
+      .run({ id: missionId, now: nowIso, actorJson: actor ? JSON.stringify(actor) : null });
     const row = this.getMissionRowById(missionId);
     if (!row) throw new Error("Mission not found");
     return this.mapRow(row);
   }
 
-  retryNowMission(missionId: string, nowIso: string): MissionRecord {
+  retryNowMission(missionId: string, nowIso: string, actor?: Actor): MissionRecord {
     const mission = this.getMissionRowById(missionId);
     if (!mission) throw new Error("Mission not found");
     if (mission.status !== "RETRY") {
@@ -441,13 +446,15 @@ export class MissionRepository {
         `UPDATE missions
          SET next_retry_at=@now,
              governance_json=@governance,
-             updated_at=@now
+             updated_at=@now,
+             actor_json=@actorJson
          WHERE id=@id AND status='RETRY'`
       )
       .run({
         id: missionId,
         now: nowIso,
-        governance: JSON.stringify(updatedGovernance)
+        governance: JSON.stringify(updatedGovernance),
+        actorJson: actor ? JSON.stringify(actor) : null
       });
     const row = this.getMissionRowById(missionId);
     if (!row) throw new Error("Mission not found");
@@ -535,7 +542,8 @@ export class MissionRepository {
       completedAt: row.completed_at ?? undefined,
       failedAt: row.failed_at ?? undefined,
       resultMeta: row.result_json ? (JSON.parse(row.result_json) as Record<string, unknown>) : undefined,
-      lastError: row.last_error_json ? (JSON.parse(row.last_error_json) as Record<string, unknown>) : undefined
+      lastError: row.last_error_json ? (JSON.parse(row.last_error_json) as Record<string, unknown>) : undefined,
+      actor: row.actor_json ? (JSON.parse(row.actor_json) as Actor) : undefined
     };
   }
 

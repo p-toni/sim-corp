@@ -11,7 +11,8 @@ import {
   RoastProfileSchema,
   RoastProfileVersionSchema,
   RoastProfileExportBundleSchema,
-  RoastProfileCsvRowSchema
+  RoastProfileCsvRowSchema,
+  ActorSchema
 } from "@sim-corp/schemas";
 import type {
   EventOverride,
@@ -25,7 +26,8 @@ import type {
   RoastProfile,
   RoastProfileVersion,
   RoastProfileExportBundle,
-  RoastProfileCsvRow
+  RoastProfileCsvRow,
+  Actor
 } from "@sim-corp/schemas";
 
 export const DEFAULT_REPORT_KIND = "POST_ROAST_V1";
@@ -103,18 +105,19 @@ export class IngestionRepository {
     return SessionMetaSchema.parse(JSON.parse(row.meta_json));
   }
 
-  upsertSessionMeta(sessionId: string, meta: SessionMeta): SessionMeta {
+  upsertSessionMeta(sessionId: string, meta: SessionMeta, actor?: Actor): SessionMeta {
     const parsed = SessionMetaSchema.parse(meta);
     const now = new Date().toISOString();
     this.db
       .prepare(
-        `INSERT INTO session_meta (session_id, meta_json, updated_at)
-         VALUES (@sessionId, @metaJson, @updatedAt)
-         ON CONFLICT(session_id) DO UPDATE SET meta_json=excluded.meta_json, updated_at=excluded.updated_at`
+        `INSERT INTO session_meta (session_id, meta_json, actor_json, updated_at)
+         VALUES (@sessionId, @metaJson, @actorJson, @updatedAt)
+         ON CONFLICT(session_id) DO UPDATE SET meta_json=excluded.meta_json, actor_json=excluded.actor_json, updated_at=excluded.updated_at`
       )
       .run({
         sessionId,
         metaJson: JSON.stringify(parsed),
+        actorJson: actorToJson(actor),
         updatedAt: now
       });
     return parsed;
@@ -131,25 +134,28 @@ export class IngestionRepository {
 
   addSessionNote(
     sessionId: string,
-    input: Omit<SessionNote, "noteId" | "createdAt">
+    input: Omit<SessionNote, "noteId" | "createdAt">,
+    actor?: Actor
   ): SessionNote {
     const now = new Date().toISOString();
     const noteId = `N-${sessionId}-${Math.random().toString(36).slice(2, 8)}-${Date.now()}`;
     const note = SessionNoteSchema.parse({
       ...input,
+      actor: input.actor ?? actor,
       noteId,
       createdAt: now
     });
     this.db
       .prepare(
-        `INSERT INTO session_notes (note_id, session_id, created_at, author, note_json)
-         VALUES (@noteId, @sessionId, @createdAt, @author, @noteJson)`
+        `INSERT INTO session_notes (note_id, session_id, created_at, author, actor_json, note_json)
+         VALUES (@noteId, @sessionId, @createdAt, @author, @actorJson, @noteJson)`
       )
       .run({
         noteId,
         sessionId,
         createdAt: note.createdAt,
         author: note.author ?? null,
+        actorJson: actorToJson(note.actor ?? actor),
         noteJson: JSON.stringify(note)
       });
     return note;
@@ -158,7 +164,7 @@ export class IngestionRepository {
   getEventOverrides(sessionId: string): EventOverride[] {
     const rows = this.db
       .prepare(
-        `SELECT event_type, elapsed_seconds, source, author, reason, updated_at FROM event_overrides WHERE session_id = @sessionId`
+        `SELECT event_type, elapsed_seconds, source, author, actor_json, reason, updated_at FROM event_overrides WHERE session_id = @sessionId`
       )
       .all({ sessionId });
     return rows.map((row) =>
@@ -167,26 +173,29 @@ export class IngestionRepository {
         elapsedSeconds: row.elapsed_seconds,
         source: row.source,
         author: row.author ?? undefined,
+        actor: parseActorJson(row.actor_json),
         reason: row.reason ?? undefined,
         updatedAt: row.updated_at
       })
     );
   }
 
-  upsertEventOverrides(sessionId: string, overrides: EventOverride[]): EventOverride[] {
+  upsertEventOverrides(sessionId: string, overrides: EventOverride[], actor?: Actor): EventOverride[] {
     const parsedOverrides = overrides.map((o) =>
       EventOverrideSchema.parse({
         ...o,
+        actor: o.actor ?? actor,
         updatedAt: o.updatedAt ?? new Date().toISOString()
       })
     );
     const stmt = this.db.prepare(
-      `INSERT INTO event_overrides (session_id, event_type, elapsed_seconds, source, author, reason, updated_at)
-       VALUES (@sessionId, @eventType, @elapsedSeconds, @source, @author, @reason, @updatedAt)
+      `INSERT INTO event_overrides (session_id, event_type, elapsed_seconds, source, author, actor_json, reason, updated_at)
+       VALUES (@sessionId, @eventType, @elapsedSeconds, @source, @author, @actorJson, @reason, @updatedAt)
        ON CONFLICT(session_id, event_type) DO UPDATE SET
          elapsed_seconds=excluded.elapsed_seconds,
          source=excluded.source,
          author=excluded.author,
+         actor_json=excluded.actor_json,
          reason=excluded.reason,
          updated_at=excluded.updated_at`
     );
@@ -198,6 +207,7 @@ export class IngestionRepository {
         elapsedSeconds: override.elapsedSeconds,
         source: override.source ?? "HUMAN",
         author: override.author ?? null,
+        actorJson: actorToJson(override.actor ?? actor),
         reason: override.reason ?? null,
         updatedAt: override.updatedAt ?? now
       });
@@ -377,12 +387,18 @@ export class IngestionRepository {
     };
   }
 
-  createSessionReport(sessionId: string, report: RoastReport, traceId?: string): SessionReportResult {
+  createSessionReport(
+    sessionId: string,
+    report: RoastReport,
+    traceId?: string,
+    actor?: Actor
+  ): SessionReportResult {
     const baseId = report.reportId ?? this.generateReportId(sessionId);
     const createdAt = report.createdAt ?? new Date().toISOString();
     const reportKind = (report as RoastReport & { reportKind?: string }).reportKind ?? DEFAULT_REPORT_KIND;
     const parsed = RoastReportSchema.parse({
       ...report,
+      actor: report.actor ?? actor,
       reportId: baseId,
       sessionId,
       createdAt,
@@ -391,8 +407,8 @@ export class IngestionRepository {
 
     const result = this.db
       .prepare(
-        `INSERT OR IGNORE INTO session_reports (report_id, session_id, report_kind, created_at, created_by, agent_name, agent_version, markdown, report_json, trace_id)
-         VALUES (@reportId, @sessionId, @reportKind, @createdAt, @createdBy, @agentName, @agentVersion, @markdown, @reportJson, @traceId)`
+        `INSERT OR IGNORE INTO session_reports (report_id, session_id, report_kind, created_at, created_by, actor_json, agent_name, agent_version, markdown, report_json, trace_id)
+         VALUES (@reportId, @sessionId, @reportKind, @createdAt, @createdBy, @actorJson, @agentName, @agentVersion, @markdown, @reportJson, @traceId)`
       )
       .run({
         reportId: parsed.reportId,
@@ -400,6 +416,7 @@ export class IngestionRepository {
         reportKind: parsed.reportKind,
         createdAt: parsed.createdAt,
         createdBy: parsed.createdBy,
+        actorJson: actorToJson(parsed.actor ?? actor),
         agentName: parsed.agentName ?? null,
         agentVersion: parsed.agentVersion ?? null,
         markdown: parsed.markdown,
@@ -496,10 +513,11 @@ export class IngestionRepository {
     return RoastProfileSchema.parse(JSON.parse(row.profile_json));
   }
 
-  createProfile(profile: Partial<RoastProfile>, changeNote?: string): RoastProfile {
+  createProfile(profile: Partial<RoastProfile>, changeNote?: string, actor?: Actor): RoastProfile {
     const now = new Date().toISOString();
     const parsed = RoastProfileSchema.parse({
       ...profile,
+      actor: profile.actor ?? actor,
       profileId: profile.profileId ?? generateProfileId(),
       version: profile.version && profile.version >= 1 ? profile.version : 1,
       createdAt: profile.createdAt ?? now,
@@ -509,8 +527,8 @@ export class IngestionRepository {
     });
 
     const tx = this.db.transaction(() => {
-      this.persistProfile(parsed);
-      this.insertVersion(parsed, changeNote);
+      this.persistProfile(parsed, actor);
+      this.insertVersion(parsed, changeNote, actor);
     });
     tx();
     return parsed;
@@ -520,7 +538,8 @@ export class IngestionRepository {
     orgId: string,
     profileId: string,
     profile: Partial<RoastProfile>,
-    changeNote?: string
+    changeNote?: string,
+    actor?: Actor
   ): RoastProfile {
     const existing = this.getProfile(orgId, profileId);
     if (!existing) {
@@ -530,6 +549,7 @@ export class IngestionRepository {
     const merged: RoastProfile = {
       ...existing,
       ...profile,
+      actor: profile.actor ?? actor,
       orgId,
       profileId,
       version: existing.version + 1,
@@ -541,22 +561,23 @@ export class IngestionRepository {
     const parsed = RoastProfileSchema.parse(merged);
 
     const tx = this.db.transaction(() => {
-      this.persistProfile(parsed);
-      this.insertVersion(parsed, changeNote);
+      this.persistProfile(parsed, actor);
+      this.insertVersion(parsed, changeNote, actor);
     });
     tx();
     return parsed;
   }
 
-  setProfileArchived(orgId: string, profileId: string, isArchived: boolean): RoastProfile | null {
+  setProfileArchived(orgId: string, profileId: string, isArchived: boolean, actor?: Actor): RoastProfile | null {
     const existing = this.getProfile(orgId, profileId);
     if (!existing) return null;
     const updated: RoastProfile = {
       ...existing,
       isArchived,
+      actor: actor ?? existing.actor,
       updatedAt: new Date().toISOString()
     };
-    this.persistProfile(updated);
+    this.persistProfile(updated, actor);
     return updated;
   }
 
@@ -575,6 +596,7 @@ export class IngestionRepository {
         version: row.version,
         createdAt: row.created_at,
         createdBy: row.created_by ?? undefined,
+        actor: parseActorJson((row as { actor_json?: unknown }).actor_json),
         snapshot: JSON.parse(row.snapshot_json),
         changeNote: row.change_note ?? undefined
       })
@@ -594,13 +616,14 @@ export class IngestionRepository {
     });
   }
 
-  importProfiles(orgId: string, bundle: RoastProfileExportBundle): ProfileImportSummary {
+  importProfiles(orgId: string, bundle: RoastProfileExportBundle, actor?: Actor): ProfileImportSummary {
     const parsedBundle = RoastProfileExportBundleSchema.parse(bundle);
     const summary: ProfileImportSummary = { created: 0, updated: 0, skipped: 0, errors: [] };
     for (const profile of parsedBundle.profiles) {
       const now = new Date().toISOString();
       const candidate = RoastProfileSchema.parse({
         ...profile,
+        actor: profile.actor ?? actor,
         orgId: profile.orgId ?? orgId,
         profileId: profile.profileId ?? generateProfileId(),
         createdAt: profile.createdAt ?? now,
@@ -612,7 +635,7 @@ export class IngestionRepository {
       try {
         const existing = this.getProfile(candidate.orgId, candidate.profileId);
         if (!existing) {
-          this.createProfile(candidate, "Imported");
+          this.createProfile(candidate, "Imported", actor);
           summary.created += 1;
           continue;
         }
@@ -620,7 +643,7 @@ export class IngestionRepository {
           summary.skipped += 1;
           continue;
         }
-        this.addProfileVersion(candidate.orgId, candidate.profileId, candidate, "Imported new version");
+        this.addProfileVersion(candidate.orgId, candidate.profileId, candidate, "Imported new version", actor);
         summary.updated += 1;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -630,7 +653,7 @@ export class IngestionRepository {
     return summary;
   }
 
-  importCsvProfiles(orgId: string, rows: RoastProfileCsvRow[]): ProfileImportSummary {
+  importCsvProfiles(orgId: string, rows: RoastProfileCsvRow[], actor?: Actor): ProfileImportSummary {
     const summary: ProfileImportSummary = { created: 0, updated: 0, skipped: 0, errors: [] };
     const now = new Date().toISOString();
     for (const row of rows) {
@@ -656,12 +679,13 @@ export class IngestionRepository {
         targets,
         tags: parsedRow.tags ? parsedRow.tags.split(",").map((t) => t.trim()).filter(Boolean) : undefined,
         notes: parsedRow.notes,
-        source: { kind: "IMPORT" }
+        source: { kind: "IMPORT" },
+        actor
       });
       try {
         const existing = this.getProfile(profile.orgId, profile.profileId);
         if (!existing) {
-          this.createProfile(profile, "Imported CSV");
+          this.createProfile(profile, "Imported CSV", actor);
           summary.created += 1;
           continue;
         }
@@ -669,7 +693,7 @@ export class IngestionRepository {
           summary.skipped += 1;
           continue;
         }
-        this.addProfileVersion(profile.orgId, profile.profileId, profile, "Imported CSV");
+        this.addProfileVersion(profile.orgId, profile.profileId, profile, "Imported CSV", actor);
         summary.updated += 1;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -679,15 +703,15 @@ export class IngestionRepository {
     return summary;
   }
 
-  private persistProfile(profile: RoastProfile): void {
+  private persistProfile(profile: RoastProfile, actor?: Actor): void {
     this.db
       .prepare(`
         INSERT INTO roast_profiles (
           profile_id, org_id, name, version, site_id, machine_model, batch_size_grams,
-          targets_json, curve_json, tags_json, notes, source_json, is_archived, created_at, updated_at, profile_json
+          targets_json, curve_json, tags_json, notes, source_json, is_archived, actor_json, created_at, updated_at, profile_json
         ) VALUES (
           @profileId, @orgId, @name, @version, @siteId, @machineModel, @batchSizeGrams,
-          @targetsJson, @curveJson, @tagsJson, @notes, @sourceJson, @isArchived, @createdAt, @updatedAt, @profileJson
+          @targetsJson, @curveJson, @tagsJson, @notes, @sourceJson, @isArchived, @actorJson, @createdAt, @updatedAt, @profileJson
         )
         ON CONFLICT(org_id, profile_id) DO UPDATE SET
           name=excluded.name,
@@ -701,6 +725,7 @@ export class IngestionRepository {
           notes=excluded.notes,
           source_json=excluded.source_json,
           is_archived=excluded.is_archived,
+          actor_json=excluded.actor_json,
           updated_at=excluded.updated_at,
           profile_json=excluded.profile_json
       `)
@@ -718,24 +743,26 @@ export class IngestionRepository {
         notes: profile.notes ?? null,
         sourceJson: JSON.stringify(profile.source),
         isArchived: profile.isArchived ? 1 : 0,
+        actorJson: actorToJson(profile.actor ?? actor),
         createdAt: profile.createdAt,
         updatedAt: profile.updatedAt,
         profileJson: JSON.stringify(profile)
       });
   }
 
-  private insertVersion(profile: RoastProfile, changeNote?: string): RoastProfileVersion {
+  private insertVersion(profile: RoastProfile, changeNote?: string, actor?: Actor): RoastProfileVersion {
     const record = RoastProfileVersionSchema.parse({
       profileId: profile.profileId,
       version: profile.version,
       createdAt: profile.updatedAt,
       snapshot: profile,
+      actor: profile.actor ?? actor,
       changeNote
     });
     this.db
       .prepare(
-        `INSERT OR REPLACE INTO roast_profile_versions (profile_id, org_id, version, created_at, created_by, change_note, snapshot_json)
-         VALUES (@profileId, @orgId, @version, @createdAt, @createdBy, @changeNote, @snapshotJson)`
+        `INSERT OR REPLACE INTO roast_profile_versions (profile_id, org_id, version, created_at, created_by, actor_json, change_note, snapshot_json)
+         VALUES (@profileId, @orgId, @version, @createdAt, @createdBy, @actorJson, @changeNote, @snapshotJson)`
       )
       .run({
         profileId: profile.profileId,
@@ -743,6 +770,7 @@ export class IngestionRepository {
         version: record.version,
         createdAt: record.createdAt,
         createdBy: record.createdBy ?? null,
+        actorJson: actorToJson(record.actor ?? actor),
         changeNote: record.changeNote ?? null,
         snapshotJson: JSON.stringify(record.snapshot)
       });
@@ -760,6 +788,20 @@ function generateProfileId(): string {
   const ts = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 12);
   const rand = Math.random().toString(36).slice(2, 6);
   return `P-${ts}-${rand}`;
+}
+
+function actorToJson(actor?: Actor): string | null {
+  if (!actor) return null;
+  return JSON.stringify(actor);
+}
+
+function parseActorJson(value: unknown): Actor | undefined {
+  if (!value) return undefined;
+  try {
+    return ActorSchema.parse(typeof value === "string" ? JSON.parse(value) : value);
+  } catch {
+    return undefined;
+  }
 }
 
 function canonicalizeProfile(profile: RoastProfile): Record<string, unknown> {

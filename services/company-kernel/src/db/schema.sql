@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS missions (
   last_heartbeat_at TEXT NULL,
   completed_at TEXT NULL,
   failed_at TEXT NULL,
-  result_json TEXT NULL
+  result_json TEXT NULL,
+  actor_json TEXT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_missions_status_retry_created ON missions (status, next_retry_at, created_at);
