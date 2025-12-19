@@ -2,11 +2,13 @@ import { TelemetryEnvelopeSchema } from "@sim-corp/schemas";
 import type { TelemetryEnvelope } from "@sim-corp/schemas";
 import type { MqttClient } from "../mqtt-client";
 import type { IngestionHandlers } from "./handlers";
+import type { EnvelopeVerifier } from "./verification";
 
 type Logger = Partial<Record<"debug" | "info" | "warn" | "error", (...args: unknown[]) => void>>;
 
 interface AttachOptions {
   logger?: Logger;
+  verifier?: EnvelopeVerifier;
 }
 
 const TELEMETRY_TOPIC = "roaster/+/+/+/telemetry";
@@ -17,7 +19,7 @@ export function attachMqttHandlers(
   handlers: IngestionHandlers,
   options: AttachOptions = {}
 ): void {
-  const { logger = console } = options;
+  const { logger = console, verifier } = options;
   const topics: string[] = [TELEMETRY_TOPIC, EVENT_TOPIC];
 
   client
@@ -30,6 +32,17 @@ export function attachMqttHandlers(
       const parsed = TelemetryEnvelopeSchema.safeParse(envelope);
       if (!parsed.success) {
         logger.warn?.("ingestion: invalid telemetry envelope", parsed.error);
+        return;
+      }
+
+      if (verifier) {
+        void verifier
+          .verify(parsed.data)
+          .then((verified) => handlers.handleEnvelope(verified))
+          .catch((error) => {
+            logger.warn?.("ingestion: signature verification failed", toSafeLogValue(error));
+            handlers.handleEnvelope(parsed.data);
+          });
         return;
       }
 

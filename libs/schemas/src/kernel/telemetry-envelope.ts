@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { IsoDateTimeSchema } from "../common/scalars";
 import { RoastEventSchema, TelemetryPointSchema } from "../domain/roaster";
+import { VerificationStatusSchema } from "./verification";
 
 export const TelemetryOriginSchema = z.object({
   orgId: z.string(),
@@ -17,7 +18,8 @@ export const TelemetryEnvelopeSchema = z.object({
   payload: z.union([TelemetryPointSchema, RoastEventSchema]),
   sessionId: z.string().optional(),
   sig: z.string().optional(),
-  kid: z.string().optional()
+  kid: z.string().optional(),
+  verification: VerificationStatusSchema.optional()
 });
 
 export type TelemetryOrigin = z.infer<typeof TelemetryOriginSchema>;

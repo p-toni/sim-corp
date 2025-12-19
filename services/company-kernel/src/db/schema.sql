@@ -42,3 +42,14 @@ CREATE TABLE IF NOT EXISTS rate_limit_buckets (
   tokens REAL NOT NULL,
   updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS device_keys (
+  kid TEXT PRIMARY KEY,
+  org_id TEXT NOT NULL,
+  public_key_b64 TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  revoked_at TEXT NULL,
+  meta_json TEXT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_device_keys_org_id ON device_keys (org_id);

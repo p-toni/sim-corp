@@ -25,7 +25,9 @@ import {
   GovernanceDecisionSchema,
   RoastProfileSchema,
   RoastProfileVersionSchema,
-  RoastPredictionSchema
+  RoastPredictionSchema,
+  getEnvelopeSigningBytes,
+  toSignableEnvelope
 } from "./index";
 
 const baseTelemetry = {
@@ -150,6 +152,38 @@ describe("telemetry envelope schema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("telemetry envelope signing", () => {
+  const baseEnvelope = TelemetryEnvelopeSchema.parse({
+    ts: "2025-01-01T00:00:00.000Z",
+    origin: { orgId: "org-1", siteId: "site-1", machineId: "machine-1" },
+    topic: "telemetry",
+    payload: baseTelemetry,
+    sessionId: "session-1",
+    kid: "device:driver@org-1/site-1/machine-1"
+  });
+
+  it("produces stable signing bytes for the same envelope", () => {
+    const first = getEnvelopeSigningBytes(baseEnvelope);
+    const second = getEnvelopeSigningBytes({ ...baseEnvelope });
+    expect(Buffer.from(first).toString("utf-8")).toBe(Buffer.from(second).toString("utf-8"));
+  });
+
+  it("changes signing bytes when envelope data changes", () => {
+    const original = getEnvelopeSigningBytes(baseEnvelope);
+    const changed = getEnvelopeSigningBytes({
+      ...baseEnvelope,
+      payload: { ...baseEnvelope.payload, btC: 200 }
+    });
+    expect(Buffer.from(original).toString("utf-8")).not.toBe(Buffer.from(changed).toString("utf-8"));
+  });
+
+  it("includes kid and sessionId in signable object when present", () => {
+    const signable = toSignableEnvelope(baseEnvelope);
+    expect(signable.kid).toBe(baseEnvelope.kid);
+    expect(signable.sessionId).toBe(baseEnvelope.sessionId);
   });
 });
 

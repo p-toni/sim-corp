@@ -2,13 +2,17 @@ import {
   AgentTrace,
   AgentTraceSchema,
   RoastEvent,
+  RoastEventRecord,
   RoastSession,
   RoastSessionSchema,
   RoastSessionSummary,
   RoastSessionSummarySchema,
   RoastEventSchema,
   TelemetryPoint,
+  TelemetryRecord,
   TelemetryPointSchema,
+  TelemetryRecordSchema,
+  RoastEventRecordSchema,
   RoastAnalysis,
   RoastAnalysisSchema,
   type Mission,
@@ -322,14 +326,14 @@ export async function listSessions(baseUrl: string, params: { orgId?: string; si
   return fetchJson(url, RoastSessionSummarySchema.array());
 }
 
-export async function getSessionTelemetry(baseUrl: string, sessionId: string): Promise<TelemetryPoint[]> {
+export async function getSessionTelemetry(baseUrl: string, sessionId: string): Promise<TelemetryRecord[]> {
   const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/telemetry`;
-  return fetchJson(url, TelemetryPointSchema.array());
+  return fetchJson(url, TelemetryRecordSchema.array());
 }
 
-export async function getSessionEvents(baseUrl: string, sessionId: string): Promise<RoastEvent[]> {
+export async function getSessionEvents(baseUrl: string, sessionId: string): Promise<RoastEventRecord[]> {
   const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/events`;
-  return fetchJson(url, RoastEventSchema.array());
+  return fetchJson(url, RoastEventRecordSchema.array());
 }
 
 export async function getSessionSummary(baseUrl: string, sessionId: string): Promise<RoastSession> {

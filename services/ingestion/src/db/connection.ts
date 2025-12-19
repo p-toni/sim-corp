@@ -51,6 +51,7 @@ function ensureDir(dir: string, logger?: FastifyBaseLogger): void {
 
 export function applyMigrations(db: Database.Database, logger?: FastifyBaseLogger): void {
   migrateSessionReports(db, logger);
+  migrateEnvelopeVerification(db, logger);
 }
 
 function migrateSessionReports(db: Database.Database, logger?: FastifyBaseLogger): void {
@@ -116,5 +117,39 @@ function dedupeReports(db: Database.Database, logger?: FastifyBaseLogger): void 
   const del = db.prepare(`DELETE FROM session_reports WHERE id = @id`);
   for (const row of duplicates) {
     del.run({ id: row.id });
+  }
+}
+
+function migrateEnvelopeVerification(db: Database.Database, logger?: FastifyBaseLogger): void {
+  addColumns(db, "telemetry_points", [
+    ["kid", "kid TEXT NULL"],
+    ["sig", "sig TEXT NULL"],
+    ["verified", "verified INTEGER NOT NULL DEFAULT 0"],
+    ["verified_by", "verified_by TEXT NULL"],
+    ["verify_reason", "verify_reason TEXT NULL"]
+  ], logger);
+
+  addColumns(db, "events", [
+    ["kid", "kid TEXT NULL"],
+    ["sig", "sig TEXT NULL"],
+    ["verified", "verified INTEGER NOT NULL DEFAULT 0"],
+    ["verified_by", "verified_by TEXT NULL"],
+    ["verify_reason", "verify_reason TEXT NULL"]
+  ], logger);
+}
+
+function addColumns(
+  db: Database.Database,
+  table: string,
+  columns: Array<[string, string]>,
+  logger?: FastifyBaseLogger
+): void {
+  const existing = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  const names = new Set(existing.map((col) => col.name));
+  for (const [name, ddl] of columns) {
+    if (!names.has(name)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+      logger?.info({ table, column: name }, "ingestion: added column");
+    }
   }
 }

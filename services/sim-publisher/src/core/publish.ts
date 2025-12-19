@@ -9,6 +9,7 @@ import type {
   SimOutput,
   SimTwinClient
 } from "./types";
+import { createEnvelopeSigner } from "./signing";
 
 const MIN_INTERVAL_MS = 50;
 const MAX_BUFFER = 5_000;
@@ -50,6 +51,16 @@ export class SimPublisherManager {
     const output = await this.simTwin.runSimulation(request);
     const sessionId = randomUUID();
     const stats: PublishSessionStats = { telemetrySent: 0, eventsSent: 0 };
+    const signer = createEnvelopeSigner({
+      mode: process.env.SIGNING_MODE,
+      kid: process.env.SIGNING_KID,
+      privateKeyB64: process.env.SIGNING_PRIVATE_KEY_B64,
+      defaultKid: `service:sim-publisher@${request.orgId}/${request.siteId}/${request.machineId}`,
+      orgId: request.orgId,
+      kernelUrl: process.env.KERNEL_URL,
+      logger: console
+    });
+    await signer.ensureRegistered();
 
     const cancelFns: Array<() => void> = [];
     const publishTelemetry = this.scheduleTelemetry(sessionId, request, output, stats, cancelFns);
@@ -97,9 +108,10 @@ export class SimPublisherManager {
         const timer = setTimeout(async () => {
           if (!this.sessions.has(sessionId)) return;
           const envelope = buildEnvelope(request, "telemetry", point);
-          await this.mqtt.publish(topic, JSON.stringify(envelope));
+          const signed = signer.signEnvelope(envelope);
+          await this.mqtt.publish(topic, JSON.stringify(signed));
           stats.telemetrySent += 1;
-          stats.lastSentTs = envelope.ts;
+          stats.lastSentTs = signed.ts;
         }, delayMs);
         cancelFns.push(() => clearTimeout(timer));
         if (idx === 0 && delayMs === 0) {
@@ -129,9 +141,10 @@ export class SimPublisherManager {
         const timer = setTimeout(async () => {
           if (!this.sessions.has(sessionId)) return;
           const envelope = buildEnvelope(request, "event", event);
-          await this.mqtt.publish(topic, JSON.stringify(envelope));
+          const signed = signer.signEnvelope(envelope);
+          await this.mqtt.publish(topic, JSON.stringify(signed));
           stats.eventsSent += 1;
-          stats.lastSentTs = envelope.ts;
+          stats.lastSentTs = signed.ts;
         }, delayMs);
         cancelFns.push(() => clearTimeout(timer));
       });

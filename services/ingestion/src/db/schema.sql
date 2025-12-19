@@ -27,6 +27,11 @@ CREATE TABLE IF NOT EXISTS telemetry_points (
   et_c REAL,
   ror_c_per_min REAL,
   ambient_c REAL,
+  kid TEXT NULL,
+  sig TEXT NULL,
+  verified INTEGER NOT NULL DEFAULT 0,
+  verified_by TEXT NULL,
+  verify_reason TEXT NULL,
   raw_json TEXT NOT NULL,
   FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
 );
@@ -40,6 +45,11 @@ CREATE TABLE IF NOT EXISTS events (
   ts TEXT NOT NULL,
   elapsed_seconds REAL NULL,
   type TEXT NOT NULL,
+  kid TEXT NULL,
+  sig TEXT NULL,
+  verified INTEGER NOT NULL DEFAULT 0,
+  verified_by TEXT NULL,
+  verify_reason TEXT NULL,
   raw_json TEXT NOT NULL,
   FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
 );

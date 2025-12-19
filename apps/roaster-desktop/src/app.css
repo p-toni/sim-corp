@@ -392,6 +392,11 @@ button.primary:not(:disabled):hover {
   color: #991b1b;
 }
 
+.verification-badge {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .status-skipped,
 .status-cancelled,
 .status-timeout {

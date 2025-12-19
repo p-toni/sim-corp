@@ -34,6 +34,34 @@ Services:
   - configure roaster-desktop with `VITE_CLERK_PUBLISHABLE_KEY` (or `CLERK_PUBLISHABLE_KEY`) so the UI can sign in and forward Bearer tokens to APIs.
 - Roaster-desktop will attach Bearer tokens to API calls when signed in; dev mode omits auth headers automatically.
 
+## Signed telemetry + device registry (T-027)
+
+In dev, telemetry/event publishers auto-generate ed25519 keys and register them in the kernel when `KERNEL_URL` + `SIGNING_AUTO_REGISTER=true` are set (see `infra/local/docker-compose.yaml`).
+
+### Inspect a device key
+1. Grab the `kid` from service logs (`driver-bridge`, `sim-publisher`, `event-inference`).
+2. Query the kernel registry:
+```bash
+curl http://127.0.0.1:3000/devices/<KID>
+```
+
+### Rotate keys in dev
+1. Generate a new keypair:
+```bash
+node -e "const { generateKeyPairSync } = require('crypto'); const k = generateKeyPairSync('ed25519'); console.log('PRIVATE_KEY_B64=' + k.privateKey.export({format:'der', type:'pkcs8'}).toString('base64')); console.log('PUBLIC_KEY_B64=' + k.publicKey.export({format:'der', type:'spki'}).toString('base64'));"
+```
+2. Stop the service, set `SIGNING_PRIVATE_KEY_B64` + `SIGNING_KID`, and restart.
+3. Register the new public key with the kernel:
+```bash
+curl -X POST http://127.0.0.1:3000/devices \
+  -H "content-type: application/json" \
+  -d '{"kid":"<KID>","orgId":"org","publicKeyB64":"<PUBLIC_KEY_B64>"}'
+```
+4. Optionally revoke the old key:
+```bash
+curl -X POST http://127.0.0.1:3000/devices/<OLD_KID>/revoke
+```
+
 ## Start roaster-desktop (optional UI)
 - Packaged desktop (Tauri):
   - Build artifacts: `pnpm --filter @sim-corp/roaster-desktop tauri:build` (Node 20 + Rust toolchain)

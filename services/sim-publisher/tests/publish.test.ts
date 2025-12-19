@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TelemetryEnvelopeSchema } from "@sim-corp/schemas";
+import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
+import { TelemetryEnvelopeSchema, getEnvelopeSigningBytes } from "@sim-corp/schemas";
+import { createPublicKey, generateKeyPairSync, verify } from "node:crypto";
 import type { MqttPublisher, SimTwinClient } from "../src/core/types";
 import { SimPublisherManager } from "../src/core/publish";
 
@@ -30,6 +31,7 @@ describe("SimPublisherManager", () => {
   let mqtt: FakeMqttPublisher;
   let simTwin: FakeSimTwinClient;
   let manager: SimPublisherManager;
+  const originalEnv = { ...process.env };
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -38,7 +40,22 @@ describe("SimPublisherManager", () => {
     manager = new SimPublisherManager(mqtt, simTwin);
   });
 
+  afterEach(() => {
+    for (const key of Object.keys(process.env)) {
+      if (!(key in originalEnv)) {
+        delete process.env[key];
+      }
+    }
+    Object.assign(process.env, originalEnv);
+  });
+
   it("publishes telemetry and events with correct topics and envelope shape", async () => {
+    const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+    process.env.SIGNING_MODE = "ed25519";
+    process.env.SIGNING_KID = "service:sim-publisher@org/site/machine";
+    process.env.SIGNING_PRIVATE_KEY_B64 = privateKey.export({ format: "der", type: "pkcs8" }).toString("base64");
+    const publicKeyB64 = publicKey.export({ format: "der", type: "spki" }).toString("base64");
+
     const session = await manager.start({
       orgId: "org",
       siteId: "site",
@@ -63,6 +80,17 @@ describe("SimPublisherManager", () => {
       const parsed = TelemetryEnvelopeSchema.safeParse(JSON.parse(msg.payload));
       expect(parsed.success).toBe(true);
       expect(parsed.success && parsed.data.origin.machineId).toBe("machine");
+      if (parsed.success) {
+        expect(parsed.data.kid).toBe(process.env.SIGNING_KID);
+        const bytes = getEnvelopeSigningBytes(parsed.data);
+        const ok = verify(
+          null,
+          bytes,
+          createPublicKey({ key: Buffer.from(publicKeyB64, "base64"), format: "der", type: "spki" }),
+          Buffer.from(parsed.data.sig ?? "", "base64")
+        );
+        expect(ok).toBe(true);
+      }
     });
 
     expect(session.stats.telemetrySent).toBeGreaterThan(0);

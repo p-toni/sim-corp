@@ -1,4 +1,4 @@
-import type { RoastEvent, TelemetryPoint, TelemetryOrigin } from "@sim-corp/schemas";
+import type { RoastEventRecord, TelemetryRecord, TelemetryOrigin } from "@sim-corp/schemas";
 
 export interface TelemetryQuery {
   orgId?: string;
@@ -7,7 +7,7 @@ export interface TelemetryQuery {
   limit?: number;
 }
 
-export type StoredTelemetryPoint = TelemetryPoint & TelemetryOrigin;
+export type StoredTelemetryPoint = TelemetryRecord & TelemetryOrigin;
 
 export class TelemetryStore {
   private readonly telemetry: StoredTelemetryPoint[] = [];
@@ -54,7 +54,7 @@ export class TelemetryStore {
 
 export type EventQuery = TelemetryQuery;
 
-export type StoredRoastEvent = RoastEvent & TelemetryOrigin;
+export type StoredRoastEvent = RoastEventRecord & TelemetryOrigin;
 
 export class EventStore {
   private readonly events: StoredRoastEvent[] = [];
