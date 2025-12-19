@@ -20,6 +20,7 @@ import { ReportMissionEnqueuer } from "./core/report-missions";
 import { MqttOpsEventPublisher, type OpsEventPublisher } from "./ops/publisher";
 import { registerProfileRoutes } from "./routes/profiles";
 import { registerAuth } from "./auth";
+import { DeviceKeyResolver, EnvelopeVerifier, parseFallbackKeys } from "./core/verification";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -51,10 +52,11 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   });
   const envelopeStream = new EnvelopeStream();
   const handlers = new IngestionHandlers(telemetryStore, eventStore, persist, envelopeStream);
+  const verifier = buildVerifier(app);
 
   const mqttClient = resolveMqttClient(options.mqttClient, app);
   if (mqttClient) {
-    attachMqttHandlers(mqttClient, handlers, { logger: app.log });
+    attachMqttHandlers(mqttClient, handlers, { logger: app.log, verifier });
     app.addHook("onClose", async () => {
       await mqttClient.disconnect().catch((error: unknown) => {
         app.log.error(error, "Failed to disconnect MQTT client");
@@ -91,6 +93,13 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   registerEnvelopeStreamRoutes(app, { envelopeStream });
 
   return app;
+}
+
+function buildVerifier(app: FastifyInstance): EnvelopeVerifier {
+  const kernelUrl = process.env.INGESTION_KERNEL_URL ?? process.env.KERNEL_URL;
+  const fallback = parseFallbackKeys(process.env.INGESTION_DEVICE_KEYS_JSON);
+  const resolver = new DeviceKeyResolver({ kernelUrl, fallbackKeys: fallback, logger: app.log });
+  return new EnvelopeVerifier(resolver);
 }
 
 function resolveMqttClient(providedClient: MqttClient | null | undefined, app: FastifyInstance): MqttClient | null {

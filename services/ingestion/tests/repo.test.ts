@@ -54,8 +54,10 @@ describe("IngestionRepository", () => {
     expect(sessions.length).toBe(1);
     const telemetry = repo.getTelemetry("s1");
     expect(telemetry.length).toBe(1);
+    expect(telemetry[0].verification?.verified).toBe(false);
     const events = repo.getEvents("s1");
     expect(events[0].type).toBe("DROP");
+    expect(events[0].verification?.verified).toBe(false);
   });
 
   it("stores qc metadata, notes, and overrides", () => {

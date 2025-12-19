@@ -18,7 +18,10 @@ export class IngestionHandlers {
         const payload = persisted.payload as TelemetryPoint;
         const storedPoint: StoredTelemetryPoint = {
           ...payload,
-          ...persisted.origin
+          ...persisted.origin,
+          kid: persisted.kid,
+          sig: persisted.sig,
+          verification: persisted.verification
         };
         this.telemetryStore.add(storedPoint);
         this.envelopeStream?.publishTelemetry(persisted);
@@ -28,7 +31,10 @@ export class IngestionHandlers {
         const payload = persisted.payload as RoastEvent;
         const storedEvent: StoredRoastEvent = {
           ...payload,
-          ...persisted.origin
+          ...persisted.origin,
+          kid: persisted.kid,
+          sig: persisted.sig,
+          verification: persisted.verification
         };
         this.eventStore.add(storedEvent);
         this.envelopeStream?.publishEvent(persisted);

@@ -8,6 +8,8 @@ import {
   SessionMetaSchema,
   SessionNoteSchema,
   TelemetryPointSchema,
+  TelemetryRecordSchema,
+  RoastEventRecordSchema,
   RoastProfileSchema,
   RoastProfileVersionSchema,
   RoastProfileExportBundleSchema,
@@ -23,6 +25,8 @@ import type {
   SessionMeta,
   SessionNote,
   TelemetryPoint,
+  TelemetryRecord,
+  RoastEventRecord,
   RoastProfile,
   RoastProfileVersion,
   RoastProfileExportBundle,
@@ -215,38 +219,50 @@ export class IngestionRepository {
     return this.getEventOverrides(sessionId);
   }
 
-  appendTelemetry(sessionId: string, point: TelemetryPoint): void {
-    const parsed = TelemetryPointSchema.parse(point);
+  appendTelemetry(sessionId: string, point: TelemetryRecord): void {
+    const parsed = TelemetryRecordSchema.parse(point);
+    const { verification, kid, sig, ...payload } = parsed;
     this.db
       .prepare(
-        `INSERT INTO telemetry_points (session_id, ts, elapsed_seconds, bt_c, et_c, ror_c_per_min, ambient_c, raw_json)
-         VALUES (@sessionId, @ts, @elapsedSeconds, @btC, @etC, @rorCPerMin, @ambientC, @raw)`
+        `INSERT INTO telemetry_points (session_id, ts, elapsed_seconds, bt_c, et_c, ror_c_per_min, ambient_c, kid, sig, verified, verified_by, verify_reason, raw_json)
+         VALUES (@sessionId, @ts, @elapsedSeconds, @btC, @etC, @rorCPerMin, @ambientC, @kid, @sig, @verified, @verifiedBy, @verifyReason, @raw)`
       )
       .run({
         sessionId,
-        ts: parsed.ts,
-        elapsedSeconds: parsed.elapsedSeconds,
-        btC: parsed.btC ?? null,
-        etC: parsed.etC ?? null,
-        rorCPerMin: parsed.rorCPerMin ?? null,
-        ambientC: parsed.ambientC ?? null,
-        raw: JSON.stringify(parsed)
+        ts: payload.ts,
+        elapsedSeconds: payload.elapsedSeconds,
+        btC: payload.btC ?? null,
+        etC: payload.etC ?? null,
+        rorCPerMin: payload.rorCPerMin ?? null,
+        ambientC: payload.ambientC ?? null,
+        kid: kid ?? null,
+        sig: sig ?? null,
+        verified: verification?.verified ? 1 : 0,
+        verifiedBy: verification?.verifiedBy ?? null,
+        verifyReason: verification?.reason ?? null,
+        raw: JSON.stringify(TelemetryPointSchema.parse(payload))
       });
   }
 
-  appendEvent(sessionId: string, event: RoastEvent): void {
-    const parsed = RoastEventSchema.parse(event);
+  appendEvent(sessionId: string, event: RoastEventRecord): void {
+    const parsed = RoastEventRecordSchema.parse(event);
+    const { verification, kid, sig, ...payload } = parsed;
     this.db
       .prepare(
-        `INSERT INTO events (session_id, ts, elapsed_seconds, type, raw_json)
-         VALUES (@sessionId, @ts, @elapsedSeconds, @type, @raw)`
+        `INSERT INTO events (session_id, ts, elapsed_seconds, type, kid, sig, verified, verified_by, verify_reason, raw_json)
+         VALUES (@sessionId, @ts, @elapsedSeconds, @type, @kid, @sig, @verified, @verifiedBy, @verifyReason, @raw)`
       )
       .run({
         sessionId,
-        ts: parsed.ts,
-        elapsedSeconds: parsed.payload?.elapsedSeconds ?? null,
-        type: parsed.type,
-        raw: JSON.stringify(parsed)
+        ts: payload.ts,
+        elapsedSeconds: payload.payload?.elapsedSeconds ?? null,
+        type: payload.type,
+        kid: kid ?? null,
+        sig: sig ?? null,
+        verified: verification?.verified ? 1 : 0,
+        verifiedBy: verification?.verifiedBy ?? null,
+        verifyReason: verification?.reason ?? null,
+        raw: JSON.stringify(RoastEventSchema.parse(payload))
       });
   }
 
@@ -322,7 +338,7 @@ export class IngestionRepository {
     });
   }
 
-  getTelemetry(sessionId: string, limit = 2000, from?: number, to?: number): TelemetryPoint[] {
+  getTelemetry(sessionId: string, limit = 2000, from?: number, to?: number): TelemetryRecord[] {
     const conditions = ["session_id = @sessionId"];
     const params: Record<string, unknown> = { sessionId, limit };
     if (typeof from === "number") {
@@ -336,19 +352,41 @@ export class IngestionRepository {
     const where = `WHERE ${conditions.join(" AND ")}`;
     const rows = this.db
       .prepare(
-        `SELECT raw_json FROM telemetry_points ${where}
+        `SELECT raw_json, kid, sig, verified, verified_by, verify_reason FROM telemetry_points ${where}
          ORDER BY elapsed_seconds ASC
          LIMIT @limit`
       )
       .all(params);
-    return rows.map((row) => TelemetryPointSchema.parse(JSON.parse(row.raw_json)));
+    return rows.map((row) =>
+      TelemetryRecordSchema.parse({
+        ...TelemetryPointSchema.parse(JSON.parse(row.raw_json)),
+        kid: row.kid ?? undefined,
+        sig: row.sig ?? undefined,
+        verification: {
+          verified: row.verified === 1,
+          verifiedBy: row.verified_by ?? undefined,
+          reason: row.verify_reason ?? undefined
+        }
+      })
+    );
   }
 
-  getEvents(sessionId: string): RoastEvent[] {
+  getEvents(sessionId: string): RoastEventRecord[] {
     const rows = this.db
-      .prepare(`SELECT raw_json FROM events WHERE session_id = @sessionId ORDER BY ts ASC`)
+      .prepare(`SELECT raw_json, kid, sig, verified, verified_by, verify_reason FROM events WHERE session_id = @sessionId ORDER BY ts ASC`)
       .all({ sessionId });
-    return rows.map((row) => RoastEventSchema.parse(JSON.parse(row.raw_json)));
+    return rows.map((row) =>
+      RoastEventRecordSchema.parse({
+        ...RoastEventSchema.parse(JSON.parse(row.raw_json)),
+        kid: row.kid ?? undefined,
+        sig: row.sig ?? undefined,
+        verification: {
+          verified: row.verified === 1,
+          verifiedBy: row.verified_by ?? undefined,
+          reason: row.verify_reason ?? undefined
+        }
+      })
+    );
   }
 
   getLastTelemetryElapsed(sessionId: string): number | null {

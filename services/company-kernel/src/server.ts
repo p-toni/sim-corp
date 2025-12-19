@@ -16,6 +16,8 @@ import { RateLimiter } from "./core/governor/rate-limit";
 import { GovernorEngine } from "./core/governor/engine";
 import { registerGovernorRoutes } from "./routes/governor";
 import { registerAuth } from "./auth";
+import { registerDeviceRoutes } from "./routes/devices";
+import { DeviceKeyRepository } from "./db/device-keys";
 
 interface BuildServerOptions {
   missionStore?: MissionStore;
@@ -36,6 +38,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   const governorConfig = new GovernorConfigStore(db);
   const rateLimiter = new RateLimiter(db);
   const governor = new GovernorEngine(governorConfig, rateLimiter);
+  const deviceKeys = new DeviceKeyRepository(db);
 
   await registerHealthRoutes(app);
   await registerAgentRoutes(app, { registry });
@@ -44,6 +47,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   await registerTraceRoutes(app, { traces });
   await registerMissionRoutes(app, { missions, governor });
   await registerGovernorRoutes(app, { config: governorConfig });
+  await registerDeviceRoutes(app, { repo: deviceKeys });
 
   return app;
 }

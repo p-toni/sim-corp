@@ -224,8 +224,16 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 **Evidence:** `pnpm --filter @sim-corp/ingestion test`, `pnpm --filter @sim-corp/roaster-desktop test` (offline env: vitest missing)
 
 ### T-027 — Device identity + signed telemetry
-**Status:** PLANNED  
-**Milestone:** M2
+**Status:** DONE  
+**Milestone:** M2  
+**Evidence:**  
+- `pnpm --filter @sim-corp/schemas test` (fails locally: vitest not found, Node 20 required)  
+- `pnpm --filter @sim-corp/company-kernel test` (fails locally: vitest not found, Node 20 required)  
+- `pnpm --filter @sim-corp/ingestion test` (fails locally: vitest not found, Node 20 required)  
+- `pnpm --filter @sim-corp/driver-bridge test` (fails locally: vitest not found, Node 20 required)  
+- `pnpm --filter @sim-corp/sim-publisher test` (fails locally: vitest not found, Node 20 required)  
+- `pnpm --filter @sim-corp/event-inference test` (fails locally: vitest not found, Node 20 required)  
+- `pnpm --filter @sim-corp/roaster-desktop test` (fails locally: vitest not found, Node 20 required)
 
 ### T-028 — Eval harness + golden cases + promotion gates
 **Status:** PLANNED  

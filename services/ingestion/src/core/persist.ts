@@ -2,7 +2,9 @@ import type {
   RoastEvent,
   RoastSessionSummary,
   TelemetryEnvelope,
-  TelemetryPoint
+  TelemetryPoint,
+  TelemetryRecord,
+  RoastEventRecord
 } from "@sim-corp/schemas";
 import { IngestionRepository } from "../db/repo";
 import type { Sessionizer } from "./sessionizer";
@@ -22,16 +24,29 @@ export class PersistencePipeline {
     this.deps.repo.upsertSession(sessionSummary);
 
     if (withSession.topic === "telemetry") {
-      this.deps.repo.appendTelemetry(withSession.sessionId!, withSession.payload as TelemetryPoint);
-      if (typeof (withSession.payload as TelemetryPoint).btC === "number") {
+      const payload = withSession.payload as TelemetryPoint;
+      const record: TelemetryRecord = {
+        ...payload,
+        kid: withSession.kid,
+        sig: withSession.sig,
+        verification: withSession.verification
+      };
+      this.deps.repo.appendTelemetry(withSession.sessionId!, record);
+      if (typeof payload.btC === "number") {
         this.deps.repo.upsertSession({
           ...sessionSummary,
-          maxBtC: Math.max(sessionSummary.maxBtC ?? 0, (withSession.payload as TelemetryPoint).btC!)
+          maxBtC: Math.max(sessionSummary.maxBtC ?? 0, payload.btC)
         });
       }
     } else if (withSession.topic === "event") {
       const event = withSession.payload as RoastEvent;
-      this.deps.repo.appendEvent(withSession.sessionId!, event);
+      const record: RoastEventRecord = {
+        ...event,
+        kid: withSession.kid,
+        sig: withSession.sig,
+        verification: withSession.verification
+      };
+      this.deps.repo.appendEvent(withSession.sessionId!, record);
       const update = { ...sessionSummary };
       if (event.type === "FC" && typeof event.payload?.elapsedSeconds === "number") {
         update.fcSeconds = event.payload.elapsedSeconds;

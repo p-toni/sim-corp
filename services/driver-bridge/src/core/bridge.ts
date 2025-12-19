@@ -3,6 +3,7 @@ import { TelemetryEnvelopeSchema } from "@sim-corp/schemas";
 import type { TelemetryEnvelope } from "@sim-corp/schemas";
 import type { DriverConfig, DriverFactory } from "@sim-corp/driver-core";
 import type { MqttPublisher } from "../mqtt/publisher";
+import { createEnvelopeSigner } from "./signing";
 
 export interface BridgeStats {
   samplesPublished: number;
@@ -44,6 +45,16 @@ export class DriverBridge {
     const driverFactory = driverFactoryOverride ?? this.deps.driverFactory;
     const driver = driverFactory(config);
     await driver.connect();
+    const signer = createEnvelopeSigner({
+      mode: process.env.SIGNING_MODE,
+      kid: process.env.SIGNING_KID,
+      privateKeyB64: process.env.SIGNING_PRIVATE_KEY_B64,
+      defaultKid: `device:driver-bridge@${config.orgId}/${config.siteId}/${config.machineId}`,
+      orgId: config.orgId,
+      kernelUrl: process.env.KERNEL_URL,
+      logger: console
+    });
+    await signer.ensureRegistered();
 
     const intervalMs = Math.max(
       100,
@@ -71,11 +82,12 @@ export class DriverBridge {
           topic: "telemetry",
           payload: point
         }) as TelemetryEnvelope;
+        const signed = signer.signEnvelope(envelope);
 
         const topic = `roaster/${config.orgId}/${config.siteId}/${config.machineId}/telemetry`;
-        await this.deps.mqttPublisher.publish(topic, JSON.stringify(envelope));
+        await this.deps.mqttPublisher.publish(topic, JSON.stringify(signed));
         stats.samplesPublished += 1;
-        stats.lastPublishedAt = envelope.ts;
+        stats.lastPublishedAt = signed.ts;
       } catch (error) {
         stats.lastError = error instanceof Error ? error.message : String(error);
       }

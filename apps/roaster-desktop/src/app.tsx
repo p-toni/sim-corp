@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   AgentTrace,
   RoastEvent,
+  RoastEventRecord,
   TelemetryEnvelope,
+  TelemetryRecord,
   TelemetryPoint,
   MissionSignals,
   RoastProfile,
@@ -70,6 +72,8 @@ import { ReportPanel } from "./components/ReportPanel";
 import { OpsPanel } from "./components/OpsPanel";
 import { ProfilesPanel } from "./components/ProfilesPanel";
 import { useAuthInfo, AuthControls } from "./lib/auth";
+import { VerificationBadge, type VerificationSummary } from "./components/VerificationBadge";
+import { summarizeVerification, summaryFromEnvelope } from "./lib/verification";
 
 interface AppProps {
   runMission?: MissionRunner;
@@ -82,8 +86,8 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
   const [liveConfig, setLiveConfig] = useState<LiveConfig>(defaultLiveConfig);
   const [endpoints, setEndpoints] = useState<EndpointSettings>(defaultEndpointSettings);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [telemetry, setTelemetry] = useState<TelemetryPoint[]>([]);
-  const [events, setEvents] = useState<RoastEvent[]>([]);
+  const [telemetry, setTelemetry] = useState<TelemetryRecord[]>([]);
+  const [events, setEvents] = useState<RoastEventRecord[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [playback, setPlayback] = useState<PlaybackState>({ sessions: [], selectedSessionId: null });
   const [analysis, setAnalysis] = useState<import("@sim-corp/schemas").RoastAnalysis | null>(null);
@@ -107,6 +111,7 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
   const [kernelStatus, setKernelStatus] = useState<string>("Disabled");
   const [liveStatus, setLiveStatus] = useState<string>("Disconnected");
   const [liveError, setLiveError] = useState<string | null>(null);
+  const [liveVerification, setLiveVerification] = useState<VerificationSummary | null>(null);
   const [profiles, setProfiles] = useState<RoastProfile[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<RoastProfile | null>(null);
   const [profileVersions, setProfileVersions] = useState<RoastProfileVersion[]>([]);
@@ -228,6 +233,7 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     eventSourceRef.current = null;
     setLiveStatus("Disconnected");
     setCurrentSessionId(null);
+    setLiveVerification(null);
   };
 
   const startStream = (
@@ -260,6 +266,7 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     setError(null);
     setLiveError(null);
     setLiveStatus("Connecting");
+    setLiveVerification(null);
 
     const base = liveConfig.ingestionUrl.replace(/\/$/, "");
     const params = new URLSearchParams({
@@ -278,13 +285,15 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
         setEvents([]);
         setCurrentSessionId(sessionId);
       }
+      setLiveVerification(summaryFromEnvelope(env));
       const payload = env.payload as TelemetryPoint;
-      setTelemetry((prev) => appendWithLimit(prev, payload));
+      setTelemetry((prev) => appendWithLimit(prev, payload as TelemetryRecord));
     };
 
     const onEvent = (env: TelemetryEnvelope): void => {
       const payload = env.payload as RoastEvent;
-      setEvents((prev) => appendWithLimit(prev, payload));
+      setEvents((prev) => appendWithLimit(prev, payload as RoastEventRecord));
+      setLiveVerification(summaryFromEnvelope(env));
       if (env.sessionId && env.sessionId !== currentSessionId) {
         setCurrentSessionId(env.sessionId);
       }
@@ -295,14 +304,16 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
       const legacyEvents = `${base}/stream/events?${params}`;
       telemetrySourceRef.current = startStream(legacyTelemetry, "telemetry", (env) => {
         const payload = env as unknown as TelemetryPoint;
-        setTelemetry((prev) => appendWithLimit(prev, payload));
+        setTelemetry((prev) => appendWithLimit(prev, payload as TelemetryRecord));
+        setLiveVerification(null);
       }, (evt) => {
         setLiveStatus("Error");
         setLiveError(`Telemetry stream error: ${evt}`);
       });
       eventSourceRef.current = startStream(legacyEvents, "roastEvent", (env) => {
         const payload = env as unknown as RoastEvent;
-        setEvents((prev) => appendWithLimit(prev, payload));
+        setEvents((prev) => appendWithLimit(prev, payload as RoastEventRecord));
+        setLiveVerification(null);
       }, (evt) => {
         setLiveStatus("Error");
         setLiveError(`Events stream error: ${evt}`);
@@ -739,6 +750,11 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
   };
 
   const latestElapsedSeconds = telemetry[telemetry.length - 1]?.elapsedSeconds ?? null;
+  const playbackVerification = useMemo(
+    () => summarizeVerification(telemetry, events),
+    [telemetry, events]
+  );
+  const verificationSummary = mode === "live" ? liveVerification : playbackVerification;
   const authSummary = authInfo.isSignedIn
     ? authInfo.displayName ?? authInfo.userId ?? "Signed in"
     : authInfo.hasClerk
@@ -815,8 +831,11 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
       ) : (
         <div className="stack">
           {mode !== "batch" ? (
-            <div className="muted small-text">
-              {currentSessionId ? `Current session: ${currentSessionId}` : "No session detected"}
+            <div className="split">
+              <div className="muted small-text">
+                {currentSessionId ? `Current session: ${currentSessionId}` : "No session detected"}
+              </div>
+              <VerificationBadge summary={verificationSummary} />
             </div>
           ) : null}
           <CurveChart telemetry={telemetry} events={events} phases={analysis?.phases} />

@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, afterEach } from "vitest";
 import { DriverBridge } from "../src/core/bridge";
 import type { Driver, DriverConfig } from "@sim-corp/driver-core";
 import type { MqttPublisher } from "../src/mqtt/publisher";
-import { TelemetryEnvelopeSchema } from "@sim-corp/schemas";
+import { TelemetryEnvelopeSchema, getEnvelopeSigningBytes } from "@sim-corp/schemas";
+import { createPublicKey, generateKeyPairSync, verify } from "node:crypto";
 
 class FakeDriver implements Driver {
   constructor(private readonly cfg: DriverConfig) {}
@@ -28,7 +29,24 @@ class FakePublisher implements MqttPublisher {
 }
 
 describe("DriverBridge", () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    for (const key of Object.keys(process.env)) {
+      if (!(key in originalEnv)) {
+        delete process.env[key];
+      }
+    }
+    Object.assign(process.env, originalEnv);
+  });
+
   it("publishes telemetry envelopes on interval", async () => {
+    const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+    process.env.SIGNING_MODE = "ed25519";
+    process.env.SIGNING_KID = "device:test@org/site/machine";
+    process.env.SIGNING_PRIVATE_KEY_B64 = privateKey.export({ format: "der", type: "pkcs8" }).toString("base64");
+    const publicKeyB64 = publicKey.export({ format: "der", type: "spki" }).toString("base64");
+
     const publisher = new FakePublisher();
     const bridge = new DriverBridge({
       driverFactory: (cfg) => new FakeDriver(cfg),
@@ -52,5 +70,17 @@ describe("DriverBridge", () => {
     const parsed = TelemetryEnvelopeSchema.safeParse(JSON.parse(first.payload));
     expect(parsed.success).toBe(true);
     expect(parsed.success && parsed.data.origin.machineId).toBe("machine");
+    if (parsed.success) {
+      expect(parsed.data.kid).toBe(process.env.SIGNING_KID);
+      expect(parsed.data.sig).toBeTruthy();
+      const bytes = getEnvelopeSigningBytes(parsed.data);
+      const ok = verify(
+        null,
+        bytes,
+        createPublicKey({ key: Buffer.from(publicKeyB64, "base64"), format: "der", type: "spki" }),
+        Buffer.from(parsed.data.sig ?? "", "base64")
+      );
+      expect(ok).toBe(true);
+    }
   });
 });

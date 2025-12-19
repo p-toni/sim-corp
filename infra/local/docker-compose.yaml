@@ -18,6 +18,7 @@ services:
     environment:
       NODE_ENV: development
       KERNEL_DB_PATH: /data/kernel.db
+      DEV_ORG_ID: org
     volumes:
       - ../../:/app
       - ../../node_modules:/app/node_modules
@@ -73,6 +74,9 @@ services:
       NODE_ENV: development
       MQTT_URL: mqtt://mosquitto:1883
       SIM_TWIN_URL: http://sim-twin:4002
+      SIGNING_MODE: ed25519
+      SIGNING_AUTO_REGISTER: "true"
+      KERNEL_URL: http://company-kernel:3000
     volumes:
       - ../../:/app
       - ../../node_modules:/app/node_modules
@@ -90,6 +94,9 @@ services:
     environment:
       NODE_ENV: development
       MQTT_URL: mqtt://mosquitto:1883
+      SIGNING_MODE: ed25519
+      SIGNING_AUTO_REGISTER: "true"
+      KERNEL_URL: http://company-kernel:3000
     volumes:
       - ../../:/app
       - ../../node_modules:/app/node_modules
@@ -107,6 +114,10 @@ services:
       NODE_ENV: development
       MQTT_URL: mqtt://mosquitto:1883
       EVENT_INFERENCE_PORT: 4005
+      SIGNING_MODE: ed25519
+      SIGNING_AUTO_REGISTER: "true"
+      SIGNING_ORG_ID: org
+      KERNEL_URL: http://company-kernel:3000
     volumes:
       - ../../:/app
       - ../../node_modules:/app/node_modules
