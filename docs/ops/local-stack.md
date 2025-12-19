@@ -25,6 +25,15 @@ Services:
 - report-worker: 4007
 - dispatcher: 4010
 
+### Auth modes (dev vs Clerk)
+
+- Default `AUTH_MODE=dev` keeps the stack usable without external auth.
+- Dev actor defaults: `DEV_USER_ID=dev-user`, `DEV_ORG_ID=org` (override per service if needed).
+- To exercise Clerk locally:
+  - set `AUTH_MODE=clerk` on services and provide `CLERK_JWT_ISSUER` + `CLERK_JWT_AUDIENCE` for JWT verification,
+  - configure roaster-desktop with `VITE_CLERK_PUBLISHABLE_KEY` (or `CLERK_PUBLISHABLE_KEY`) so the UI can sign in and forward Bearer tokens to APIs.
+- Roaster-desktop will attach Bearer tokens to API calls when signed in; dev mode omits auth headers automatically.
+
 ## Start roaster-desktop (optional UI)
 - Packaged desktop (Tauri):
   - Build artifacts: `pnpm --filter @sim-corp/roaster-desktop tauri:build` (Node 20 + Rust toolchain)

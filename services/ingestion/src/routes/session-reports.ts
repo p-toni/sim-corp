@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { RoastReport } from "@sim-corp/schemas";
 import type { IngestionRepository } from "../db/repo";
+import { ensureOrgAccess } from "../auth";
 
 interface SessionReportDeps {
   repo: IngestionRepository;
@@ -22,6 +23,7 @@ export function registerSessionReportRoutes(app: FastifyInstance, deps: SessionR
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
+      if (!ensureOrgAccess(reply, request.actor, session.orgId)) return;
       const limit = toNumber(request.query.limit, 20);
       const offset = toNumber(request.query.offset, 0);
       return repo.listSessionReports(session.sessionId, limit, offset);
@@ -35,6 +37,7 @@ export function registerSessionReportRoutes(app: FastifyInstance, deps: SessionR
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
+      if (!ensureOrgAccess(reply, request.actor, session.orgId)) return;
       const report = repo.getLatestSessionReport(session.sessionId);
       if (!report) {
         return reply.status(404).send({ error: "Report not found" });
@@ -48,6 +51,7 @@ export function registerSessionReportRoutes(app: FastifyInstance, deps: SessionR
     if (!report) {
       return reply.status(404).send({ error: "Report not found" });
     }
+    if (!ensureOrgAccess(reply, request.actor, report.orgId)) return;
     return report;
   });
 
@@ -58,6 +62,7 @@ export function registerSessionReportRoutes(app: FastifyInstance, deps: SessionR
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
+      if (!ensureOrgAccess(reply, request.actor, session.orgId)) return;
 
       const body = (request.body ?? {}) as Record<string, unknown>;
       const { traceId, ...payload } = body;
@@ -72,7 +77,8 @@ export function registerSessionReportRoutes(app: FastifyInstance, deps: SessionR
         const { report, created } = repo.createSessionReport(
           session.sessionId,
           reportInput as RoastReport,
-          typeof traceId === "string" ? traceId : undefined
+          typeof traceId === "string" ? traceId : undefined,
+          request.actor
         );
         reply.status(created ? 201 : 200);
         return report;

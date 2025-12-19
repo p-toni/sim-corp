@@ -50,6 +50,7 @@ CREATE INDEX IF NOT EXISTS idx_events_session_type ON events (session_id, type);
 CREATE TABLE IF NOT EXISTS session_meta (
   session_id TEXT PRIMARY KEY,
   meta_json TEXT NOT NULL,
+  actor_json TEXT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
 );
@@ -60,6 +61,7 @@ CREATE TABLE IF NOT EXISTS session_notes (
   session_id TEXT NOT NULL,
   created_at TEXT NOT NULL,
   author TEXT NULL,
+  actor_json TEXT NULL,
   note_json TEXT NOT NULL,
   FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
 );
@@ -72,6 +74,7 @@ CREATE TABLE IF NOT EXISTS event_overrides (
   elapsed_seconds REAL NOT NULL,
   source TEXT NOT NULL,
   author TEXT NULL,
+  actor_json TEXT NULL,
   reason TEXT NULL,
   updated_at TEXT NOT NULL,
   PRIMARY KEY (session_id, event_type),
@@ -87,6 +90,7 @@ CREATE TABLE IF NOT EXISTS session_reports (
   report_kind TEXT NOT NULL DEFAULT 'POST_ROAST_V1',
   created_at TEXT NOT NULL,
   created_by TEXT NOT NULL,
+  actor_json TEXT NULL,
   agent_name TEXT NULL,
   agent_version TEXT NULL,
   markdown TEXT NOT NULL,
@@ -114,6 +118,7 @@ CREATE TABLE IF NOT EXISTS roast_profiles (
   notes TEXT NULL,
   source_json TEXT NOT NULL,
   is_archived INTEGER NOT NULL DEFAULT 0,
+  actor_json TEXT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   profile_json TEXT NOT NULL,
@@ -131,6 +136,7 @@ CREATE TABLE IF NOT EXISTS roast_profile_versions (
   version INTEGER NOT NULL,
   created_at TEXT NOT NULL,
   created_by TEXT NULL,
+  actor_json TEXT NULL,
   change_note TEXT NULL,
   snapshot_json TEXT NOT NULL,
   UNIQUE(org_id, profile_id, version)

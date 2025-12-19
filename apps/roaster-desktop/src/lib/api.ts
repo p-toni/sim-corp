@@ -259,7 +259,7 @@ export async function postTraceToKernel(trace: AgentTrace): Promise<void> {
   }
 
   const url = new URL("/traces", resolveKernelUrl()).toString();
-  const response = await fetch(url, {
+  const response = await authFetch(url, {
     method: "POST",
     headers: {
       "content-type": "application/json"
@@ -280,11 +280,26 @@ class HttpError extends Error {
   }
 }
 
+let authTokenProvider: () => Promise<string | null> = async () => null;
+
+export function setAuthTokenProvider(provider: () => Promise<string | null>): void {
+  authTokenProvider = provider;
+}
+
+async function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers ?? {});
+  const token = await authTokenProvider();
+  if (token) {
+    headers.set("authorization", `Bearer ${token}`);
+  }
+  return fetch(url, { ...init, headers });
+}
+
 async function fetchJson<T>(
   url: string,
   schema?: { safeParse: (value: unknown) => { success: boolean; data: T } }
 ): Promise<T> {
-  const res = await fetch(url);
+  const res = await authFetch(url);
   if (!res.ok) {
     throw new HttpError(`Request failed ${res.status}`, res.status);
   }
@@ -347,7 +362,7 @@ export async function getSessionMeta(baseUrl: string, sessionId: string): Promis
 
 export async function saveSessionMeta(baseUrl: string, sessionId: string, meta: SessionMeta): Promise<SessionMeta> {
   const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/meta`;
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(meta)
@@ -371,7 +386,7 @@ export async function listSessionNotes(baseUrl: string, sessionId: string, param
 
 export async function addSessionNote(baseUrl: string, sessionId: string, note: Partial<SessionNote>): Promise<SessionNote> {
   const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/notes`;
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(note)
@@ -392,7 +407,7 @@ export async function getEventOverrides(baseUrl: string, sessionId: string): Pro
 
 export async function saveEventOverrides(baseUrl: string, sessionId: string, overrides: EventOverride[]): Promise<EventOverride[]> {
   const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/events/overrides`;
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ overrides })
@@ -408,7 +423,7 @@ export async function saveEventOverrides(baseUrl: string, sessionId: string, ove
 
 export async function getLatestSessionReport(baseUrl: string, sessionId: string): Promise<RoastReport | null> {
   const url = `${baseUrl.replace(/\/$/, "")}/sessions/${sessionId}/reports/latest`;
-  const res = await fetch(url);
+  const res = await authFetch(url);
   if (res.status === 404) {
     return null;
   }
@@ -434,7 +449,7 @@ export async function enqueueReportMission(
     ...(context ? { context } : {}),
     ...(signals ? { signals } : {})
   };
-  const res = await fetch(new URL("/missions", resolveKernelUrl()).toString(), {
+  const res = await authFetch(new URL("/missions", resolveKernelUrl()).toString(), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload)
@@ -472,7 +487,7 @@ export async function listMissionsBySubject(subjectId: string, goal = "generate-
 
 export async function approveMission(missionId: string): Promise<KernelMissionRecord> {
   const url = new URL(`/missions/${missionId}/approve`, resolveKernelUrl()).toString();
-  const res = await fetch(url, { method: "POST" });
+  const res = await authFetch(url, { method: "POST" });
   if (!res.ok) {
     const message = await res.text().catch(() => "unknown error");
     throw new HttpError(message || "Approval failed", res.status);
@@ -485,7 +500,7 @@ export async function approveMission(missionId: string): Promise<KernelMissionRe
 
 export async function cancelMission(missionId: string): Promise<KernelMissionRecord> {
   const url = new URL(`/missions/${missionId}/cancel`, resolveKernelUrl()).toString();
-  const res = await fetch(url, { method: "POST" });
+  const res = await authFetch(url, { method: "POST" });
   if (!res.ok) {
     const message = await res.text().catch(() => "unknown error");
     throw new HttpError(message || "Cancel failed", res.status);
@@ -498,7 +513,7 @@ export async function cancelMission(missionId: string): Promise<KernelMissionRec
 
 export async function retryNowMission(missionId: string): Promise<KernelMissionRecord> {
   const url = new URL(`/missions/${missionId}/retryNow`, resolveKernelUrl()).toString();
-  const res = await fetch(url, { method: "POST" });
+  const res = await authFetch(url, { method: "POST" });
   if (!res.ok) {
     const message = await res.text().catch(() => "unknown error");
     throw new HttpError(message || "Retry failed", res.status);
@@ -519,7 +534,7 @@ export async function listProfiles(baseUrl: string, filters: ProfileListFilters)
   if (filters.tag) params.set("tag", filters.tag);
   if (filters.includeArchived) params.set("includeArchived", "true");
   if (typeof filters.limit === "number") params.set("limit", String(filters.limit));
-  const res = await fetch(`${base}/profiles?${params.toString()}`);
+  const res = await authFetch(`${base}/profiles?${params.toString()}`);
   const json = await res.json();
   const parsed = RoastProfileSchema.array().safeParse(json);
   if (!parsed.success) {
@@ -530,7 +545,7 @@ export async function listProfiles(baseUrl: string, filters: ProfileListFilters)
 
 export async function getProfile(baseUrl: string, orgId: string, profileId: string): Promise<RoastProfile> {
   const base = baseUrl.replace(/\/$/, "");
-  const res = await fetch(`${base}/profiles/${profileId}?orgId=${orgId}`);
+  const res = await authFetch(`${base}/profiles/${profileId}?orgId=${orgId}`);
   const json = await res.json();
   const parsed = RoastProfileSchema.safeParse(json);
   if (!parsed.success) throw new Error("Failed to parse profile");
@@ -543,7 +558,7 @@ export async function listProfileVersions(
   profileId: string
 ): Promise<RoastProfileVersion[]> {
   const base = baseUrl.replace(/\/$/, "");
-  const res = await fetch(`${base}/profiles/${profileId}/versions?orgId=${orgId}`);
+  const res = await authFetch(`${base}/profiles/${profileId}/versions?orgId=${orgId}`);
   const json = await res.json();
   const parsed = RoastProfileVersionSchema.array().safeParse(json);
   if (!parsed.success) throw new Error("Failed to parse profile versions");
@@ -556,7 +571,7 @@ export async function createProfile(
   changeNote?: string
 ): Promise<RoastProfile> {
   const base = baseUrl.replace(/\/$/, "");
-  const res = await fetch(`${base}/profiles`, {
+  const res = await authFetch(`${base}/profiles`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ profile, changeNote })
@@ -574,7 +589,7 @@ export async function createProfileVersion(
   changeNote?: string
 ): Promise<RoastProfile> {
   const base = baseUrl.replace(/\/$/, "");
-  const res = await fetch(`${base}/profiles/${profileId}/new-version`, {
+  const res = await authFetch(`${base}/profiles/${profileId}/new-version`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ profile, changeNote })
@@ -593,7 +608,7 @@ export async function toggleArchiveProfile(
 ): Promise<RoastProfile> {
   const base = baseUrl.replace(/\/$/, "");
   const path = archived ? "archive" : "unarchive";
-  const res = await fetch(`${base}/profiles/${profileId}/${path}?orgId=${orgId}`, { method: "POST" });
+  const res = await authFetch(`${base}/profiles/${profileId}/${path}?orgId=${orgId}`, { method: "POST" });
   const json = await res.json();
   const parsed = RoastProfileSchema.safeParse(json);
   if (!parsed.success) throw new Error("Failed to parse archived profile");
@@ -607,7 +622,7 @@ export async function exportProfile(
   format: "json" | "csv"
 ): Promise<RoastProfileExportBundle | string> {
   const base = baseUrl.replace(/\/$/, "");
-  const res = await fetch(`${base}/profiles/${profileId}/export?orgId=${orgId}&format=${format}`);
+  const res = await authFetch(`${base}/profiles/${profileId}/export?orgId=${orgId}&format=${format}`);
   if (format === "csv") {
     return res.text();
   }

@@ -9,6 +9,12 @@ interface SettingsPanelProps {
   settings: EndpointSettings;
   onChange: (next: EndpointSettings) => void;
   onSave: (next: EndpointSettings) => Promise<EndpointSettings>;
+  authMode: "dev" | "clerk";
+  authOrgId?: string;
+  authUserId?: string;
+  authDisplayName?: string;
+  hasClerk?: boolean;
+  isSignedIn?: boolean;
 }
 
 function readStatusLabel(status: unknown): string {
@@ -23,7 +29,17 @@ function readStatusLabel(status: unknown): string {
   return "OK";
 }
 
-export function SettingsPanel({ settings, onChange, onSave }: SettingsPanelProps) {
+export function SettingsPanel({
+  settings,
+  onChange,
+  onSave,
+  authMode,
+  authOrgId,
+  authUserId,
+  authDisplayName,
+  hasClerk,
+  isSignedIn
+}: SettingsPanelProps) {
   const [draft, setDraft] = useState<EndpointSettings>(settings);
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -155,6 +171,22 @@ export function SettingsPanel({ settings, onChange, onSave }: SettingsPanelProps
         </div>
         {dispatcherStatus ? <div className="status-text">Status: {dispatcherStatus}</div> : null}
         {dispatcherError ? <div className="error-text">{dispatcherError}</div> : null}
+      </div>
+
+      <div className="panel">
+        <div className="panel-header">
+          <div>
+            <h3 className="panel-title">Authentication</h3>
+            <p className="muted small-text">
+              Mode: {authMode} {hasClerk ? "(Clerk)" : "(dev)"}
+            </p>
+          </div>
+          <span className="badge">{isSignedIn ? "Signed in" : "Signed out"}</span>
+        </div>
+        <div className="stack small-text">
+          <div>User: {authDisplayName ?? authUserId ?? "Unknown"}</div>
+          <div>Org: {authOrgId ?? "Unknown"}</div>
+        </div>
       </div>
     </div>
   );

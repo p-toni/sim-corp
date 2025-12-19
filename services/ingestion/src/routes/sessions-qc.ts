@@ -7,6 +7,7 @@ import {
   type SessionNote
 } from "@sim-corp/schemas";
 import type { IngestionRepository } from "../db/repo";
+import { ensureOrgAccess } from "../auth";
 
 interface SessionsQcDeps {
   repo: IngestionRepository;
@@ -22,6 +23,7 @@ export function registerSessionQcRoutes(app: FastifyInstance, deps: SessionsQcDe
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
+      if (!ensureOrgAccess(reply, request.actor, session.orgId)) return;
       return repo.getSessionMeta(request.params.id) ?? SessionMetaSchema.parse({});
     }
   );
@@ -33,8 +35,9 @@ export function registerSessionQcRoutes(app: FastifyInstance, deps: SessionsQcDe
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
+      if (!ensureOrgAccess(reply, request.actor, session.orgId)) return;
       const meta = SessionMetaSchema.parse(request.body ?? {});
-      const stored = repo.upsertSessionMeta(request.params.id, meta);
+      const stored = repo.upsertSessionMeta(request.params.id, meta, request.actor);
       return stored;
     }
   );
@@ -52,6 +55,7 @@ export function registerSessionQcRoutes(app: FastifyInstance, deps: SessionsQcDe
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
+      if (!ensureOrgAccess(reply, request.actor, session.orgId)) return;
       const limit = toNumber(request.query.limit, 50);
       const offset = toNumber(request.query.offset, 0);
       return repo.listSessionNotes(request.params.id, limit, offset);
@@ -65,12 +69,13 @@ export function registerSessionQcRoutes(app: FastifyInstance, deps: SessionsQcDe
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
+      if (!ensureOrgAccess(reply, request.actor, session.orgId)) return;
       const payload = request.body ?? {};
       const baseSchema = SessionNoteSchema.omit({ noteId: true, createdAt: true }).partial({
         author: true
       });
       const parsed = baseSchema.parse(payload);
-      const note: SessionNote = repo.addSessionNote(request.params.id, parsed);
+      const note: SessionNote = repo.addSessionNote(request.params.id, parsed, request.actor);
       reply.status(201);
       return note;
     }
@@ -83,6 +88,7 @@ export function registerSessionQcRoutes(app: FastifyInstance, deps: SessionsQcDe
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
+      if (!ensureOrgAccess(reply, request.actor, session.orgId)) return;
       return repo.getEventOverrides(request.params.id);
     }
   );
@@ -94,6 +100,7 @@ export function registerSessionQcRoutes(app: FastifyInstance, deps: SessionsQcDe
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
+      if (!ensureOrgAccess(reply, request.actor, session.orgId)) return;
       const body = (request.body as { overrides?: unknown }) ?? {};
       const overridesInput = (body.overrides ?? body) as unknown;
       const parsedOverrides = EventOverrideSchema.array().parse(overridesInput).map((o) => ({
@@ -110,7 +117,11 @@ export function registerSessionQcRoutes(app: FastifyInstance, deps: SessionsQcDe
           }
         }
       }
-      const stored = repo.upsertEventOverrides(request.params.id, parsedOverrides as EventOverride[]);
+      const stored = repo.upsertEventOverrides(
+        request.params.id,
+        parsedOverrides as EventOverride[],
+        request.actor
+      );
       return stored;
     }
   );

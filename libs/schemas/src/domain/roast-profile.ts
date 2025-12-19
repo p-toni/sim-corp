@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { IdentifierSchema, IsoDateTimeSchema, NonEmptyStringSchema } from "../common/scalars";
+import { ActorSchema, IdentifierSchema, IsoDateTimeSchema, NonEmptyStringSchema } from "../common";
 
 const FiniteNumberSchema = z
   .number()
@@ -58,7 +58,8 @@ export const RoastProfileSchema = z.object({
   tags: NonEmptyStringSchema.array().optional(),
   notes: z.string().optional(),
   source: RoastProfileSourceSchema,
-  isArchived: z.boolean().optional()
+  isArchived: z.boolean().optional(),
+  actor: ActorSchema.optional()
 });
 
 export type RoastProfile = z.infer<typeof RoastProfileSchema>;
@@ -68,6 +69,7 @@ export const RoastProfileVersionSchema = z.object({
   version: z.number().int().min(1),
   createdAt: IsoDateTimeSchema,
   createdBy: z.string().optional(),
+  actor: ActorSchema.optional(),
   snapshot: RoastProfileSchema,
   changeNote: z.string().optional()
 });

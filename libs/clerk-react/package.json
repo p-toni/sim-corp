@@ -1,0 +1,7 @@
+{
+  "name": "@clerk/clerk-react",
+  "version": "5.8.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.tsx"
+}

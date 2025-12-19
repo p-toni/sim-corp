@@ -15,6 +15,7 @@ import { GovernorConfigStore } from "./core/governor/config";
 import { RateLimiter } from "./core/governor/rate-limit";
 import { GovernorEngine } from "./core/governor/engine";
 import { registerGovernorRoutes } from "./routes/governor";
+import { registerAuth } from "./auth";
 
 interface BuildServerOptions {
   missionStore?: MissionStore;
@@ -23,6 +24,8 @@ interface BuildServerOptions {
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: true });
+
+  registerAuth(app);
 
   const registry = new Registry();
   const policy = new PolicyEngine(registry);

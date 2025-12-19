@@ -69,12 +69,14 @@ import { QcPanel } from "./components/QcPanel";
 import { ReportPanel } from "./components/ReportPanel";
 import { OpsPanel } from "./components/OpsPanel";
 import { ProfilesPanel } from "./components/ProfilesPanel";
+import { useAuthInfo, AuthControls } from "./lib/auth";
 
 interface AppProps {
   runMission?: MissionRunner;
 }
 
 export function App({ runMission = runSelfContainedMission }: AppProps) {
+  const authInfo = useAuthInfo();
   const [mode, setMode] = useState<AppMode>("batch");
   const [params, setParams] = useState<SimMissionParams>(defaultMissionParams);
   const [liveConfig, setLiveConfig] = useState<LiveConfig>(defaultLiveConfig);
@@ -737,9 +739,23 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
   };
 
   const latestElapsedSeconds = telemetry[telemetry.length - 1]?.elapsedSeconds ?? null;
+  const authSummary = authInfo.isSignedIn
+    ? authInfo.displayName ?? authInfo.userId ?? "Signed in"
+    : authInfo.hasClerk
+      ? "Not signed in"
+      : "Dev mode";
+  const authSlot = (
+    <div className="stack align-end small-text">
+      <div>Mode: {authInfo.mode}</div>
+      <div>Org: {authInfo.orgId ?? "Unknown"}</div>
+      <div>{authSummary}</div>
+      {authInfo.hasClerk ? <AuthControls /> : null}
+    </div>
+  );
 
   return (
     <Layout
+      authSlot={authSlot}
       sidebar={
         <Controls
           mode={mode}
@@ -768,7 +784,17 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
       }
     >
       {mode === "settings" ? (
-        <SettingsPanel settings={endpoints} onSave={persistSettings} onChange={handleSettingsChange} />
+        <SettingsPanel
+          settings={endpoints}
+          onSave={persistSettings}
+          onChange={handleSettingsChange}
+          authMode={authInfo.mode}
+          authOrgId={authInfo.orgId}
+          authUserId={authInfo.userId}
+          authDisplayName={authInfo.displayName}
+          hasClerk={authInfo.hasClerk}
+          isSignedIn={authInfo.isSignedIn}
+        />
       ) : mode === "ops" ? (
         <OpsPanel />
       ) : mode === "profiles" ? (

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { RoastAnalysisSchema } from "./roast-analysis";
 import { EventOverrideSchema, SessionMetaSchema, SessionNoteSchema } from "./qc";
+import { ActorSchema } from "../common";
 
 export const RoastReportSchema = z.object({
   reportId: z.string(),
@@ -11,6 +12,7 @@ export const RoastReportSchema = z.object({
   machineId: z.string(),
   createdAt: z.string(),
   createdBy: z.enum(["AGENT", "HUMAN"]).default("AGENT"),
+  actor: ActorSchema.optional(),
   agentName: z.string().optional(),
   agentVersion: z.string().optional(),
   analysis: RoastAnalysisSchema,
