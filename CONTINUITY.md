@@ -1,0 +1,18 @@
+- Goal (incl. success criteria):
+  - Add the specified Continuity Ledger block to the top of AGENTS.md and persist workspace continuity in CONTINUITY.md.
+- Constraints/Assumptions:
+  - Follow developer instructions (commit changes, run make_pr after commit).
+  - Maintain/update CONTINUITY.md at start of turns and on state changes.
+- Key decisions:
+  - Created AGENTS.md at repo root since none existed.
+- State:
+  - Done: ["Added Continuity Ledger block to AGENTS.md", "Initialized CONTINUITY.md", "Committed changes", "Generated PR message via make_pr"]
+  - Now: []
+  - Next: []
+- Open questions (UNCONFIRMED if needed):
+  - UNCONFIRMED: None.
+- Working set (files/ids/commands):
+  - AGENTS.md
+  - CONTINUITY.md
+  - git commit -m "Add continuity ledger guidance"
+  - make_pr: "Add continuity ledger guidance"
