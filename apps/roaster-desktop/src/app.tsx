@@ -6,7 +6,8 @@ import type {
   TelemetryPoint,
   MissionSignals,
   RoastProfile,
-  RoastProfileVersion
+  RoastProfileVersion,
+  VerificationResult
 } from "@sim-corp/schemas";
 import { Controls } from "./components/Controls";
 import { CurveChart } from "./components/CurveChart";
@@ -16,6 +17,7 @@ import { TraceViewer } from "./components/TraceViewer";
 import { AnalysisPanel } from "./components/AnalysisPanel";
 import { PredictionPanel } from "./components/PredictionPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { TrustBadge } from "./components/TrustBadge";
 import {
   extractSimOutputs,
   getSessionEvents,
@@ -113,6 +115,8 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
   const [profileFilters, setProfileFilters] = useState({ q: "", tag: "", machineModel: "", includeArchived: false });
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [predictionProfileId, setPredictionProfileId] = useState<string | null>(null);
+  const [lastVerification, setLastVerification] = useState<VerificationResult | null>(null);
+  const [lastKid, setLastKid] = useState<string | undefined>(undefined);
   const telemetrySourceRef = useRef<EventSource | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -260,6 +264,8 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
     setError(null);
     setLiveError(null);
     setLiveStatus("Connecting");
+    setLastVerification(null);
+    setLastKid(undefined);
 
     const base = liveConfig.ingestionUrl.replace(/\/$/, "");
     const params = new URLSearchParams({
@@ -280,6 +286,14 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
       }
       const payload = env.payload as TelemetryPoint;
       setTelemetry((prev) => appendWithLimit(prev, payload));
+
+      // Track verification state for trust badge
+      if (env._verification !== undefined) {
+        setLastVerification(env._verification);
+      }
+      if (env.kid !== undefined) {
+        setLastKid(env.kid);
+      }
     };
 
     const onEvent = (env: TelemetryEnvelope): void => {
@@ -815,8 +829,9 @@ export function App({ runMission = runSelfContainedMission }: AppProps) {
       ) : (
         <div className="stack">
           {mode !== "batch" ? (
-            <div className="muted small-text">
-              {currentSessionId ? `Current session: ${currentSessionId}` : "No session detected"}
+            <div className="muted small-text" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <span>{currentSessionId ? `Current session: ${currentSessionId}` : "No session detected"}</span>
+              {mode === "live" && <TrustBadge verification={lastVerification} kid={lastKid} />}
             </div>
           ) : null}
           <CurveChart telemetry={telemetry} events={events} phases={analysis?.phases} />

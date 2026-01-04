@@ -48,6 +48,61 @@ body {
   font-weight: 600;
 }
 
+/* Trust State Badges */
+.trust-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.trust-badge.verified {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+
+.trust-badge.unsigned {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fbbf24;
+}
+
+.trust-badge.failed {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.trust-badge .badge-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.trust-badge .badge-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.trust-badge .badge-kid {
+  font-size: 10px;
+  opacity: 0.7;
+  font-family: monospace;
+  margin-left: 4px;
+}
+
+.trust-badge .badge-error {
+  font-size: 10px;
+  opacity: 0.8;
+  font-style: italic;
+  margin-left: 4px;
+}
+
 .app-main {
   display: grid;
   grid-template-columns: 280px 1fr;

@@ -2,6 +2,18 @@ import { z } from "zod";
 import { RoastAnalysisSchema } from "./roast-analysis";
 import { EventOverrideSchema, SessionMetaSchema, SessionNoteSchema } from "./qc";
 import { ActorSchema } from "../common";
+import { EvalRunSchema } from "../kernel/eval";
+
+export const TrustMetricsSchema = z.object({
+  totalPoints: z.number(),
+  verifiedPoints: z.number(),
+  unsignedPoints: z.number(),
+  failedPoints: z.number(),
+  verificationRate: z.number(),
+  deviceIds: z.array(z.string()).default([])
+});
+
+export type TrustMetrics = z.infer<typeof TrustMetricsSchema>;
 
 export const RoastReportSchema = z.object({
   reportId: z.string(),
@@ -20,6 +32,8 @@ export const RoastReportSchema = z.object({
   overrides: z.array(EventOverrideSchema).default([]),
   notes: z.array(SessionNoteSchema).default([]),
   markdown: z.string(),
+  trustMetrics: TrustMetricsSchema.optional(),
+  evaluations: z.array(EvalRunSchema).default([]),
   nextActions: z
     .array(
       z.object({

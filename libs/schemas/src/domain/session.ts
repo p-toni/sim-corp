@@ -9,7 +9,13 @@ export const RoastSessionSummarySchema = TelemetryOriginSchema.extend({
   durationSeconds: z.number().nonnegative().optional(),
   fcSeconds: z.number().nonnegative().optional(),
   dropSeconds: z.number().nonnegative().optional(),
-  maxBtC: z.number().optional()
+  maxBtC: z.number().optional(),
+  // Trust metrics
+  telemetryPoints: z.number().nonnegative().optional(),
+  verifiedPoints: z.number().nonnegative().optional(),
+  unsignedPoints: z.number().nonnegative().optional(),
+  failedPoints: z.number().nonnegative().optional(),
+  deviceIds: z.array(z.string()).optional()
 });
 
 export type RoastSessionSummary = z.infer<typeof RoastSessionSummarySchema>;

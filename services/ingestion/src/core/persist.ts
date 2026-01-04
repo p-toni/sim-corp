@@ -23,12 +23,37 @@ export class PersistencePipeline {
 
     if (withSession.topic === "telemetry") {
       this.deps.repo.appendTelemetry(withSession.sessionId!, withSession.payload as TelemetryPoint);
-      if (typeof (withSession.payload as TelemetryPoint).btC === "number") {
-        this.deps.repo.upsertSession({
-          ...sessionSummary,
-          maxBtC: Math.max(sessionSummary.maxBtC ?? 0, (withSession.payload as TelemetryPoint).btC!)
-        });
+
+      // Update trust metrics for telemetry
+      const currentSession = this.deps.repo.getSession(withSession.sessionId!);
+      const telemetryPoints = (currentSession?.telemetryPoints ?? 0) + 1;
+      const verified = withSession._verification?.verified === true;
+      const unsigned = !withSession.sig && !withSession.kid;
+      const failed = !verified && !unsigned;
+
+      const verifiedPoints = (currentSession?.verifiedPoints ?? 0) + (verified ? 1 : 0);
+      const unsignedPoints = (currentSession?.unsignedPoints ?? 0) + (unsigned ? 1 : 0);
+      const failedPoints = (currentSession?.failedPoints ?? 0) + (failed ? 1 : 0);
+
+      const deviceIds = currentSession?.deviceIds ?? [];
+      if (withSession.kid && !deviceIds.includes(withSession.kid)) {
+        deviceIds.push(withSession.kid);
       }
+
+      const trustUpdate = {
+        ...sessionSummary,
+        telemetryPoints,
+        verifiedPoints,
+        unsignedPoints,
+        failedPoints,
+        deviceIds
+      };
+
+      if (typeof (withSession.payload as TelemetryPoint).btC === "number") {
+        trustUpdate.maxBtC = Math.max(sessionSummary.maxBtC ?? 0, (withSession.payload as TelemetryPoint).btC!);
+      }
+
+      this.deps.repo.upsertSession(trustUpdate);
     } else if (withSession.topic === "event") {
       const event = withSession.payload as RoastEvent;
       this.deps.repo.appendEvent(withSession.sessionId!, event);
