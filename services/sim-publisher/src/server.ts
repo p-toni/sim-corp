@@ -13,6 +13,7 @@ interface BuildServerOptions {
   manager?: SimPublisherManager;
   mqttPublisher?: MqttPublisher;
   simTwinClient?: SimTwinClient;
+  keystorePath?: string;
 }
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -20,7 +21,8 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
 
   const mqttPublisher = options.mqttPublisher ?? new RealMqttPublisher();
   const simTwinClient = options.simTwinClient ?? new HttpSimTwinClient();
-  const manager = options.manager ?? new SimPublisherManager(mqttPublisher, simTwinClient);
+  const keystorePath = options.keystorePath ?? process.env.DEVICE_KEYSTORE_PATH ?? "./var/device-keys";
+  const manager = options.manager ?? new SimPublisherManager(mqttPublisher, simTwinClient, keystorePath);
 
   registerHealthRoutes(app);
   registerStartRoute(app, { manager });

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { TelemetryEnvelopeSchema } from "@sim-corp/schemas";
 import type { TelemetryEnvelope } from "@sim-corp/schemas";
+import { DeviceKeyStore, signTelemetry } from "@sim-corp/device-identity";
 import type {
   MqttPublisher,
   PublishRequest,
@@ -17,8 +18,13 @@ function topicFor(origin: PublishRequest, suffix: "telemetry" | "events"): strin
   return `roaster/${origin.orgId}/${origin.siteId}/${origin.machineId}/${suffix}`;
 }
 
-function buildEnvelope(origin: PublishRequest, topic: TelemetryEnvelope["topic"], payload: unknown): TelemetryEnvelope {
-  return TelemetryEnvelopeSchema.parse({
+async function buildEnvelope(
+  origin: PublishRequest,
+  topic: TelemetryEnvelope["topic"],
+  payload: unknown,
+  keystore?: DeviceKeyStore
+): Promise<TelemetryEnvelope> {
+  const envelope: TelemetryEnvelope = {
     ts: typeof (payload as { ts?: unknown }).ts === "string" ? (payload as { ts: string }).ts : new Date().toISOString(),
     origin: {
       orgId: origin.orgId,
@@ -27,16 +33,38 @@ function buildEnvelope(origin: PublishRequest, topic: TelemetryEnvelope["topic"]
     },
     topic,
     payload
-  });
+  };
+
+  // Sign telemetry if keystore is provided
+  if (keystore) {
+    const kid = `device:${origin.machineId}@${origin.siteId}`;
+    try {
+      const keypair = await keystore.getOrCreate(kid);
+      const signed = await signTelemetry(payload as Record<string, unknown>, keypair.privateKey, kid);
+      envelope.sig = signed.sig;
+      envelope.kid = kid;
+    } catch (err) {
+      // Log error but don't fail telemetry publishing
+      console.error(`Failed to sign telemetry for ${kid}:`, err);
+    }
+  }
+
+  return TelemetryEnvelopeSchema.parse(envelope);
 }
 
 export class SimPublisherManager {
   private readonly sessions = new Map<string, PublishSession>();
+  private readonly keystore?: DeviceKeyStore;
 
   constructor(
     private readonly mqtt: MqttPublisher,
-    private readonly simTwin: SimTwinClient
-  ) {}
+    private readonly simTwin: SimTwinClient,
+    keystorePath?: string
+  ) {
+    if (keystorePath) {
+      this.keystore = new DeviceKeyStore(keystorePath);
+    }
+  }
 
   listSessions(): PublishSession[] {
     return Array.from(this.sessions.values());
@@ -96,7 +124,7 @@ export class SimPublisherManager {
         const delayMs = Math.max(MIN_INTERVAL_MS, Math.round(point.elapsedSeconds * 1000));
         const timer = setTimeout(async () => {
           if (!this.sessions.has(sessionId)) return;
-          const envelope = buildEnvelope(request, "telemetry", point);
+          const envelope = await buildEnvelope(request, "telemetry", point, this.keystore);
           await this.mqtt.publish(topic, JSON.stringify(envelope));
           stats.telemetrySent += 1;
           stats.lastSentTs = envelope.ts;
@@ -128,7 +156,7 @@ export class SimPublisherManager {
         const delayMs = Math.max(MIN_INTERVAL_MS, Math.round(elapsed * 1000));
         const timer = setTimeout(async () => {
           if (!this.sessions.has(sessionId)) return;
-          const envelope = buildEnvelope(request, "event", event);
+          const envelope = await buildEnvelope(request, "event", event, this.keystore);
           await this.mqtt.publish(topic, JSON.stringify(envelope));
           stats.eventsSent += 1;
           stats.lastSentTs = envelope.ts;

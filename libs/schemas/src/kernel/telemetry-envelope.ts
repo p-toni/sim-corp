@@ -10,6 +10,11 @@ export const TelemetryOriginSchema = z.object({
 
 export const TelemetryTopicSchema = z.enum(["telemetry", "event"]);
 
+export const VerificationResultSchema = z.object({
+  verified: z.boolean(),
+  error: z.string().optional()
+});
+
 export const TelemetryEnvelopeSchema = z.object({
   ts: IsoDateTimeSchema,
   origin: TelemetryOriginSchema,
@@ -17,9 +22,11 @@ export const TelemetryEnvelopeSchema = z.object({
   payload: z.union([TelemetryPointSchema, RoastEventSchema]),
   sessionId: z.string().optional(),
   sig: z.string().optional(),
-  kid: z.string().optional()
+  kid: z.string().optional(),
+  _verification: VerificationResultSchema.optional()
 });
 
+export type VerificationResult = z.infer<typeof VerificationResultSchema>;
 export type TelemetryOrigin = z.infer<typeof TelemetryOriginSchema>;
 export type TelemetryTopic = z.infer<typeof TelemetryTopicSchema>;
 export type TelemetryEnvelope = z.infer<typeof TelemetryEnvelopeSchema>;

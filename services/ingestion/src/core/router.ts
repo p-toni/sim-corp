@@ -33,7 +33,7 @@ export function attachMqttHandlers(
         return;
       }
 
-      handlers.handleEnvelope(parsed.data);
+      void handlers.handleEnvelope(parsed.data);
     })
     .catch((error: unknown) => {
       logger.error?.("ingestion: failed to subscribe to MQTT topics", toSafeLogValue(error));
