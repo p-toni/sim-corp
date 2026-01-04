@@ -20,6 +20,10 @@ import { ReportMissionEnqueuer } from "./core/report-missions";
 import { MqttOpsEventPublisher, type OpsEventPublisher } from "./ops/publisher";
 import { registerProfileRoutes } from "./routes/profiles";
 import { registerAuth } from "./auth";
+import { DeviceKeyStore } from "@sim-corp/device-identity";
+import { SignatureVerifier } from "./core/signature-verifier";
+import { EvalServiceClient } from "./core/eval-client";
+import { AutoEvaluator } from "./core/auto-evaluator";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -27,6 +31,9 @@ interface BuildServerOptions {
   eventStore?: EventStore;
   mqttClient?: MqttClient | null;
   opsPublisher?: OpsEventPublisher | null;
+  keystorePath?: string;
+  evalServiceUrl?: string;
+  autoEvalEnabled?: boolean;
 }
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -44,13 +51,34 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     kernelUrl: process.env.INGESTION_KERNEL_URL,
     opsPublisher
   });
+
+  // Setup auto-evaluator if enabled
+  const evalServiceUrl = options.evalServiceUrl ?? process.env.EVAL_SERVICE_URL ?? "http://127.0.0.1:4007";
+  const autoEvalEnabled = options.autoEvalEnabled ?? process.env.AUTO_EVAL_ENABLED === "true";
+  const analyticsUrl = process.env.ANALYTICS_URL ?? "http://127.0.0.1:4006";
+
+  const evalClient = autoEvalEnabled ? new EvalServiceClient({ baseUrl: evalServiceUrl }) : null;
+  const autoEvaluator = new AutoEvaluator(
+    evalClient,
+    { enabled: autoEvalEnabled, analyticsUrl },
+    app.log
+  );
+
   const persist = new PersistencePipeline({
     repo,
     sessionizer,
-    onSessionClosed: (session) => reportMissionEnqueuer.handleSessionClosed(session)
+    onSessionClosed: async (session) => {
+      await reportMissionEnqueuer.handleSessionClosed(session);
+      await autoEvaluator.handleSessionClosed(session);
+    }
   });
   const envelopeStream = new EnvelopeStream();
-  const handlers = new IngestionHandlers(telemetryStore, eventStore, persist, envelopeStream);
+
+  // Setup signature verification if keystore path is provided
+  const keystorePath = options.keystorePath ?? process.env.DEVICE_KEYSTORE_PATH ?? "./var/device-keys";
+  const signatureVerifier = new SignatureVerifier(new DeviceKeyStore(keystorePath));
+
+  const handlers = new IngestionHandlers(telemetryStore, eventStore, persist, envelopeStream, signatureVerifier);
 
   const mqttClient = resolveMqttClient(options.mqttClient, app);
   if (mqttClient) {
