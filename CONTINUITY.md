@@ -1,14 +1,13 @@
 Goal (incl. success criteria):
-- Retroactively seed continuity system: CONTINUITY.md reflects repo evidence, AGENTS.md begins with continuity guidance, canonical task registry referenced, and a validation note is prepared.
+- Push upstream the Execution Sandbox doc updates and continuity decision.
 
 Constraints/Assumptions:
-- Follow README.md constraints and repository docs.
+- Follow README.md constraints and repository docs (read before changes).
 - Update CONTINUITY.md at start of turns and on state changes.
-- Commit changes and run make_pr after committing.
-- Keep changes minimal and scoped to docs/tracking.
+- Keep changes scoped to docs and decision log updates.
 
 Key decisions:
-- Treat docs/tasks/task-registry.md as the canonical task registry because it exists and labels itself canonical; note mismatched references elsewhere (see Open questions).
+- Execution Sandbox layer introduced; API-only agents remain service-based.
 
 State:
 Done:
@@ -39,17 +38,20 @@ Done:
 - T-024 DONE — predictive assist v1 (libs/schemas, services/analytics, apps/roaster-desktop).
 - T-025 DONE — Tauri packaging v1 (apps/roaster-desktop).
 - T-026 DONE — auth & tenancy (services/ingestion, apps/roaster-desktop).
+- Docs updated to introduce Execution Sandbox layer across foundation/engineering docs.
 Now:
-- None.
+- Prepare commit and push upstream.
 Next:
-- None.
+- Confirm upstream push completed.
 
 Open questions (UNCONFIRMED if needed):
-- UNCONFIRMED: docs/ops/spec-vs-reality.md and docs/tasks/roadmap.md reference tasks/task-registry.md, but the file lives at docs/tasks/task-registry.md; TODO(@human) consolidate or add redirect.
+- None.
 
 Working set (files/ids/commands):
 - CONTINUITY.md
-- AGENTS.md
-- docs/tasks/task-registry.md
-- docs/ops/spec-vs-reality.md
-- docs/tasks/roadmap.md
+- docs/foundation/system-architecture.md
+- docs/foundation/company-kernel-p0.md
+- docs/foundation/vision.md
+- docs/foundation/p0-decisions.md
+- docs/foundation/agent-charters.md
+- docs/engineering/contracts.md

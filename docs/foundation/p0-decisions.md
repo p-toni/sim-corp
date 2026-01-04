@@ -24,3 +24,8 @@
 
 - **Clerk** for user auth & sessions.
 - Agents & devices: keypairs + mTLS; kernel-centric identity and policy.
+
+## Execution Sandbox
+
+- Sandbox tech choice is abstracted behind a SandboxRunner interface.
+- Initial implementation: self-hosted Docker runner; managed options (E2B/Modal/Fly/Firecracker) later without mission semantics changes.

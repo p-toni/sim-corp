@@ -14,6 +14,7 @@ We need a thin **kernel** that:
    - Implements: Get Mission → Scan Scene → Think → Act → Observe.
    - Handles: context assembly, tool calls (MCP/OpenAPI), timeouts, retries, HITL checkpoints.
    - Emits: structured traces & logs.
+   - P0 runtime supports API-only tools; any filesystem/shell/computer use runs inside a sandbox via SandboxRunner.
 
 2. **Control-plane & Registry**
    - Stores: agents, tools, policies, versions, roll-out state.
@@ -38,6 +39,11 @@ We need a thin **kernel** that:
    - Minimal roast sim (charge→TP→FC→drop) for offline testing.
    - Used by the eval harness.
 
+7. **Sandbox Runner interface (computer use)**
+   - Launches isolated execution environments for missions that require a workspace.
+   - Enforces resource limits, network allowlists, and per-mission tenancy boundaries.
+   - Persists artifacts/traces outside the sandbox; no durable state inside.
+
 ## Key Interfaces
 
 - **Mission intake**
@@ -56,6 +62,11 @@ We need a thin **kernel** that:
 
 - **Policy check**
   - `POST /policy/check { agentId, tool, action, resource } -> { allow|deny, reason }` 
+
+- **SandboxRunner (high level)**
+  - `POST /sandbox/run { missionId, agentRef, inputs, limits, networkAllowlist, secretsRef } -> { sandboxId, status }`
+  - `POST /sandbox/stream { sandboxId } -> { logs, artifacts, status }`
+  - `POST /sandbox/stop { sandboxId } -> { status }`
 
 - **Signed telemetry envelope**
   - see `docs/engineering/contracts.md` for payload.

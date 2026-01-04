@@ -10,16 +10,19 @@
 
 - **Mission:** Turn specs into reliable, observable, secure features and integrations.
 - **Responsibilities:** design & code, hardware drivers, schemas, migrations, CI/CD pipelines, feature flags.
+- **Sandbox use:** run code/data missions in the Execution Sandbox when filesystem or tooling access is required.
 
 ## Operator Agent
 
 - **Mission:** Keep the system healthy; ship safely; resolve incidents fast.
 - **Responsibilities:** SLOs, rollouts, on-call, incident triage, cost & capacity management.
+- **Sandbox use:** use the Execution Sandbox for investigations or fixes that require a workspace or shell.
 
 ## Scientist Agent (R&D)
 
 - **Mission:** Advance models, evaluations, and simulations that raise quality and autonomy safely.
 - **Responsibilities:** physics-informed models, data curation, golden cases, LM-as-Judge, digital twin, Agent Gym.
+- **Sandbox use:** use the Execution Sandbox for data/simulation work that needs isolated tooling or files.
 
 ## Community Agent
 

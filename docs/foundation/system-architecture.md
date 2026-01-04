@@ -39,6 +39,7 @@ For any mission:
 - **Simulation engine:** physics (roast dynamics) + agent behavior + economic outcomes.
 - **Observability:** OpenTelemetry traces/metrics/logs; red/green dashboards.
 - **Edge runtime:** offline-first agent execution; conflict-free sync.
+- **Execution sandbox:** isolated workspace for agents that need filesystem/shell/tooling access; launched per mission via a SandboxRunner, with CPU/mem/time limits, network allowlists, and no durable state (artifacts and traces persist outside the sandbox).
 - **Integration layer:** roaster drivers (Bullet R1, Giesen W6/Modbus), import/export adapters, public APIs.
 
 ## R&D Department

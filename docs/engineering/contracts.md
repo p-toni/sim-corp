@@ -60,6 +60,15 @@ export interface RoasterDriver {
 
 For P0: real drivers should implement connect, capabilities, readLoop, health, and write can be a stub that always rejects with `ok: false` (read-only).
 
+## Mission Execution Mode
+
+```json
+{ "mode": "SERVICE" | "SANDBOX" }
+```
+
+- `SERVICE`: normal stateless service job (API tools only).
+- `SANDBOX`: isolated workspace with filesystem/shell/tooling; artifacts and traces persist outside the sandbox.
+
 ## Telemetry Envelope (Edge → Kernel)
 
 ```json

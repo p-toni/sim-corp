@@ -39,6 +39,9 @@ Build a self-building, agent-run company that autonomously plans, ships, operate
   - reversible participation (users can leave with their data),
   - transparent ownership & licensing.
 
+Autonomy at scale requires secure execution sandboxes for any agent-operated software/data work.  
+Agents that need a workspace (files, shells, toolchains) run in isolated sandboxes with strict limits, while API-only agents remain normal services.
+
 ## Why this matters
 
 - Generic app features will be absorbed into foundation models.
