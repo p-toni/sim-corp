@@ -1,5 +1,5 @@
 Goal (incl. success criteria):
-- Push upstream the Execution Sandbox doc updates and continuity decision.
+- Execution Sandbox doc updates delivered and pushed upstream.
 
 Constraints/Assumptions:
 - Follow README.md constraints and repository docs (read before changes).
@@ -39,10 +39,11 @@ Done:
 - T-025 DONE — Tauri packaging v1 (apps/roaster-desktop).
 - T-026 DONE — auth & tenancy (services/ingestion, apps/roaster-desktop).
 - Docs updated to introduce Execution Sandbox layer across foundation/engineering docs.
+- Upstream push completed (first attempt timed out).
 Now:
-- Prepare commit and push upstream.
+- None.
 Next:
-- Confirm upstream push completed.
+- None.
 
 Open questions (UNCONFIRMED if needed):
 - None.
