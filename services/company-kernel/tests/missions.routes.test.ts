@@ -180,12 +180,12 @@ describe("mission routes", () => {
     await store.createMission({
       goal: "generate-roast-report",
       subjectId: "target-subject",
-      context: { machineId: "mx-1" }
+      context: { orgId: "dev-org", machineId: "mx-1" }
     });
     await store.createMission({
       goal: "generate-roast-report",
       subjectId: "other",
-      context: { machineId: "mx-2" }
+      context: { orgId: "dev-org", machineId: "mx-2" }
     });
 
     const bySubject = await server.inject({ method: "GET", url: "/missions?subjectId=target-subject" });
@@ -198,6 +198,74 @@ describe("mission routes", () => {
     const machineItems = (byMachine.json() as { items: Array<{ context?: { machineId?: string } }> }).items;
     expect(machineItems.length).toBe(1);
     expect(machineItems[0]?.context?.machineId).toBe("mx-1");
+  });
+
+  it("supports filtering by sessionId", async () => {
+    const repo = new MissionRepository(openKernelDatabase(dbPath));
+    const store = new MissionStore(repo, { baseBackoffMs: 1 });
+    await store.createMission({
+      goal: "generate-roast-report",
+      params: { sessionId: "session-1" },
+      context: { orgId: "dev-org" }
+    });
+    await store.createMission({
+      goal: "generate-roast-report",
+      params: { sessionId: "session-2" },
+      context: { orgId: "dev-org" }
+    });
+    await store.createMission({
+      goal: "simulate-roast",
+      params: { targetFirstCrackSeconds: 500 },
+      context: { orgId: "dev-org" }
+    });
+
+    const bySession = await server.inject({ method: "GET", url: "/missions?sessionId=session-1" });
+    expect(bySession.statusCode).toBe(200);
+    const sessionItems = (bySession.json() as { items: Array<{ params?: { sessionId?: string } }> }).items;
+    expect(sessionItems.length).toBe(1);
+    expect(sessionItems[0]?.params?.sessionId).toBe("session-1");
+  });
+
+  it("enforces org isolation in mission listings", async () => {
+    const repo = new MissionRepository(openKernelDatabase(dbPath));
+    const store = new MissionStore(repo, { baseBackoffMs: 1 });
+
+    // Create missions for dev-org (the default actor's org)
+    await store.createMission({
+      goal: "generate-roast-report",
+      params: { sessionId: "dev-session-1" },
+      context: { orgId: "dev-org" }
+    });
+    await store.createMission({
+      goal: "generate-roast-report",
+      params: { sessionId: "dev-session-2" },
+      context: { orgId: "dev-org" }
+    });
+
+    // Create missions for a different org
+    await store.createMission({
+      goal: "generate-roast-report",
+      params: { sessionId: "other-session-1" },
+      context: { orgId: "other-org" }
+    });
+    await store.createMission({
+      goal: "generate-roast-report",
+      params: { sessionId: "other-session-2" },
+      context: { orgId: "other-org" }
+    });
+
+    // When dev-org user queries without orgId filter, should only see dev-org missions
+    const userList = await server.inject({ method: "GET", url: "/missions" });
+    expect(userList.statusCode).toBe(200);
+    const userItems = (userList.json() as { items: Array<{ context?: { orgId?: string } }> }).items;
+    expect(userItems.length).toBe(2);
+    expect(userItems.every((m) => m.context?.orgId === "dev-org")).toBe(true);
+
+    // Verify other-org missions exist in database but aren't returned
+    const allMissions = repo.listMissions({});
+    expect(allMissions.length).toBe(4);
+    const otherOrgMissions = allMissions.filter((m) => (m.context as { orgId?: string })?.orgId === "other-org");
+    expect(otherOrgMissions.length).toBe(2);
   });
 
   it("supports retryNow for retryable missions", async () => {

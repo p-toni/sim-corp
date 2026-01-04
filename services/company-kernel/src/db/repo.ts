@@ -147,6 +147,7 @@ export class MissionRepository {
     goal?: string;
     agent?: string;
     subjectId?: string;
+    sessionId?: string;
     orgId?: string;
     siteId?: string;
     machineId?: string;
@@ -174,6 +175,10 @@ export class MissionRepository {
     if (filters.subjectId) {
       conditions.push("subject_id = @subjectId");
       params.subjectId = filters.subjectId;
+    }
+    if (filters.sessionId) {
+      conditions.push("json_extract(params_json, '$.sessionId') = @sessionId");
+      params.sessionId = filters.sessionId;
     }
     if (filters.orgId) {
       conditions.push("json_extract(context_json, '$.orgId') = @orgId");
