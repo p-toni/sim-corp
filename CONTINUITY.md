@@ -73,11 +73,17 @@ Now:
   - T-028 (Eval harness + auto-eval) ✅ DONE
   - Vendor driver requirement satisfied via tcp-line driver (T-020)
   - Stack/pipeline identical regardless of machine (serial→TCP bridge)
+- M4 (Safe Autopilot L3 Beta) PLANNING (2026-01-05)
+  - Planning document created: docs/tasks/M4-PLAN.md
+  - Tasks defined: T-030 (L3 autopilot), T-031 (fake driver), T-032 (analytics)
+  - Architecture designed: command flow, approval workflow, safety gates
+  - Ready to begin implementation
 
 Next:
-- T-028 P1 — LM-as-judge implementation
+- T-030 — Safe autopilot L3 (command schemas, approval workflow, safety gates)
+- T-031 — Fake driver command support (test infrastructure)
+- T-028 P1 — LM-as-judge implementation (deferred to post-M4 or parallel)
 - T-028 P1 — Historical baseline variance
-- T-028 P1 — Governor integration for autonomy promotion
 - T-029 — Bullet R1 USB driver (pilot-readiness follow-on, requires hardware)
 
 Open questions (UNCONFIRMED if needed):

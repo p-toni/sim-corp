@@ -285,5 +285,63 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 **Blocker:** USB protocol not officially documented; requires hardware access for development
 
 ### T-030 — Safe autopilot L3 beta (explicit approval + constrained writes)
-**Status:** PLANNED  
+**Status:** PLANNED
 **Milestone:** M4
+
+**Scope:**
+- Command schemas (RoasterCommand, CommandProposal, CommandExecution)
+- Command service (proposal submission, validation, approval workflow)
+- Extend driver interface (writeCommand, abortCommand, getCommandStatus)
+- Command executor service (execution coordination, status tracking)
+- Desktop UI for command approval (review, approve/reject)
+- Audit trail (complete logging, queryable API)
+- Safety gates (constraints, rate limits, state validation, emergency abort)
+- Integration with governor (autonomy level gating)
+- Integration tests (end-to-end command flow)
+- Documentation (ops runbook, command safety guide)
+
+**Exit Criteria:**
+- ✅ Autopilot actions only occur with explicit approval (L3)
+- ✅ No uncontrolled actuation; strict limits enforced
+- ✅ Complete audit trails for all commands
+- ✅ Safety gates functional (constraints, rate limits, abort)
+- ✅ 0 severe incidents attributable to software
+- ✅ ≥ 3 command types implemented and tested
+
+**Subtasks:**
+- T-030.1 — Command schemas
+- T-030.2 — Command service
+- T-030.3 — Driver write interface
+- T-030.4 — Command executor
+- T-030.5 — Desktop approval UI
+- T-030.6 — Audit trail
+- T-030.7 — Safety gates
+- T-030.8 — Integration tests
+- T-030.9 — Documentation
+
+**P1 (Should Have):**
+- T-030.10 — Sim-roast-runner command proposals
+- T-030.11 — Eval harness integration
+- T-030.12 — Governor integration
+- T-030.13 — Emergency abort UI
+- T-030.14 — Command history viewer
+
+**See:** `docs/tasks/M4-PLAN.md` for full planning document
+
+### T-031 — Fake driver command support (test infrastructure)
+**Status:** PLANNED
+**Milestone:** M4
+
+**Scope:** Extend FakeDriver with writeCommand implementation for testing command flow without real hardware
+
+**Evidence:** `pnpm --filter @sim-corp/driver-fake test`
+
+### T-032 — Command analytics & monitoring
+**Status:** PLANNED
+**Milestone:** M4
+
+**Scope:**
+- Command success/failure dashboards
+- Command latency tracking
+- Safety gate violation alerts
+- Command outcome correlation with roast quality
