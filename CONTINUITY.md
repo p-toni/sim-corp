@@ -66,6 +66,23 @@ Done:
   - **Configuration:** Environment-gated (AUTO_EVAL_ENABLED, EVAL_SERVICE_URL)
   - **Documentation:** docs/ops/eval-harness.md (500+ lines)
   - **Tests:** All passing (eval 5, ingestion 24, agent 1, desktop build)
+- **T-030 L3 Autopilot Foundation (2026-01-05):**
+  - **T-030.1 Command Schemas:** 7 comprehensive schemas (272 LOC)
+    - RoasterCommand, CommandProposal, CommandExecutionResult
+    - CommandApprovalRequest/Response, CommandBatch, CommandConstraintsPreset
+    - 14 test cases covering all schemas and lifecycle scenarios
+    - Total: 44 schema tests passing
+  - **T-030.3 Driver Write Interface:** Extended Driver interface
+    - writeCommand(), abortCommand(), getCommandStatus()
+    - CommandStatus interface for tracking
+    - Backward compatible (optional methods)
+    - Comprehensive documentation
+  - **T-031 Fake Driver Commands:** Test infrastructure complete
+    - Implemented all write methods in FakeDriver
+    - Command types: SET_POWER, SET_FAN, SET_DRUM, ABORT, PREHEAT
+    - Simulates execution (10-50ms delay), tracks state
+    - Constraint enforcement (range clamping)
+    - 12 command tests, 15 total tests passing
 
 Now:
 - M2 (Trust & Provenance) COMPLETE with full UI visualization
@@ -73,17 +90,22 @@ Now:
   - T-028 (Eval harness + auto-eval) ✅ DONE
   - Vendor driver requirement satisfied via tcp-line driver (T-020)
   - Stack/pipeline identical regardless of machine (serial→TCP bridge)
-- M4 (Safe Autopilot L3 Beta) PLANNING (2026-01-05)
+- M4 (Safe Autopilot L3 Beta) IN PROGRESS (2026-01-05)
   - Planning document created: docs/tasks/M4-PLAN.md
-  - Tasks defined: T-030 (L3 autopilot), T-031 (fake driver), T-032 (analytics)
-  - Architecture designed: command flow, approval workflow, safety gates
-  - Ready to begin implementation
+  - ✅ T-030.1 — Command schemas COMPLETE (7 schemas, 44 tests)
+  - ✅ T-030.3 — Driver write interface COMPLETE
+  - ✅ T-031 — Fake driver command support COMPLETE (15 tests)
+  - Foundation ready for command service implementation
 
 Next:
-- T-030 — Safe autopilot L3 (command schemas, approval workflow, safety gates)
-- T-031 — Fake driver command support (test infrastructure)
+- T-030.2 — Command service (proposal submission, validation, approval workflow)
+- T-030.4 — Command executor (execution coordination with drivers)
+- T-030.5 — Desktop UI for command approval
+- T-030.6 — Audit trail implementation
+- T-030.7 — Safety gates (constraints, rate limits)
+- T-030.8 — Integration tests
+- T-030.9 — Documentation
 - T-028 P1 — LM-as-judge implementation (deferred to post-M4 or parallel)
-- T-028 P1 — Historical baseline variance
 - T-029 — Bullet R1 USB driver (pilot-readiness follow-on, requires hardware)
 
 Open questions (UNCONFIRMED if needed):
