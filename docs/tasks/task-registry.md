@@ -224,12 +224,49 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 **Evidence:** `pnpm --filter @sim-corp/ingestion test`, `pnpm --filter @sim-corp/roaster-desktop test` (offline env: vitest missing)
 
 ### T-027 — Device identity + signed telemetry
-**Status:** PLANNED  
+**Status:** DONE
 **Milestone:** M2
+**Completed:** 2026-01-04
+
+**Delivered:**
+- Created `@sim-corp/device-identity` library with Ed25519 keypair generation, signing, and verification
+- Integrated telemetry signing in sim-publisher (optional, via keystore path)
+- Implemented signature verification in ingestion service
+- Device keys stored in file-based keystore (default: `./var/device-keys`)
+- Signatures use JWT format with 5-minute expiration
+- Verification results tracked in telemetry metadata (`_verification` field)
+- All tests passing (13 tests in device-identity, integration tests in sim-publisher + ingestion)
+
+**Exit Criteria Met:**
+- ✅ Telemetry envelopes signed by device/bridge
+- ✅ Signatures verified by ingestion
+- ✅ Kid (key ID) in format `device:{machineId}@{siteId}`
+- ✅ Trust state tracked (verified/unverified/error)
 
 ### T-028 — Eval harness + golden cases + promotion gates
-**Status:** PLANNED  
+**Status:** DOING
 **Milestone:** M3
+**Progress:** P0 implementation complete (2026-01-04)
+
+**Delivered (P0):**
+- Enhanced eval schemas (GoldenCase, EvalRun, DetailedMetrics, LMJudgeScore)
+- Eval service with SQLite storage
+- Metrics calculator (timing error, RoR stability, variance)
+- Pass/fail evaluator with gate logic
+- REST API endpoints (golden cases, evaluations, promotion check)
+- Comprehensive tests (5 tests passing)
+- Documentation in `docs/ops/eval-harness.md`
+
+**Evidence:**
+- `pnpm --filter @sim-corp/schemas build` (eval schemas)
+- `pnpm --filter @sim-corp/eval test` (5 tests passing)
+
+**Remaining (P1):**
+- Automatic evaluation on session close
+- Integration with report workflow
+- LM-as-judge implementation
+- Historical baseline variance
+- Governor integration for autonomy promotion
 
 ### T-029 — Bullet R1 read-only driver (vendor-specific)
 **Status:** PLANNED  
