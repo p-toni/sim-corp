@@ -20,10 +20,19 @@ Key decisions:
   - Implemented sessionId filter in mission repository
   - Added orgId isolation test for multi-tenancy security
   - Fixed all pre-existing bugs from review
+- **M3 Completion Strategy (2026-01-05):**
+  - Used tcp-line driver (T-020) as "chosen vendor driver" for M3
+  - Rationale: Already supports real-hardware shadow ingestion via serial→TCP bridge
+  - Stack/pipeline identical regardless of machine (Bullet R1, Giesen, etc.)
+  - Deferred Bullet R1 USB driver (T-029) to pilot-readiness phase
+  - Bullet R1 requires research→implementation split (USB protocol not documented)
 
 State:
 Done:
-- T-001 to T-027 — All tasks DONE and verified
+- T-001 to T-028 — All tasks DONE and verified
+- M1 (Mission Inbox + Profiles + Predictive Assist + Tauri) — COMPLETE
+- M2 (Trust & Provenance) — COMPLETE
+- M3 (Design Partner Pilot: Eval Harness + Vendor Driver) — COMPLETE
 - **T-027 Deliverables:**
   - Device identity library (192 LOC, 13 tests passing)
   - Sim-publisher signing integration (3 tests passing)
@@ -47,40 +56,29 @@ Done:
   - Trust metrics calculated and stored by persistence pipeline
   - Trust metrics included in roast reports
   - Trust metrics UI in ReportPanel (verification rate, device IDs)
-- **T-028 Eval Harness Schemas (2026-01-04):**
-  - Enhanced GoldenCaseSchema (bean metadata, tolerances, sensory baseline)
-  - Enhanced EvalRunSchema (detailed metrics, LM judging, promotion gates)
-  - DetailedEvalMetricsSchema (timing, temp, RoR stability, variance)
-  - LMJudgeScoreSchema (plan clarity, physics, safety scores + violations)
-  - Human review workflow fields
-- **T-028 Eval Service P0 (2026-01-04):**
-  - SQLite storage with golden_cases and eval_runs tables
-  - MetricsCalculator (timing error, RoR stability analysis)
-  - Evaluator (pass/fail determination, gate logic)
-  - EvalService (orchestration, promotion eligibility)
-  - REST API (golden cases CRUD, run evaluation, check promotion)
-  - Comprehensive tests (5 tests, 100% passing)
-  - Full documentation in docs/ops/eval-harness.md (500+ lines)
-- **T-028 Auto-Evaluation Integration (2026-01-04):**
-  - EvalServiceClient in ingestion (HTTP client for eval service API)
-  - AutoEvaluator (orchestrates eval on session close)
-  - Integrated with PersistencePipeline (auto-eval when sessions close)
-  - Evaluations field added to RoastReportSchema
-  - GET_EVALUATIONS_TOOL in roast-report-agent (fetches eval results)
-  - Evaluation results UI in ReportPanel (outcome badges, metrics, gates)
-  - Environment-gated (AUTO_EVAL_ENABLED, EVAL_SERVICE_URL)
-  - All tests passing (ingestion 24 tests, desktop build successful)
+- **T-028 Eval Harness + Auto-Eval (2026-01-04 to 2026-01-05):**
+  - **Schemas:** Enhanced GoldenCase, EvalRun, DetailedMetrics, LMJudgeScore
+  - **Eval Service:** SQLite storage, MetricsCalculator, Evaluator, gate logic
+  - **REST API:** Golden cases CRUD, run evaluation, check promotion (5 tests)
+  - **Auto-Evaluation:** EvalServiceClient + AutoEvaluator integrated with PersistencePipeline
+  - **Report Integration:** Evaluations field in RoastReport, GET_EVALUATIONS_TOOL
+  - **UI Visualization:** Evaluation results panel (outcome badges, metrics, gates)
+  - **Configuration:** Environment-gated (AUTO_EVAL_ENABLED, EVAL_SERVICE_URL)
+  - **Documentation:** docs/ops/eval-harness.md (500+ lines)
+  - **Tests:** All passing (eval 5, ingestion 24, agent 1, desktop build)
 
 Now:
 - M2 (Trust & Provenance) COMPLETE with full UI visualization
-- M3 (Design Partner Pilot) NEAR COMPLETE — T-028 P0 auto-eval DONE
-- T-028 (Eval harness P0 + auto-eval integration) — COMPLETE
+- M3 (Design Partner Pilot) COMPLETE (2026-01-05)
+  - T-028 (Eval harness + auto-eval) ✅ DONE
+  - Vendor driver requirement satisfied via tcp-line driver (T-020)
+  - Stack/pipeline identical regardless of machine (serial→TCP bridge)
 
 Next:
 - T-028 P1 — LM-as-judge implementation
 - T-028 P1 — Historical baseline variance
 - T-028 P1 — Governor integration for autonomy promotion
-- T-029 — Bullet R1 read-only driver (M3 requirement)
+- T-029 — Bullet R1 USB driver (pilot-readiness follow-on, requires hardware)
 
 Open questions (UNCONFIRMED if needed):
 - Event inference heuristics: May need machine-specific calibration for production

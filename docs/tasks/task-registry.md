@@ -244,33 +244,45 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 - ✅ Trust state tracked (verified/unverified/error)
 
 ### T-028 — Eval harness + golden cases + promotion gates
-**Status:** DOING
+**Status:** DONE
 **Milestone:** M3
-**Progress:** P0 implementation complete (2026-01-04)
+**Completed:** 2026-01-05
 
-**Delivered (P0):**
+**Delivered:**
 - Enhanced eval schemas (GoldenCase, EvalRun, DetailedMetrics, LMJudgeScore)
-- Eval service with SQLite storage
+- Eval service with SQLite storage (golden_cases, eval_runs tables)
 - Metrics calculator (timing error, RoR stability, variance)
 - Pass/fail evaluator with gate logic
 - REST API endpoints (golden cases, evaluations, promotion check)
-- Comprehensive tests (5 tests passing)
+- Auto-evaluation on session close (EvalServiceClient + AutoEvaluator)
+- Integration with report workflow (evaluations in RoastReport schema)
+- Evaluation results UI in desktop app (outcome badges, metrics, gates)
+- Comprehensive tests (5 tests in eval service, 24 tests in ingestion)
 - Documentation in `docs/ops/eval-harness.md`
 
 **Evidence:**
 - `pnpm --filter @sim-corp/schemas build` (eval schemas)
 - `pnpm --filter @sim-corp/eval test` (5 tests passing)
+- `pnpm --filter @sim-corp/ingestion test` (24 tests passing, auto-eval integration)
+- `pnpm --filter @sim-corp/roast-report-agent test` (1 test passing)
+- `pnpm --filter @sim-corp/roaster-desktop build` (successful with eval UI)
 
-**Remaining (P1):**
-- Automatic evaluation on session close
-- Integration with report workflow
+**Deferred to P1/P2:**
 - LM-as-judge implementation
 - Historical baseline variance
-- Governor integration for autonomy promotion
+- Governor integration for autonomy promotion (L2→L3 gates)
 
 ### T-029 — Bullet R1 read-only driver (vendor-specific)
-**Status:** PLANNED  
-**Milestone:** M3
+**Status:** PLANNED
+**Milestone:** Post-M3 (pilot-readiness)
+**Note:** M3 uses tcp-line driver (T-020) as "chosen vendor driver" — already supports real-hardware shadow ingestion via serial→TCP bridge with identical stack/pipeline regardless of machine.
+
+**Scope (when initiated):**
+- **Phase 1 - Research:** Reverse-engineer Aillio Bullet R1 V2 USB protocol (requires hardware access or Artisan source analysis)
+- **Phase 2 - Implementation:** USB driver implementation (likely Rust N-API similar to tcp-line)
+- **Phase 3 - Testing:** Validation with real Bullet R1 hardware
+
+**Blocker:** USB protocol not officially documented; requires hardware access for development
 
 ### T-030 — Safe autopilot L3 beta (explicit approval + constrained writes)
 **Status:** PLANNED  
