@@ -8,6 +8,10 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "dependencies": {
     "@sim-corp/driver-core": "workspace:*",
     "@sim-corp/schemas": "workspace:*"
