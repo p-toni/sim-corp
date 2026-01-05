@@ -5,12 +5,14 @@ import {
   RoastSessionSchema,
   SessionMetaSchema,
   SessionNoteSchema,
+  EvalRunSchema,
   type EventOverride,
   type RoastAnalysis,
   type RoastReport,
   type RoastSession,
   type SessionMeta,
-  type SessionNote
+  type SessionNote,
+  type EvalRun
 } from "@sim-corp/schemas";
 import type { ToolRegistry, StepContext } from "@sim-corp/agent-runtime";
 import { z } from "zod";
@@ -57,10 +59,11 @@ async function writeJson<T>(url: string, payload: unknown, schema: z.ZodSchema<T
   return schema.parse(json);
 }
 
-function resolveBaseUrls(config?: { ingestionUrl?: string; analyticsUrl?: string }) {
+function resolveBaseUrls(config?: { ingestionUrl?: string; analyticsUrl?: string; evalUrl?: string }) {
   const ingestionUrl = config?.ingestionUrl ?? process.env.INGESTION_URL ?? DEFAULT_INGESTION_URL;
   const analyticsUrl = config?.analyticsUrl ?? process.env.ANALYTICS_URL ?? DEFAULT_ANALYTICS_URL;
-  return { ingestionUrl, analyticsUrl };
+  const evalUrl = config?.evalUrl ?? process.env.EVAL_SERVICE_URL ?? "http://127.0.0.1:4007";
+  return { ingestionUrl, analyticsUrl, evalUrl };
 }
 
 function resolveSessionId(input: unknown): string {
@@ -77,15 +80,17 @@ export const GET_META_TOOL = "getMeta";
 export const GET_NOTES_TOOL = "getNotes";
 export const GET_OVERRIDES_TOOL = "getOverrides";
 export const GET_ANALYSIS_TOOL = "getAnalysis";
+export const GET_EVALUATIONS_TOOL = "getEvaluations";
 export const WRITE_REPORT_TOOL = "writeReport";
 
 export interface ReportToolsConfig {
   ingestionUrl?: string;
   analyticsUrl?: string;
+  evalUrl?: string;
 }
 
 export function createReportTools(config: ReportToolsConfig = {}): ToolRegistry {
-  const { ingestionUrl, analyticsUrl } = resolveBaseUrls(config);
+  const { ingestionUrl, analyticsUrl, evalUrl } = resolveBaseUrls(config);
   const fetcher = buildFetcher();
 
   return {
@@ -123,6 +128,19 @@ export function createReportTools(config: ReportToolsConfig = {}): ToolRegistry 
       const analysis = normalizeAnalysis(await fetcher(url, RoastAnalysisSchema));
       setScratch(ctx, "analysis", analysis);
       return analysis;
+    },
+    [GET_EVALUATIONS_TOOL]: async (input, ctx): Promise<EvalRun[]> => {
+      const sessionId = resolveSessionId(input);
+      const url = `${evalUrl.replace(/\/$/, "")}/evaluations?sessionId=${encodeURIComponent(sessionId)}`;
+      try {
+        const evaluations = await fetcher(url, EvalRunSchema.array());
+        setScratch(ctx, "evaluations", evaluations);
+        return evaluations;
+      } catch (err) {
+        // Eval service might not be available or no evaluations exist
+        setScratch(ctx, "evaluations", []);
+        return [];
+      }
     },
     [WRITE_REPORT_TOOL]: async (input, ctx): Promise<RoastReport> => {
       const parsedInput = WriteReportInputSchema.parse(input);

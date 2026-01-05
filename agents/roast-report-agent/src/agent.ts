@@ -14,6 +14,7 @@ import {
   GET_NOTES_TOOL,
   GET_OVERRIDES_TOOL,
   GET_SESSION_TOOL,
+  GET_EVALUATIONS_TOOL,
   WRITE_REPORT_TOOL
 } from "./tools";
 import { renderReport } from "./template";
@@ -56,6 +57,7 @@ function buildReport(ctx: StepContext): RoastReport {
   const meta = getScratch<SessionMeta>(ctx, "meta");
   const notes = getScratch<SessionNote[]>(ctx, "notes") ?? [];
   const overrides = getScratch<EventOverride[]>(ctx, "overrides") ?? [];
+  const evaluations = getScratch<import("@sim-corp/schemas").EvalRun[]>(ctx, "evaluations") ?? [];
   const { markdown, nextActions } = renderReport({
     session,
     analysis,
@@ -65,6 +67,22 @@ function buildReport(ctx: StepContext): RoastReport {
     agentName: AGENT_NAME,
     agentVersion: AGENT_VERSION
   });
+
+  // Build trust metrics from session data
+  const totalPoints = session.telemetryPoints ?? 0;
+  const verifiedPoints = session.verifiedPoints ?? 0;
+  const unsignedPoints = session.unsignedPoints ?? 0;
+  const failedPoints = session.failedPoints ?? 0;
+  const verificationRate = totalPoints > 0 ? verifiedPoints / totalPoints : 0;
+
+  const trustMetrics = totalPoints > 0 ? {
+    totalPoints,
+    verifiedPoints,
+    unsignedPoints,
+    failedPoints,
+    verificationRate,
+    deviceIds: session.deviceIds ?? []
+  } : undefined;
 
   return {
     reportId: `R-${session.sessionId}-${Date.now()}`,
@@ -82,6 +100,8 @@ function buildReport(ctx: StepContext): RoastReport {
     overrides,
     notes,
     markdown,
+    trustMetrics,
+    evaluations,
     nextActions
   };
 }
@@ -114,7 +134,8 @@ async function handleAct(ctx: StepContext): Promise<StepOutput> {
       { toolName: GET_META_TOOL, input: { sessionId } },
       { toolName: GET_NOTES_TOOL, input: { sessionId } },
       { toolName: GET_OVERRIDES_TOOL, input: { sessionId } },
-      { toolName: GET_ANALYSIS_TOOL, input: { sessionId } }
+      { toolName: GET_ANALYSIS_TOOL, input: { sessionId } },
+      { toolName: GET_EVALUATIONS_TOOL, input: { sessionId } }
     ],
     notes: "fetching inputs"
   };
