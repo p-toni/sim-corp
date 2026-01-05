@@ -25,7 +25,14 @@ import {
   GovernanceDecisionSchema,
   RoastProfileSchema,
   RoastProfileVersionSchema,
-  RoastPredictionSchema
+  RoastPredictionSchema,
+  RoasterCommandSchema,
+  CommandProposalSchema,
+  CommandExecutionResultSchema,
+  CommandApprovalRequestSchema,
+  CommandApprovalResponseSchema,
+  CommandBatchSchema,
+  CommandConstraintsPresetSchema
 } from "./index";
 
 const baseTelemetry = {
@@ -505,5 +512,365 @@ describe("kernel schemas", () => {
     const metric = evalRun.metrics[0];
     expect(metric).toBeDefined();
     expect(metric?.name).toBe("timingError");
+  });
+});
+
+describe("command schemas", () => {
+  it("validates roaster commands", () => {
+    const command = RoasterCommandSchema.parse({
+      commandId: "cmd-1",
+      commandType: "SET_POWER",
+      machineId: "machine-1",
+      targetValue: 75,
+      targetUnit: "%",
+      timestamp: "2025-01-01T00:00:00.000Z"
+    });
+
+    expect(command.commandType).toBe("SET_POWER");
+    expect(command.targetValue).toBe(75);
+    expect(command.constraints.requireStates).toEqual([]);
+    expect(command.constraints.forbiddenStates).toEqual([]);
+    expect(command.metadata).toEqual({});
+  });
+
+  it("validates power command with constraints", () => {
+    const command = RoasterCommandSchema.parse({
+      commandId: "cmd-2",
+      commandType: "SET_POWER",
+      machineId: "machine-1",
+      targetValue: 80,
+      constraints: {
+        minValue: 0,
+        maxValue: 100,
+        rampRate: 5,
+        requireStates: ["RUNNING"],
+        forbiddenStates: ["IDLE"]
+      },
+      timestamp: "2025-01-01T00:00:00.000Z"
+    });
+
+    expect(command.constraints.minValue).toBe(0);
+    expect(command.constraints.maxValue).toBe(100);
+    expect(command.constraints.rampRate).toBe(5);
+    expect(command.constraints.requireStates).toEqual(["RUNNING"]);
+  });
+
+  it("validates abort command without target value", () => {
+    const command = RoasterCommandSchema.parse({
+      commandId: "cmd-abort",
+      commandType: "ABORT",
+      machineId: "machine-1",
+      timestamp: "2025-01-01T00:00:00.000Z"
+    });
+
+    expect(command.commandType).toBe("ABORT");
+    expect(command.targetValue).toBeUndefined();
+  });
+
+  it("validates command proposal lifecycle", () => {
+    const proposal = CommandProposalSchema.parse({
+      proposalId: "prop-1",
+      command: {
+        commandId: "cmd-1",
+        commandType: "SET_FAN",
+        machineId: "machine-1",
+        targetValue: 7,
+        timestamp: "2025-01-01T00:00:00.000Z"
+      },
+      proposedBy: "AGENT",
+      agentName: "sim-roast-runner",
+      agentVersion: "1.0.0",
+      reasoning: "Increase airflow to prevent RoR crash",
+      sessionId: "session-1",
+      missionId: "mission-1",
+      status: "PENDING_APPROVAL",
+      createdAt: "2025-01-01T00:00:00.000Z"
+    });
+
+    expect(proposal.status).toBe("PENDING_APPROVAL");
+    expect(proposal.proposedBy).toBe("AGENT");
+    expect(proposal.agentName).toBe("sim-roast-runner");
+    expect(proposal.approvalRequired).toBe(true);
+    expect(proposal.approvalTimeoutSeconds).toBe(300); // default 5 minutes
+  });
+
+  it("validates approved command proposal", () => {
+    const proposal = CommandProposalSchema.parse({
+      proposalId: "prop-2",
+      command: {
+        commandId: "cmd-2",
+        commandType: "SET_POWER",
+        machineId: "machine-1",
+        targetValue: 75,
+        timestamp: "2025-01-01T00:00:00.000Z"
+      },
+      proposedBy: "AGENT",
+      reasoning: "Reduce power to prevent overshoot",
+      status: "APPROVED",
+      createdAt: "2025-01-01T00:00:00.000Z",
+      approvedBy: {
+        kind: "USER",
+        id: "user-1",
+        display: "Operator Alice"
+      },
+      approvedAt: "2025-01-01T00:00:30.000Z"
+    });
+
+    expect(proposal.status).toBe("APPROVED");
+    expect(proposal.approvedBy).toBeDefined();
+    expect(proposal.approvedBy?.kind).toBe("USER");
+  });
+
+  it("validates rejected command proposal with reason", () => {
+    const proposal = CommandProposalSchema.parse({
+      proposalId: "prop-3",
+      command: {
+        commandId: "cmd-3",
+        commandType: "SET_DRUM",
+        machineId: "machine-1",
+        targetValue: 65,
+        timestamp: "2025-01-01T00:00:00.000Z"
+      },
+      proposedBy: "AGENT",
+      reasoning: "Increase drum speed for better mixing",
+      status: "REJECTED",
+      createdAt: "2025-01-01T00:00:00.000Z",
+      rejectedBy: {
+        kind: "USER",
+        id: "user-1"
+      },
+      rejectedAt: "2025-01-01T00:00:30.000Z",
+      rejectionReason: {
+        code: "UNSAFE_STATE",
+        message: "Roaster not in valid state for drum speed change",
+        details: { currentState: "PREHEATING" }
+      }
+    });
+
+    expect(proposal.status).toBe("REJECTED");
+    expect(proposal.rejectionReason?.code).toBe("UNSAFE_STATE");
+  });
+
+  it("validates completed command with outcome", () => {
+    const proposal = CommandProposalSchema.parse({
+      proposalId: "prop-4",
+      command: {
+        commandId: "cmd-4",
+        commandType: "SET_POWER",
+        machineId: "machine-1",
+        targetValue: 80,
+        timestamp: "2025-01-01T00:00:00.000Z"
+      },
+      proposedBy: "AGENT",
+      reasoning: "Increase power to maintain RoR",
+      status: "COMPLETED",
+      createdAt: "2025-01-01T00:00:00.000Z",
+      approvedAt: "2025-01-01T00:00:30.000Z",
+      executionStartedAt: "2025-01-01T00:00:31.000Z",
+      executionCompletedAt: "2025-01-01T00:00:33.000Z",
+      executionDurationMs: 2000,
+      outcome: {
+        status: "SUCCESS",
+        message: "Power level changed successfully",
+        actualValue: 80,
+        telemetryChanges: {
+          gasPct: 80,
+          powerPct: 80
+        }
+      }
+    });
+
+    expect(proposal.status).toBe("COMPLETED");
+    expect(proposal.outcome?.status).toBe("SUCCESS");
+    expect(proposal.outcome?.actualValue).toBe(80);
+  });
+
+  it("validates command execution result", () => {
+    const result = CommandExecutionResultSchema.parse({
+      commandId: "cmd-1",
+      status: "ACCEPTED",
+      message: "Command accepted by driver",
+      executedAt: "2025-01-01T00:00:00.000Z",
+      actualValue: 75
+    });
+
+    expect(result.status).toBe("ACCEPTED");
+    expect(result.actualValue).toBe(75);
+  });
+
+  it("validates failed command execution result", () => {
+    const result = CommandExecutionResultSchema.parse({
+      commandId: "cmd-2",
+      status: "FAILED",
+      message: "Hardware communication timeout",
+      executedAt: "2025-01-01T00:00:00.000Z",
+      errorCode: "TIMEOUT"
+    });
+
+    expect(result.status).toBe("FAILED");
+    expect(result.errorCode).toBe("TIMEOUT");
+  });
+
+  it("validates command approval request", () => {
+    const request = CommandApprovalRequestSchema.parse({
+      proposalId: "prop-1",
+      command: {
+        commandId: "cmd-1",
+        commandType: "SET_FAN",
+        machineId: "machine-1",
+        targetValue: 8,
+        timestamp: "2025-01-01T00:00:00.000Z"
+      },
+      reasoning: "Increase fan to prevent scorching",
+      proposedBy: "AGENT",
+      agentName: "sim-roast-runner",
+      sessionId: "session-1",
+      expiresAt: "2025-01-01T00:05:00.000Z",
+      safetyChecks: {
+        constraintsValid: true,
+        stateValid: true,
+        rateLimitValid: true,
+        warnings: ["Fan change may affect RoR"],
+        risks: [
+          {
+            level: "LOW",
+            description: "Minor RoR fluctuation expected"
+          }
+        ]
+      }
+    });
+
+    expect(request.safetyChecks?.constraintsValid).toBe(true);
+    expect(request.safetyChecks?.warnings).toHaveLength(1);
+    expect(request.safetyChecks?.risks[0]?.level).toBe("LOW");
+  });
+
+  it("validates command approval response", () => {
+    const response = CommandApprovalResponseSchema.parse({
+      proposalId: "prop-1",
+      decision: "APPROVED",
+      actor: {
+        kind: "USER",
+        id: "user-1",
+        display: "Operator Bob"
+      },
+      timestamp: "2025-01-01T00:00:30.000Z",
+      reason: "Safe to proceed, roaster state is valid"
+    });
+
+    expect(response.decision).toBe("APPROVED");
+    expect(response.actor.kind).toBe("USER");
+  });
+
+  it("validates command batch", () => {
+    const batch = CommandBatchSchema.parse({
+      batchId: "batch-1",
+      title: "Preheat sequence",
+      description: "Standard preheat commands for Ethiopia roast",
+      proposals: [
+        {
+          proposalId: "prop-1",
+          command: {
+            commandId: "cmd-1",
+            commandType: "SET_POWER",
+            machineId: "machine-1",
+            targetValue: 100,
+            timestamp: "2025-01-01T00:00:00.000Z"
+          },
+          proposedBy: "AGENT",
+          reasoning: "Max power for preheat",
+          status: "PENDING_APPROVAL",
+          createdAt: "2025-01-01T00:00:00.000Z"
+        },
+        {
+          proposalId: "prop-2",
+          command: {
+            commandId: "cmd-2",
+            commandType: "SET_FAN",
+            machineId: "machine-1",
+            targetValue: 5,
+            timestamp: "2025-01-01T00:00:00.000Z"
+          },
+          proposedBy: "AGENT",
+          reasoning: "Medium fan for preheat",
+          status: "PENDING_APPROVAL",
+          createdAt: "2025-01-01T00:00:00.000Z"
+        }
+      ],
+      status: "PENDING",
+      createdAt: "2025-01-01T00:00:00.000Z"
+    });
+
+    expect(batch.proposals).toHaveLength(2);
+    expect(batch.batchApprovalRequired).toBe(true);
+    expect(batch.status).toBe("PENDING");
+  });
+
+  it("validates command constraints preset", () => {
+    const preset = CommandConstraintsPresetSchema.parse({
+      presetId: "preset-power-safe",
+      name: "Safe Power Limits",
+      commandType: "SET_POWER",
+      constraints: {
+        minValue: 0,
+        maxValue: 100,
+        rampRate: 5,
+        requireStates: ["RUNNING", "PREHEATING"],
+        minIntervalSeconds: 10
+      },
+      machineId: "machine-1",
+      description: "Conservative power change constraints"
+    });
+
+    expect(preset.commandType).toBe("SET_POWER");
+    expect(preset.constraints.maxValue).toBe(100);
+    expect(preset.constraints.rampRate).toBe(5);
+  });
+
+  it("validates all command types", () => {
+    const types = ["SET_POWER", "SET_FAN", "SET_DRUM", "ABORT", "PREHEAT", "CHARGE", "DROP"];
+
+    types.forEach((type) => {
+      const command = RoasterCommandSchema.parse({
+        commandId: `cmd-${type}`,
+        commandType: type,
+        machineId: "machine-1",
+        timestamp: "2025-01-01T00:00:00.000Z"
+      });
+
+      expect(command.commandType).toBe(type);
+    });
+  });
+
+  it("validates all command statuses", () => {
+    const statuses = [
+      "PROPOSED",
+      "PENDING_APPROVAL",
+      "APPROVED",
+      "REJECTED",
+      "EXECUTING",
+      "COMPLETED",
+      "FAILED",
+      "ABORTED",
+      "TIMEOUT"
+    ];
+
+    statuses.forEach((status) => {
+      const proposal = CommandProposalSchema.parse({
+        proposalId: `prop-${status}`,
+        command: {
+          commandId: "cmd-1",
+          commandType: "SET_POWER",
+          machineId: "machine-1",
+          timestamp: "2025-01-01T00:00:00.000Z"
+        },
+        proposedBy: "AGENT",
+        reasoning: "Test",
+        status,
+        createdAt: "2025-01-01T00:00:00.000Z"
+      });
+
+      expect(proposal.status).toBe(status);
+    });
   });
 });

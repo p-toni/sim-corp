@@ -7,6 +7,7 @@ export * from "./kernel/agent";
 export * from "./kernel/tool";
 export * from "./kernel/policy";
 export * from "./kernel/eval";
+export * from "./kernel/command";
 export * from "./kernel/telemetry-envelope";
 export * from "./kernel/ops-events";
 export * from "./domain/session";
