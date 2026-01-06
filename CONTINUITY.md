@@ -113,7 +113,7 @@ Done:
 
 Now:
 - M4 (Safe Autopilot L3 Beta) COMPLETE (2026-01-06)
-- **T-033 Agent Harness v1** COMPLETE (2026-01-06)
+- **T-033 Agent Harness v1** COMPLETE and MERGED (2026-01-06)
   - ✅ PROGRESS.md template created
   - ✅ task-registry.json (machine-editable) created from markdown
   - ✅ Harness scripts: init.mjs, smoke.mjs, clean-state.mjs
@@ -121,14 +121,14 @@ Now:
   - ✅ Documentation: docs/engineering/agent-harness.md
   - ✅ AGENTS.md updated with harness protocol
   - ✅ CONTINUITY.md updated
+  - ✅ All scripts tested successfully
+  - ✅ Commits pushed to origin/main
   - Enables multi-session agent continuity
   - Structured artifacts: CONTINUITY.md, PROGRESS.md, task-registry.json
   - Deterministic smoke checks (--quick, --ui flags)
   - Clean state verification for handoffs
 
 Next:
-- Test harness scripts end-to-end
-- Commit T-033 completion
 - T-030.5 — Desktop UI for command approval (deferred - API approval sufficient for M4)
 - T-028 P1 — LM-as-judge implementation (deferred to post-M4)
 - T-029 — Bullet R1 USB driver (pilot-readiness follow-on, requires hardware)
