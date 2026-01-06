@@ -1,0 +1,585 @@
+{
+  "$schema": "./task-registry-schema.json",
+  "version": "1.0.0",
+  "lastUpdated": "2026-01-06T20:45:00Z",
+  "tasks": [
+    {
+      "id": "T-001",
+      "title": "Repo scaffold & tooling",
+      "milestone": "Foundations",
+      "status": "DONE",
+      "evidence": {
+        "commands": ["pnpm lint", "pnpm test"],
+        "primaryArtifacts": ["root pnpm workspace", "TS strict", "ESLint", "Vitest", "repo structure docs"]
+      },
+      "notes": "Baseline tooling and repo structure"
+    },
+    {
+      "id": "T-002",
+      "title": "Shared schemas package",
+      "milestone": "Foundations",
+      "status": "DONE",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/schemas test"],
+        "primaryArtifacts": ["libs/schemas"]
+      },
+      "notes": "Zod schemas + tests"
+    },
+    {
+      "id": "T-003",
+      "title": "Agent runtime",
+      "milestone": "Foundations",
+      "status": "DONE",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/agent-runtime test"],
+        "primaryArtifacts": ["libs/agent-runtime"]
+      },
+      "notes": "Runtime loop, traces, tool calls"
+    },
+    {
+      "id": "T-004",
+      "title": "Company kernel service (P0)",
+      "milestone": "Foundations",
+      "status": "DONE",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/company-kernel test"],
+        "primaryArtifacts": ["services/company-kernel"]
+      },
+      "notes": "Registry/policy/traces + APIs"
+    },
+    {
+      "id": "T-005",
+      "title": "Ingestion service (MQTT + REST)",
+      "milestone": "Core Pipeline",
+      "status": "DONE",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/ingestion test"],
+        "primaryArtifacts": ["services/ingestion"]
+      },
+      "notes": ""
+    },
+    {
+      "id": "T-006",
+      "title": "Sim-twin service (deterministic sim)",
+      "milestone": "Core Pipeline",
+      "status": "DONE",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/sim-twin test"],
+        "primaryArtifacts": ["services/sim-twin"]
+      },
+      "notes": "Deterministic simulation engine"
+    },
+    {
+      "id": "T-007",
+      "title": "Sim-roast runner agent",
+      "milestone": "Core Pipeline",
+      "status": "DONE",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/sim-roast-runner test"],
+        "primaryArtifacts": ["agents/sim-roast-runner"]
+      },
+      "notes": "Mission execution agent"
+    },
+    {
+      "id": "T-008",
+      "title": "Roaster desktop UI (batch mission run + trace viewer)",
+      "milestone": "Core Pipeline",
+      "status": "DONE",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/roaster-desktop test"],
+        "primaryArtifacts": ["apps/roaster-desktop"]
+      },
+      "notes": "React UI + mission control"
+    },
+    {
+      "id": "T-009",
+      "title": "Streaming stack (publisher → ingestion SSE → desktop live)",
+      "milestone": "Core Pipeline",
+      "status": "DONE",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/sim-publisher test",
+          "pnpm --filter @sim-corp/ingestion test",
+          "pnpm --filter @sim-corp/roaster-desktop test"
+        ],
+        "primaryArtifacts": ["services/sim-publisher", "ingestion SSE", "desktop live mode"]
+      },
+      "notes": ""
+    },
+    {
+      "id": "T-010",
+      "title": "Local stack orchestration + runbook",
+      "milestone": "Core Pipeline",
+      "status": "DONE",
+      "evidence": {
+        "commands": [],
+        "primaryArtifacts": ["infra/local/docker-compose.yaml", "docs/ops/local-stack.md"]
+      },
+      "notes": "Manual bring-up via runbook"
+    },
+    {
+      "id": "T-011",
+      "title": "Shadow driver pipeline (drivers + bridge)",
+      "milestone": "Core Pipeline",
+      "status": "DONE",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/driver-bridge test"],
+        "primaryArtifacts": ["drivers/core", "drivers/fake", "services/driver-bridge"]
+      },
+      "notes": ""
+    },
+    {
+      "id": "T-012",
+      "title": "Event inference (heuristic events)",
+      "milestone": "Core Pipeline",
+      "status": "DONE",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/event-inference test"],
+        "primaryArtifacts": ["services/event-inference"]
+      },
+      "notes": "Heuristic event detection"
+    },
+    {
+      "id": "T-013",
+      "title": "Sessions & persistence (SQLite + sessionizer + envelope streams + playback)",
+      "milestone": "Product Loop",
+      "status": "DONE",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/ingestion test",
+          "pnpm --filter @sim-corp/roaster-desktop test"
+        ],
+        "primaryArtifacts": ["ingestion SQLite + session endpoints", "desktop playback"]
+      },
+      "notes": ""
+    },
+    {
+      "id": "T-014",
+      "title": "Analytics service + analysis UI",
+      "milestone": "Product Loop",
+      "status": "DONE",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/analytics test"],
+        "primaryArtifacts": ["services/analytics", "desktop analysis panel"]
+      },
+      "notes": "Variance analysis"
+    },
+    {
+      "id": "T-015",
+      "title": "QC ground truth (meta/notes/event overrides)",
+      "milestone": "Product Loop",
+      "status": "DONE",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/ingestion test",
+          "pnpm --filter @sim-corp/analytics test",
+          "pnpm --filter @sim-corp/roaster-desktop test"
+        ],
+        "primaryArtifacts": ["QC schemas", "ingestion QC routes", "analytics override", "desktop QC panel"]
+      },
+      "notes": ""
+    },
+    {
+      "id": "T-016",
+      "title": "Report loop end-to-end",
+      "milestone": "Product Loop",
+      "status": "DONE",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/roast-report-agent test",
+          "pnpm --filter @sim-corp/report-worker test",
+          "pnpm --filter @sim-corp/company-kernel test",
+          "pnpm --filter @sim-corp/ingestion test"
+        ],
+        "primaryArtifacts": ["report schema", "agents/roast-report-agent", "services/report-worker", "desktop Report tab"]
+      },
+      "notes": ""
+    },
+    {
+      "id": "T-017",
+      "title": "Idempotency + leases + retries hardening",
+      "milestone": "Reliability",
+      "status": "DONE",
+      "evidence": {
+        "commands": [],
+        "primaryArtifacts": ["reportKind uniqueness", "mission leases/heartbeat", "retries/backoff"]
+      },
+      "notes": "Node 20 suites green; chaos checks recommended"
+    },
+    {
+      "id": "T-018",
+      "title": "Durable mission queue (kernel SQLite)",
+      "milestone": "Reliability",
+      "status": "DONE",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/company-kernel test"],
+        "primaryArtifacts": ["kernel SQLite-backed mission repo", "durable leases/retries", "compose persistence"]
+      },
+      "notes": ""
+    },
+    {
+      "id": "T-019",
+      "title": "Ops events + dispatcher (session.closed → mission)",
+      "milestone": "Dispatch",
+      "status": "DONE",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/dispatcher test",
+          "pnpm --filter @sim-corp/ingestion test"
+        ],
+        "primaryArtifacts": ["ops events schema", "services/dispatcher"]
+      },
+      "notes": "Manual evidence: end-to-end MQTT→dispatcher→kernel→report validated"
+    },
+    {
+      "id": "T-019.1",
+      "title": "Fallback semantics (enqueue even when publish succeeds)",
+      "milestone": "Dispatch",
+      "status": "DONE",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/ingestion test"],
+        "primaryArtifacts": ["ingestion always-enqueue when fallback enabled"]
+      },
+      "notes": "Manual evidence: dispatcher down + broker down scenarios verified"
+    },
+    {
+      "id": "T-020",
+      "title": "Real hardware shadow P0 (tcp-line driver)",
+      "milestone": "Hardware",
+      "status": "DONE",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/driver-tcp-line test",
+          "pnpm --filter @sim-corp/driver-tcp-line run build:native",
+          "pnpm --filter @sim-corp/driver-bridge test"
+        ],
+        "primaryArtifacts": ["drivers/tcp-line (Rust N-API module)", "driver-bridge wiring", "schema extras"]
+      },
+      "notes": "Requires Rust toolchain or prebuilt binary"
+    },
+    {
+      "id": "T-021",
+      "title": "Governor gates (confidence + rate limits + approval)",
+      "milestone": "Governance",
+      "status": "DONE",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/company-kernel test",
+          "pnpm --filter @sim-corp/schemas test",
+          "pnpm --filter @sim-corp/dispatcher test",
+          "pnpm --filter @sim-corp/ingestion test",
+          "pnpm --filter @sim-corp/roaster-desktop test"
+        ],
+        "primaryArtifacts": ["governance/signal schemas", "kernel governor engine", "desktop quarantine UX"]
+      },
+      "notes": "Manual evidence: QUARANTINE→APPROVE→DONE and RATE_LIMIT→RETRY scenarios verified"
+    },
+    {
+      "id": "T-022",
+      "title": "Mission Inbox / Ops panel (Desktop)",
+      "milestone": "M1",
+      "status": "DONE",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/company-kernel test",
+          "pnpm --filter @sim-corp/roaster-desktop test"
+        ],
+        "primaryArtifacts": ["desktop ops panel", "mission list/filter", "approve/cancel/retry UI"]
+      },
+      "notes": "Basic governor config read-only"
+    },
+    {
+      "id": "T-023",
+      "title": "Profile library v1 (import/export + versioning)",
+      "milestone": "M1",
+      "status": "DONE",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/schemas test",
+          "pnpm --filter @sim-corp/ingestion test",
+          "pnpm --filter @sim-corp/roaster-desktop test"
+        ],
+        "primaryArtifacts": ["profile schemas", "profile management UI"]
+      },
+      "notes": ""
+    },
+    {
+      "id": "T-024",
+      "title": "Predictive assist v1 (ETA + read-only deltas)",
+      "milestone": "M1",
+      "status": "DONE",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/schemas test",
+          "pnpm --filter @sim-corp/analytics test",
+          "pnpm --filter @sim-corp/roaster-desktop test"
+        ],
+        "primaryArtifacts": ["predictive schemas", "desktop prediction panel"]
+      },
+      "notes": ""
+    },
+    {
+      "id": "T-025",
+      "title": "Tauri packaging v1",
+      "milestone": "M1",
+      "status": "DONE",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/roaster-desktop test",
+          "pnpm --filter @sim-corp/roaster-desktop build"
+        ],
+        "primaryArtifacts": ["Tauri desktop build"]
+      },
+      "notes": "Manual validation: tauri dev opens window, loads UI, persists settings"
+    },
+    {
+      "id": "T-026",
+      "title": "Auth & tenancy (Clerk) + permissions",
+      "milestone": "M2",
+      "status": "PENDING_VERIFICATION",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/ingestion test",
+          "pnpm --filter @sim-corp/roaster-desktop test"
+        ],
+        "primaryArtifacts": ["Clerk auth integration"]
+      },
+      "notes": "Offline env: vitest missing - requires verification"
+    },
+    {
+      "id": "T-027",
+      "title": "Device identity + signed telemetry",
+      "milestone": "M2",
+      "status": "DONE",
+      "completedDate": "2026-01-04",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/device-identity test",
+          "pnpm --filter @sim-corp/sim-publisher test",
+          "pnpm --filter @sim-corp/ingestion test"
+        ],
+        "primaryArtifacts": [
+          "libs/device-identity (Ed25519 signing)",
+          "sim-publisher signing integration",
+          "ingestion verification",
+          "docs/ops/device-identity.md"
+        ]
+      },
+      "notes": "192 LOC, 13 tests, file-based keystore, JWT format signatures"
+    },
+    {
+      "id": "T-028",
+      "title": "Eval harness + golden cases + promotion gates",
+      "milestone": "M3",
+      "status": "DONE",
+      "completedDate": "2026-01-05",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/schemas build",
+          "pnpm --filter @sim-corp/eval test",
+          "pnpm --filter @sim-corp/ingestion test",
+          "pnpm --filter @sim-corp/roast-report-agent test",
+          "pnpm --filter @sim-corp/roaster-desktop build"
+        ],
+        "primaryArtifacts": [
+          "services/eval (SQLite storage, metrics calculator, evaluator)",
+          "docs/ops/eval-harness.md",
+          "evaluation UI in desktop"
+        ]
+      },
+      "notes": "5 tests in eval service, 24 tests in ingestion, auto-eval on session close"
+    },
+    {
+      "id": "T-029",
+      "title": "Bullet R1 read-only driver (vendor-specific)",
+      "milestone": "Post-M3",
+      "status": "PLANNED",
+      "evidence": {
+        "commands": [],
+        "primaryArtifacts": []
+      },
+      "notes": "Blocked: USB protocol not documented, requires hardware. M3 uses tcp-line driver (T-020) instead."
+    },
+    {
+      "id": "T-030",
+      "title": "Safe autopilot L3 beta (explicit approval + constrained writes)",
+      "milestone": "M4",
+      "status": "DONE",
+      "completedDate": "2026-01-06",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/schemas test",
+          "pnpm --filter @sim-corp/command test",
+          "pnpm --filter @sim-corp/driver-fake test"
+        ],
+        "primaryArtifacts": [
+          "services/command (SQLite, REST API, approval workflow)",
+          "libs/schemas/src/kernel/command.ts (7 schemas)",
+          "drivers/core/src/types.ts (write interface)",
+          "docs/ops/command-service.md"
+        ]
+      },
+      "notes": "Complete L3 autopilot with HITL approval, safety gates, audit trail. 10 integration tests passing."
+    },
+    {
+      "id": "T-030.1",
+      "title": "Command schemas",
+      "milestone": "M4",
+      "status": "DONE",
+      "completedDate": "2026-01-06",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/schemas test"],
+        "primaryArtifacts": ["libs/schemas/src/kernel/command.ts"]
+      },
+      "notes": "7 schemas, 44 schema tests, 272 LOC"
+    },
+    {
+      "id": "T-030.2",
+      "title": "Command service",
+      "milestone": "M4",
+      "status": "DONE",
+      "completedDate": "2026-01-06",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/command test"],
+        "primaryArtifacts": ["services/command/src/core/command-service.ts", "services/command/src/db/*"]
+      },
+      "notes": "Proposal submission, validation, approval workflow. 10 integration tests."
+    },
+    {
+      "id": "T-030.3",
+      "title": "Driver write interface",
+      "milestone": "M4",
+      "status": "DONE",
+      "completedDate": "2026-01-06",
+      "evidence": {
+        "commands": [],
+        "primaryArtifacts": ["drivers/core/src/types.ts"]
+      },
+      "notes": "writeCommand(), abortCommand(), getCommandStatus() - backward compatible"
+    },
+    {
+      "id": "T-030.4",
+      "title": "Command executor",
+      "milestone": "M4",
+      "status": "DONE",
+      "completedDate": "2026-01-06",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/command test"],
+        "primaryArtifacts": ["services/command/src/core/executor.ts"]
+      },
+      "notes": "Coordinates driver execution, outcome tracking, error handling"
+    },
+    {
+      "id": "T-030.5",
+      "title": "Desktop approval UI",
+      "milestone": "M4",
+      "status": "NEXT",
+      "evidence": {
+        "commands": [],
+        "primaryArtifacts": []
+      },
+      "notes": "Deferred - API approval sufficient for M4"
+    },
+    {
+      "id": "T-030.6",
+      "title": "Audit trail",
+      "milestone": "M4",
+      "status": "DONE",
+      "completedDate": "2026-01-06",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/command test"],
+        "primaryArtifacts": ["services/command/src/db/repo.ts (audit log)"]
+      },
+      "notes": "Immutable logging, actor tracking, complete event trail"
+    },
+    {
+      "id": "T-030.7",
+      "title": "Safety gates",
+      "milestone": "M4",
+      "status": "DONE",
+      "completedDate": "2026-01-06",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/command test"],
+        "primaryArtifacts": ["services/command/src/core/validators.ts"]
+      },
+      "notes": "Multi-layer validation: constraints, state guards, rate limits"
+    },
+    {
+      "id": "T-030.8",
+      "title": "Integration tests",
+      "milestone": "M4",
+      "status": "DONE",
+      "completedDate": "2026-01-06",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/command test"],
+        "primaryArtifacts": ["services/command/tests/command-service.test.ts"]
+      },
+      "notes": "10 integration tests passing"
+    },
+    {
+      "id": "T-030.9",
+      "title": "Documentation",
+      "milestone": "M4",
+      "status": "DONE",
+      "completedDate": "2026-01-06",
+      "evidence": {
+        "commands": [],
+        "primaryArtifacts": ["docs/ops/command-service.md"]
+      },
+      "notes": "Comprehensive ops guide, 600+ lines, API reference, troubleshooting"
+    },
+    {
+      "id": "T-031",
+      "title": "Fake driver command support (test infrastructure)",
+      "milestone": "M4",
+      "status": "DONE",
+      "completedDate": "2026-01-06",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/driver-fake test"],
+        "primaryArtifacts": ["drivers/fake/src/fake-driver.ts"]
+      },
+      "notes": "15 tests passing, command simulation, constraint enforcement"
+    },
+    {
+      "id": "T-032",
+      "title": "Command analytics & monitoring",
+      "milestone": "M4",
+      "status": "PLANNED",
+      "evidence": {
+        "commands": [],
+        "primaryArtifacts": []
+      },
+      "notes": "Command dashboards, latency tracking, safety gate violation alerts"
+    },
+    {
+      "id": "T-033",
+      "title": "Agent Harness v1 (initializer + smoke + clean-state)",
+      "milestone": "Infrastructure",
+      "status": "NOW",
+      "evidence": {
+        "commands": [
+          "pnpm harness:init",
+          "pnpm harness:smoke --quick",
+          "pnpm harness:clean"
+        ],
+        "primaryArtifacts": [
+          "PROGRESS.md",
+          "docs/tasks/task-registry.json",
+          "scripts/harness/init.mjs",
+          "scripts/harness/smoke.mjs",
+          "scripts/harness/clean-state.mjs",
+          "docs/engineering/agent-harness.md"
+        ]
+      },
+      "notes": "Harness for long-running agent continuity across sessions"
+    }
+  ],
+  "statusDefinitions": {
+    "DONE": "Merged + tests pass (Node 20) + (if required) manual scenario validated",
+    "NOW": "Currently being implemented",
+    "NEXT": "Queued and ready to spec/assign",
+    "PLANNED": "Acknowledged but not yet scheduled",
+    "PENDING_VERIFICATION": "Completed but requires verification or re-test",
+    "BLOCKED": "Has a named blocker preventing progress"
+  }
+}

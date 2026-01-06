@@ -19,7 +19,10 @@
     "test:kernel": "pnpm --filter @sim-corp/company-kernel test",
     "stack:up": "docker compose -f infra/local/docker-compose.yaml up -d",
     "stack:logs": "docker compose -f infra/local/docker-compose.yaml logs -f",
-    "stack:down": "docker compose -f infra/local/docker-compose.yaml down -v"
+    "stack:down": "docker compose -f infra/local/docker-compose.yaml down -v",
+    "harness:init": "node scripts/harness/init.mjs",
+    "harness:smoke": "node scripts/harness/smoke.mjs",
+    "harness:clean": "node scripts/harness/clean-state.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",

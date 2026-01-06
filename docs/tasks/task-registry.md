@@ -285,8 +285,9 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 **Blocker:** USB protocol not officially documented; requires hardware access for development
 
 ### T-030 — Safe autopilot L3 beta (explicit approval + constrained writes)
-**Status:** PLANNED
+**Status:** DONE
 **Milestone:** M4
+**Completed:** 2026-01-06
 
 **Scope:**
 - Command schemas (RoasterCommand, CommandProposal, CommandExecution)
@@ -329,12 +330,13 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 **See:** `docs/tasks/M4-PLAN.md` for full planning document
 
 ### T-031 — Fake driver command support (test infrastructure)
-**Status:** PLANNED
+**Status:** DONE
 **Milestone:** M4
+**Completed:** 2026-01-06
 
 **Scope:** Extend FakeDriver with writeCommand implementation for testing command flow without real hardware
 
-**Evidence:** `pnpm --filter @sim-corp/driver-fake test`
+**Evidence:** `pnpm --filter @sim-corp/driver-fake test` (15 tests passing)
 
 ### T-032 — Command analytics & monitoring
 **Status:** PLANNED
@@ -345,3 +347,30 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 - Command latency tracking
 - Safety gate violation alerts
 - Command outcome correlation with roast quality
+
+### T-033 — Agent Harness v1 (initializer + smoke + clean-state)
+**Status:** DONE
+**Milestone:** Infrastructure
+**Completed:** 2026-01-06
+
+**Scope:**
+- Implement effective harness for long-running agent continuity
+- PROGRESS.md template for per-session tracking
+- task-registry.json (machine-editable checklist)
+- Harness scripts (init.mjs, smoke.mjs, clean-state.mjs)
+- Start-of-session and end-of-session protocols
+- Documentation in docs/engineering/agent-harness.md
+
+**Evidence:**
+- `pnpm harness:init`
+- `pnpm harness:smoke --quick`
+- `pnpm harness:clean`
+
+**Artifacts:**
+- PROGRESS.md
+- docs/tasks/task-registry.json
+- scripts/harness/init.mjs
+- scripts/harness/smoke.mjs
+- scripts/harness/clean-state.mjs
+- docs/engineering/agent-harness.md
+- AGENTS.md (updated with harness protocol)

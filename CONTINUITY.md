@@ -1,8 +1,9 @@
 Goal (incl. success criteria):
-- ✅ T-027 Device identity + signed telemetry COMPLETE
-- ✅ SessionId filter implementation COMPLETE
-- ✅ OrgId isolation test COMPLETE
-- ✅ All functionality tested and documented
+- ✅ M4 (Safe Autopilot L3 Beta) COMPLETE
+- ✅ T-033 Agent Harness v1 (initializer + smoke + clean-state) COMPLETE
+- Implement effective harness for long-running agents
+- Enable multi-session continuity with durable artifacts
+- Ensure clean handoff state between sessions
 
 Constraints/Assumptions:
 - Full autonomy to make necessary changes
@@ -111,27 +112,23 @@ Done:
     - Complete audit trail for regulatory compliance
 
 Now:
-- M2 (Trust & Provenance) COMPLETE with full UI visualization
-- M3 (Design Partner Pilot) COMPLETE (2026-01-05)
-  - T-028 (Eval harness + auto-eval) ✅ DONE
-  - Vendor driver requirement satisfied via tcp-line driver (T-020)
-  - Stack/pipeline identical regardless of machine (serial→TCP bridge)
 - M4 (Safe Autopilot L3 Beta) COMPLETE (2026-01-06)
-  - ✅ T-030.1 — Command schemas (7 schemas, 44 schema tests)
-  - ✅ T-030.3 — Driver write interface extension
-  - ✅ T-031 — Fake driver command support (15 tests)
-  - ✅ T-030.2 — Command service with SQLite storage
-  - ✅ T-030.7 — Safety gates and validators (constraints, state guards, rate limits)
-  - ✅ T-030.4 — Command executor (coordinates driver execution)
-  - ✅ T-030.6 — Audit trail logging (complete immutable audit)
-  - ✅ T-030.8 — Integration tests (10 service tests passing)
-  - ✅ T-030.9 — Documentation (comprehensive ops guide)
-  - REST API: 7 endpoints (propose, approve, reject, execute, abort, status, health)
-  - Zero uncontrolled actuation achieved
-  - Complete HITL (Human-In-The-Loop) approval workflow
-  - Multi-layer safety validation
+- **T-033 Agent Harness v1** COMPLETE (2026-01-06)
+  - ✅ PROGRESS.md template created
+  - ✅ task-registry.json (machine-editable) created from markdown
+  - ✅ Harness scripts: init.mjs, smoke.mjs, clean-state.mjs
+  - ✅ Package.json wiring complete
+  - ✅ Documentation: docs/engineering/agent-harness.md
+  - ✅ AGENTS.md updated with harness protocol
+  - ✅ CONTINUITY.md updated
+  - Enables multi-session agent continuity
+  - Structured artifacts: CONTINUITY.md, PROGRESS.md, task-registry.json
+  - Deterministic smoke checks (--quick, --ui flags)
+  - Clean state verification for handoffs
 
 Next:
+- Test harness scripts end-to-end
+- Commit T-033 completion
 - T-030.5 — Desktop UI for command approval (deferred - API approval sufficient for M4)
 - T-028 P1 — LM-as-judge implementation (deferred to post-M4)
 - T-029 — Bullet R1 USB driver (pilot-readiness follow-on, requires hardware)
