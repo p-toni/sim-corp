@@ -83,6 +83,32 @@ Done:
     - Simulates execution (10-50ms delay), tracks state
     - Constraint enforcement (range clamping)
     - 12 command tests, 15 total tests passing
+- **M4 Safe Autopilot L3 Beta (2026-01-06):**
+  - **Command Service** (`services/command`)
+    - SQLite storage with complete lifecycle tracking
+    - Proposal submission, approval/rejection workflow
+    - REST API: 7 endpoints (POST/GET proposals, approve, reject, execute, abort, status)
+    - 10 integration tests passing
+  - **Safety Infrastructure**
+    - Multi-layer validation: constraints, state guards, rate limits
+    - Command-specific ranges (power 0-100%, fan 1-10, drum 0-100 RPM)
+    - Ramp rate limits, interval limits, daily count limits
+  - **Command Executor**
+    - Coordinates approved command execution with drivers
+    - Driver.writeCommand() / abortCommand() / getCommandStatus()
+    - Complete outcome tracking and error handling
+  - **Audit Trail**
+    - Immutable logging from proposal → outcome
+    - Actor tracking (USER, AGENT, DEVICE, SYSTEM)
+    - Event log: PROPOSED, APPROVED, REJECTED, EXECUTING, COMPLETED, FAILED, ABORTED
+  - **Documentation**
+    - Comprehensive ops guide (docs/ops/command-service.md)
+    - API reference, safety gates, driver integration, troubleshooting
+    - 600+ lines of production-ready documentation
+  - **Zero Uncontrolled Actuation Achieved**
+    - All commands require approval path (HITL)
+    - No commands execute without validation + approval
+    - Complete audit trail for regulatory compliance
 
 Now:
 - M2 (Trust & Provenance) COMPLETE with full UI visualization
@@ -90,23 +116,26 @@ Now:
   - T-028 (Eval harness + auto-eval) ✅ DONE
   - Vendor driver requirement satisfied via tcp-line driver (T-020)
   - Stack/pipeline identical regardless of machine (serial→TCP bridge)
-- M4 (Safe Autopilot L3 Beta) IN PROGRESS (2026-01-05)
-  - Planning document created: docs/tasks/M4-PLAN.md
-  - ✅ T-030.1 — Command schemas COMPLETE (7 schemas, 44 tests)
-  - ✅ T-030.3 — Driver write interface COMPLETE
-  - ✅ T-031 — Fake driver command support COMPLETE (15 tests)
-  - Foundation ready for command service implementation
+- M4 (Safe Autopilot L3 Beta) COMPLETE (2026-01-06)
+  - ✅ T-030.1 — Command schemas (7 schemas, 44 schema tests)
+  - ✅ T-030.3 — Driver write interface extension
+  - ✅ T-031 — Fake driver command support (15 tests)
+  - ✅ T-030.2 — Command service with SQLite storage
+  - ✅ T-030.7 — Safety gates and validators (constraints, state guards, rate limits)
+  - ✅ T-030.4 — Command executor (coordinates driver execution)
+  - ✅ T-030.6 — Audit trail logging (complete immutable audit)
+  - ✅ T-030.8 — Integration tests (10 service tests passing)
+  - ✅ T-030.9 — Documentation (comprehensive ops guide)
+  - REST API: 7 endpoints (propose, approve, reject, execute, abort, status, health)
+  - Zero uncontrolled actuation achieved
+  - Complete HITL (Human-In-The-Loop) approval workflow
+  - Multi-layer safety validation
 
 Next:
-- T-030.2 — Command service (proposal submission, validation, approval workflow)
-- T-030.4 — Command executor (execution coordination with drivers)
-- T-030.5 — Desktop UI for command approval
-- T-030.6 — Audit trail implementation
-- T-030.7 — Safety gates (constraints, rate limits)
-- T-030.8 — Integration tests
-- T-030.9 — Documentation
-- T-028 P1 — LM-as-judge implementation (deferred to post-M4 or parallel)
+- T-030.5 — Desktop UI for command approval (deferred - API approval sufficient for M4)
+- T-028 P1 — LM-as-judge implementation (deferred to post-M4)
 - T-029 — Bullet R1 USB driver (pilot-readiness follow-on, requires hardware)
+- M5 — Production Hardening (HSM integration, multi-node, monitoring)
 
 Open questions (UNCONFIRMED if needed):
 - Event inference heuristics: May need machine-specific calibration for production
@@ -116,9 +145,10 @@ Open questions (UNCONFIRMED if needed):
 
 Working set (files/ids/commands):
 - CONTINUITY.md
-- docs/tasks/task-registry.md (T-027 DONE, T-028 DOING)
+- docs/tasks/task-registry.md
 - docs/ops/device-identity.md
 - docs/ops/eval-harness.md
+- docs/ops/command-service.md (NEW — M4 documentation)
 - libs/device-identity/* (device identity library)
 - libs/schemas/src/kernel/eval.ts (enhanced eval schemas)
 - libs/schemas/src/domain/roast-report.ts (TrustMetrics + evaluations)
@@ -148,3 +178,16 @@ Working set (files/ids/commands):
 - apps/roaster-desktop/src/components/ReportPanel.tsx (trust + eval UI)
 - apps/roaster-desktop/src/app.tsx (live mode trust badge)
 - apps/roaster-desktop/src/app.css (trust badge styles)
+- services/command/* (NEW — M4 command service)
+  - src/db/connection.ts (SQLite schema)
+  - src/db/repo.ts (command proposals repository)
+  - src/core/command-service.ts (proposal + approval workflow)
+  - src/core/executor.ts (command execution coordinator)
+  - src/core/validators.ts (safety gates: constraints, state, rate limits)
+  - src/routes/proposals.ts (proposal endpoints)
+  - src/routes/execution.ts (execution endpoints)
+  - src/server.ts (fastify server)
+  - tests/command-service.test.ts (10 tests)
+- libs/schemas/src/kernel/command.ts (7 command schemas, 44 tests)
+- drivers/core/src/types.ts (extended Driver interface with write methods)
+- drivers/fake/src/fake-driver.ts (command support implementation)

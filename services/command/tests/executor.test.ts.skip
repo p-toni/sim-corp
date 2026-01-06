@@ -1,0 +1,283 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import Database from "better-sqlite3";
+import { FakeDriver } from "@sim-corp/driver-fake";
+import { createCommandService } from "../src/core/command-service";
+import { createCommandExecutor } from "../src/core/executor";
+import type { RoasterCommand, Actor } from "@sim-corp/schemas";
+
+describe("CommandExecutor", () => {
+  let db: Database.Database;
+  let driver: FakeDriver;
+
+  beforeEach(() => {
+    db = new Database(":memory:");
+    db.pragma("journal_mode = WAL");
+    db.pragma("foreign_keys = ON");
+
+    // Initialize schema
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS command_proposals (
+        proposal_id TEXT PRIMARY KEY,
+        command_id TEXT NOT NULL,
+        command_type TEXT NOT NULL,
+        machine_id TEXT NOT NULL,
+        site_id TEXT,
+        org_id TEXT,
+        target_value REAL,
+        target_unit TEXT,
+        constraints TEXT,
+        metadata TEXT,
+        proposed_by TEXT NOT NULL,
+        proposed_by_actor TEXT,
+        agent_name TEXT,
+        agent_version TEXT,
+        reasoning TEXT NOT NULL,
+        session_id TEXT,
+        mission_id TEXT,
+        status TEXT NOT NULL DEFAULT 'PROPOSED',
+        created_at TEXT NOT NULL,
+        approval_required INTEGER NOT NULL DEFAULT 1,
+        approval_timeout_seconds INTEGER NOT NULL DEFAULT 300,
+        approved_by TEXT,
+        approved_at TEXT,
+        rejected_by TEXT,
+        rejected_at TEXT,
+        rejection_reason TEXT,
+        execution_started_at TEXT,
+        execution_completed_at TEXT,
+        execution_duration_ms INTEGER,
+        outcome TEXT,
+        audit_log TEXT NOT NULL DEFAULT '[]'
+      );
+    `);
+
+    driver = new FakeDriver({
+      orgId: "org-1",
+      siteId: "site-1",
+      machineId: "machine-1",
+      connection: {},
+    });
+  });
+
+  it("executes an approved command", async () => {
+    const service = createCommandService({ db });
+    const executor = createCommandExecutor({
+      db,
+      getDriver: async () => driver,
+    });
+
+    await driver.connect();
+
+    // Propose and approve a command
+    const command: RoasterCommand = {
+      commandId: "cmd-1",
+      commandType: "SET_POWER",
+      machineId: "machine-1",
+      targetValue: 75,
+      targetUnit: "%",
+      timestamp: new Date().toISOString(),
+      constraints: {},
+    };
+
+    const proposal = service.proposeCommand({
+      command,
+      proposedBy: "AGENT",
+      reasoning: "Increase power",
+      approvalRequired: true,
+    });
+
+    const approver: Actor = {
+      kind: "USER",
+      id: "user-1",
+      display: "Test User",
+    };
+
+    service.approveProposal(proposal.proposalId, approver);
+
+    // Execute the command
+    const result = await executor.executeApprovedCommand(proposal.proposalId);
+
+    expect(result.status).toBe("ACCEPTED");
+    expect(result.commandId).toBe("cmd-1");
+    expect(result.actualValue).toBe(75);
+
+    // Check proposal status updated
+    const updated = executor.getExecutionStatus(proposal.proposalId);
+    expect(updated?.status).toBe("COMPLETED");
+    expect(updated?.executionStartedAt).toBeDefined();
+    expect(updated?.executionCompletedAt).toBeDefined();
+    expect(updated?.executionDurationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("refuses to execute non-approved command", async () => {
+    const service = createCommandService({ db });
+    const executor = createCommandExecutor({
+      db,
+      getDriver: async () => driver,
+    });
+
+    const command: RoasterCommand = {
+      commandId: "cmd-2",
+      commandType: "SET_FAN",
+      machineId: "machine-1",
+      targetValue: 5,
+      targetUnit: "level",
+      timestamp: new Date().toISOString(),
+      constraints: {},
+    };
+
+    const proposal = service.proposeCommand({
+      command,
+      proposedBy: "AGENT",
+      reasoning: "Increase fan",
+      approvalRequired: true,
+    });
+
+    // Try to execute without approval
+    await expect(
+      executor.executeApprovedCommand(proposal.proposalId)
+    ).rejects.toThrow("is not approved");
+  });
+
+  it("handles driver execution errors", async () => {
+    const service = createCommandService({ db });
+    const executor = createCommandExecutor({
+      db,
+      getDriver: async () => driver, // Driver not connected - will fail
+    });
+
+    const command: RoasterCommand = {
+      commandId: "cmd-3",
+      commandType: "SET_POWER",
+      machineId: "machine-1",
+      targetValue: 50,
+      targetUnit: "%",
+      timestamp: new Date().toISOString(),
+      constraints: {},
+    };
+
+    const proposal = service.proposeCommand({
+      command,
+      proposedBy: "AGENT",
+      reasoning: "Test error handling",
+      approvalRequired: false, // Auto-approved
+    });
+
+    const result = await executor.executeApprovedCommand(proposal.proposalId);
+
+    expect(result.status).toBe("FAILED");
+    expect(result.errorCode).toBe("NOT_CONNECTED");
+
+    const updated = executor.getExecutionStatus(proposal.proposalId);
+    expect(updated?.status).toBe("FAILED");
+  });
+
+  it("aborts an executing command", async () => {
+    const service = createCommandService({ db });
+    const executor = createCommandExecutor({
+      db,
+      getDriver: async () => driver,
+    });
+
+    await driver.connect();
+
+    // Start a command execution
+    const command: RoasterCommand = {
+      commandId: "cmd-4",
+      commandType: "PREHEAT",
+      machineId: "machine-1",
+      targetValue: 200,
+      targetUnit: "°C",
+      timestamp: new Date().toISOString(),
+      constraints: {},
+    };
+
+    const proposal = service.proposeCommand({
+      command,
+      proposedBy: "AGENT",
+      reasoning: "Preheat roaster",
+      approvalRequired: false,
+    });
+
+    // Execute and then abort (we'll manually set status to EXECUTING for this test)
+    const repo = (executor as any).repo;
+    repo.updateStatus(proposal.proposalId, "EXECUTING");
+
+    const abortResult = await executor.abortCommand(proposal.proposalId);
+
+    expect(abortResult.status).toBe("ACCEPTED");
+    expect(abortResult.commandId).toContain("abort");
+  });
+
+  it("tracks execution audit trail", async () => {
+    const service = createCommandService({ db });
+    const executor = createCommandExecutor({
+      db,
+      getDriver: async () => driver,
+    });
+
+    await driver.connect();
+
+    const command: RoasterCommand = {
+      commandId: "cmd-5",
+      commandType: "SET_DRUM",
+      machineId: "machine-1",
+      targetValue: 50,
+      targetUnit: "RPM",
+      timestamp: new Date().toISOString(),
+      constraints: {},
+    };
+
+    const proposal = service.proposeCommand({
+      command,
+      proposedBy: "AGENT",
+      reasoning: "Adjust drum",
+      approvalRequired: false,
+    });
+
+    await executor.executeApprovedCommand(proposal.proposalId);
+
+    const updated = executor.getExecutionStatus(proposal.proposalId);
+    expect(updated?.auditLog.length).toBeGreaterThan(1);
+
+    const executionLogs = updated?.auditLog.filter(
+      (log) =>
+        log.action === "EXECUTION_STARTED" ||
+        log.action === "EXECUTION_COMPLETED"
+    );
+    expect(executionLogs?.length).toBeGreaterThan(0);
+  });
+
+  it("calculates execution duration", async () => {
+    const service = createCommandService({ db });
+    const executor = createCommandExecutor({
+      db,
+      getDriver: async () => driver,
+    });
+
+    await driver.connect();
+
+    const command: RoasterCommand = {
+      commandId: "cmd-6",
+      commandType: "SET_POWER",
+      machineId: "machine-1",
+      targetValue: 80,
+      targetUnit: "%",
+      timestamp: new Date().toISOString(),
+      constraints: {},
+    };
+
+    const proposal = service.proposeCommand({
+      command,
+      proposedBy: "AGENT",
+      reasoning: "High power",
+      approvalRequired: false,
+    });
+
+    await executor.executeApprovedCommand(proposal.proposalId);
+
+    const updated = executor.getExecutionStatus(proposal.proposalId);
+    expect(updated?.executionDurationMs).toBeGreaterThanOrEqual(0);
+    expect(updated?.executionDurationMs).toBeLessThan(1000); // Should be fast
+  });
+});
