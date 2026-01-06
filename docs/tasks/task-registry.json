@@ -555,7 +555,8 @@
       "id": "T-033",
       "title": "Agent Harness v1 (initializer + smoke + clean-state)",
       "milestone": "Infrastructure",
-      "status": "NOW",
+      "status": "DONE",
+      "completedDate": "2026-01-06",
       "evidence": {
         "commands": [
           "pnpm harness:init",
@@ -568,7 +569,8 @@
           "scripts/harness/init.mjs",
           "scripts/harness/smoke.mjs",
           "scripts/harness/clean-state.mjs",
-          "docs/engineering/agent-harness.md"
+          "docs/engineering/agent-harness.md",
+          "AGENTS.md (harness protocol section)"
         ]
       },
       "notes": "Harness for long-running agent continuity across sessions"
