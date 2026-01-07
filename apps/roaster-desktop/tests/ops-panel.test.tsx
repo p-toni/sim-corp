@@ -17,6 +17,14 @@ vi.mock("../src/lib/api", async () => {
   };
 });
 
+vi.mock("../src/lib/command-api", () => ({
+  listCommands: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+  getCommandSummary: vi.fn().mockResolvedValue(null),
+  approveCommand: vi.fn(),
+  rejectCommand: vi.fn(),
+  executeCommand: vi.fn(),
+}));
+
 const baseMission: KernelMissionRecord = {
   missionId: "m-1",
   id: "m-1",
@@ -52,7 +60,7 @@ describe("OpsPanel", () => {
 
     render(<OpsPanel pollIntervalMs={60_000} />);
 
-    expect(await screen.findByText(/Mission Ops/)).toBeTruthy();
+    expect(await screen.findByText(/Operations/)).toBeTruthy();
 
     const row = await screen.findByRole("button", { name: /session-1/i });
     await user.click(row);

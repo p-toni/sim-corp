@@ -339,14 +339,34 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 **Evidence:** `pnpm --filter @sim-corp/driver-fake test` (15 tests passing)
 
 ### T-032 — Command analytics & monitoring
-**Status:** PLANNED
+**Status:** DONE
 **Milestone:** M4
+**Completed:** 2026-01-06
 
-**Scope:**
-- Command success/failure dashboards
-- Command latency tracking
-- Safety gate violation alerts
-- Command outcome correlation with roast quality
+**Delivered:**
+- Analytics schemas (CommandMetrics, CommandTimeseriesMetrics, CommandAlert, CommandSummary)
+- Analytics service with aggregated metrics (success rates, latency percentiles p50/p95/p99)
+- Analytics API routes (metrics, timeseries, alerts, summary)
+- Desktop Commands tab in Ops panel (command list, detail view, analytics summary)
+- 7 comprehensive analytics tests
+- Timeseries bucketing for charting
+- Alert generation for high failure rates and latency issues
+- Breakdown by command type and machine
+- 24h/7d rolling window metrics
+
+**Evidence:**
+- `pnpm --filter @sim-corp/schemas test` (50 tests passing)
+- `pnpm --filter @sim-corp/command test` (17 tests passing, 7 analytics)
+- `pnpm --filter @sim-corp/roaster-desktop test`
+- `pnpm --filter @sim-corp/roaster-desktop build`
+
+**Primary artifacts:**
+- `libs/schemas/src/kernel/command.ts` (analytics schemas)
+- `services/command/src/core/analytics.ts` (analytics engine)
+- `services/command/src/routes/analytics.ts` (4 REST endpoints)
+- `services/command/tests/analytics.test.ts` (7 tests)
+- `apps/roaster-desktop/src/lib/command-api.ts` (API client)
+- `apps/roaster-desktop/src/components/OpsPanel.tsx` (Commands tab UI)
 
 ### T-033 — Agent Harness v1 (initializer + smoke + clean-state)
 **Status:** DONE

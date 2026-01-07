@@ -3,8 +3,10 @@ import type { Driver } from "@sim-corp/driver-core";
 import { openDatabase } from "./db/connection.js";
 import { createCommandService } from "./core/command-service.js";
 import { createCommandExecutor } from "./core/executor.js";
+import { createCommandAnalytics } from "./core/analytics.js";
 import { proposalsRoutes } from "./routes/proposals.js";
 import { executionRoutes } from "./routes/execution.js";
+import { analyticsRoutes } from "./routes/analytics.js";
 
 const PORT = parseInt(process.env.COMMAND_PORT ?? "3004", 10);
 const HOST = process.env.COMMAND_HOST ?? "0.0.0.0";
@@ -29,6 +31,7 @@ async function main() {
   const db = openDatabase();
   const commandService = createCommandService({ db });
   const executor = createCommandExecutor({ db, getDriver });
+  const analytics = createCommandAnalytics(db);
 
   const fastify = Fastify({
     logger: true,
@@ -42,6 +45,7 @@ async function main() {
   // Register routes
   await fastify.register(proposalsRoutes, { commandService });
   await fastify.register(executionRoutes, { executor });
+  await fastify.register(analyticsRoutes, { analytics });
 
   // Start server
   try {

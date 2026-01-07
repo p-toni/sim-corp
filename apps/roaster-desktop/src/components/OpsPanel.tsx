@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import type { KernelMissionRecord, MissionListFilters } from "../lib/api";
 import { approveMission, cancelMission, getGovernorConfig, listMissions, retryNowMission } from "../lib/api";
+import type { CommandProposal, CommandSummary } from "@sim-corp/schemas";
+import {
+  listCommands,
+  getCommandSummary,
+  approveCommand as approveCommandAPI,
+  rejectCommand as rejectCommandAPI,
+  type CommandListFilters,
+} from "../lib/command-api";
+import { SafetyInfoPanel } from "./SafetyInfoPanel";
+import { CommandApprovalDialog } from "./CommandApprovalDialog";
+import { CommandRejectionDialog } from "./CommandRejectionDialog";
 
 const NEEDS_ATTENTION: Array<KernelMissionRecord["status"]> = ["QUARANTINED", "RETRY", "BLOCKED"];
 const ALL_STATUSES: Array<KernelMissionRecord["status"]> = [
@@ -17,6 +28,8 @@ const ALL_STATUSES: Array<KernelMissionRecord["status"]> = [
 interface OpsPanelProps {
   pollIntervalMs?: number;
 }
+
+type OpsTab = "missions" | "commands";
 
 function formatDate(value?: string): string {
   if (!value) return "-";
@@ -36,6 +49,9 @@ function matchesText(value: string | undefined, query: string): boolean {
 }
 
 export function OpsPanel({ pollIntervalMs = 8000 }: OpsPanelProps) {
+  const [activeTab, setActiveTab] = useState<OpsTab>("missions");
+
+  // Mission state
   const [missions, setMissions] = useState<KernelMissionRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,9 +60,25 @@ export function OpsPanel({ pollIntervalMs = 8000 }: OpsPanelProps) {
   const [config, setConfig] = useState<unknown | null>(null);
   const [showConfig, setShowConfig] = useState(false);
 
+  // Command state
+  const [commands, setCommands] = useState<CommandProposal[]>([]);
+  const [commandsLoading, setCommandsLoading] = useState(false);
+  const [commandFilters, setCommandFilters] = useState<CommandListFilters>({});
+  const [selectedCommandId, setSelectedCommandId] = useState<string | null>(null);
+  const [commandSummary, setCommandSummary] = useState<CommandSummary | null>(null);
+
+  // Command approval dialog state
+  const [approvalDialogCommand, setApprovalDialogCommand] = useState<CommandProposal | null>(null);
+  const [rejectionDialogCommand, setRejectionDialogCommand] = useState<CommandProposal | null>(null);
+
   const selectedMission = useMemo(
     () => missions.find((m) => m.missionId === selectedId || m.id === selectedId) ?? null,
     [missions, selectedId]
+  );
+
+  const selectedCommand = useMemo(
+    () => commands.find((c) => c.proposalId === selectedCommandId) ?? null,
+    [commands, selectedCommandId]
   );
 
   const goalOptions = useMemo(() => {
@@ -144,35 +176,137 @@ export function OpsPanel({ pollIntervalMs = 8000 }: OpsPanelProps) {
     });
   }, [missions, filters]);
 
+  const handleRefreshCommands = async (): Promise<void> => {
+    setCommandsLoading(true);
+    setError(null);
+    try {
+      const [list, summary] = await Promise.all([
+        listCommands(commandFilters),
+        getCommandSummary(),
+      ]);
+      setCommands(list.items);
+      setCommandSummary(summary);
+      if (!selectedCommandId && list.items.length) {
+        setSelectedCommandId(list.items[0]?.proposalId ?? null);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load commands";
+      setError(message);
+    } finally {
+      setCommandsLoading(false);
+    }
+  };
+
+  const handleApproveCommand = async (): Promise<void> => {
+    if (!approvalDialogCommand) return;
+
+    setError(null);
+    try {
+      const actor = {
+        kind: "USER" as const,
+        id: "desktop-user",
+        display: "Desktop Operator",
+      };
+
+      await approveCommandAPI(approvalDialogCommand.proposalId, actor);
+      setApprovalDialogCommand(null);
+      await handleRefreshCommands();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Action failed";
+      setError(message);
+    }
+  };
+
+  const handleRejectCommand = async (reason: string): Promise<void> => {
+    if (!rejectionDialogCommand) return;
+
+    setError(null);
+    try {
+      const actor = {
+        kind: "USER" as const,
+        id: "desktop-user",
+        display: "Desktop Operator",
+      };
+
+      await rejectCommandAPI(rejectionDialogCommand.proposalId, actor, reason);
+      setRejectionDialogCommand(null);
+      await handleRefreshCommands();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Action failed";
+      setError(message);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "commands") {
+      void handleRefreshCommands();
+    }
+  }, [activeTab, commandFilters]);
+
+  useEffect(() => {
+    if (activeTab === "commands") {
+      const timer = setInterval(() => {
+        void handleRefreshCommands();
+      }, pollIntervalMs);
+      return () => clearInterval(timer);
+    }
+  }, [pollIntervalMs, activeTab, commandFilters]);
+
   return (
     <div className="panel stack">
       <div className="panel-header">
         <div>
-          <h2 className="panel-title">Mission Ops</h2>
-          <div className="muted small-text">Investigate, approve, cancel, and retry missions</div>
+          <h2 className="panel-title">Operations</h2>
+          <div className="muted small-text">Missions, commands, and governance</div>
         </div>
         <div className="live-actions">
-          <button type="button" className="secondary" onClick={() => void handleRefresh()} disabled={loading}>
-            Refresh
-          </button>
-          <label className="checkbox-field">
-            <input
-              type="checkbox"
-              checked={Array.isArray(filters.status) && filters.status.length === NEEDS_ATTENTION.length &&
-                NEEDS_ATTENTION.every((s) => (filters.status as string[]).includes(s))}
-              onChange={(event) => applyNeedsAttention(event.target.checked)}
-            />
-            <span>Needs attention</span>
-          </label>
-          <button type="button" className="secondary ghost" onClick={() => setShowConfig((prev) => !prev)}>
-            Governor config
-          </button>
+          {activeTab === "missions" ? (
+            <>
+              <button type="button" className="secondary" onClick={() => void handleRefresh()} disabled={loading}>
+                Refresh
+              </button>
+              <label className="checkbox-field">
+                <input
+                  type="checkbox"
+                  checked={Array.isArray(filters.status) && filters.status.length === NEEDS_ATTENTION.length &&
+                    NEEDS_ATTENTION.every((s) => (filters.status as string[]).includes(s))}
+                  onChange={(event) => applyNeedsAttention(event.target.checked)}
+                />
+                <span>Needs attention</span>
+              </label>
+              <button type="button" className="secondary ghost" onClick={() => setShowConfig((prev) => !prev)}>
+                Governor config
+              </button>
+            </>
+          ) : (
+            <button type="button" className="secondary" onClick={() => void handleRefreshCommands()} disabled={commandsLoading}>
+              Refresh
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="ops-grid">
-        <div className="ops-list">
-          <div className="ops-filters">
+      <div className="chip-row">
+        <button
+          type="button"
+          className={`chip ${activeTab === "missions" ? "active" : ""}`}
+          onClick={() => setActiveTab("missions")}
+        >
+          Missions
+        </button>
+        <button
+          type="button"
+          className={`chip ${activeTab === "commands" ? "active" : ""}`}
+          onClick={() => setActiveTab("commands")}
+        >
+          Commands
+        </button>
+      </div>
+
+      {activeTab === "missions" ? (
+        <div className="ops-grid">
+          <div className="ops-list">
+            <div className="ops-filters">
             <div className="filter-group">
               <label className="small-text">Status</label>
               <div className="chip-row">
@@ -372,8 +506,148 @@ export function OpsPanel({ pollIntervalMs = 8000 }: OpsPanelProps) {
           )}
         </div>
       </div>
+      ) : (
+        /* Commands Tab */
+        <div className="ops-grid">
+          <div className="ops-list">
+            <div className="ops-table" role="table">
+              <div className="ops-row header" role="row">
+                <div>Created</div>
+                <div>Status</div>
+                <div>Type</div>
+                <div>Machine</div>
+                <div>Target</div>
+                <div>Proposed By</div>
+              </div>
+              {commands.length === 0 ? (
+                <div className="empty">No commands</div>
+              ) : (
+                commands.map((cmd) => (
+                  <button
+                    key={cmd.proposalId}
+                    type="button"
+                    className={`ops-row ${selectedCommand?.proposalId === cmd.proposalId ? "selected" : ""}`}
+                    onClick={() => setSelectedCommandId(cmd.proposalId)}
+                  >
+                    <div>{formatDate(cmd.createdAt)}</div>
+                    <div>
+                      <span className={`status ${cmd.status === "COMPLETED" ? "status-success" : cmd.status === "FAILED" || cmd.status === "REJECTED" ? "status-error" : "status-neutral"}`}>
+                        {cmd.status}
+                      </span>
+                    </div>
+                    <div>{cmd.command.commandType}</div>
+                    <div>{cmd.command.machineId}</div>
+                    <div>{cmd.command.targetValue ?? "-"} {cmd.command.targetUnit ?? ""}</div>
+                    <div>{cmd.proposedBy}</div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
 
-      {showConfig ? (
+          <div className="ops-detail">
+            {selectedCommand ? (
+              <div className="stack">
+                <div className="panel-header">
+                  <h3 className="panel-title">Command {selectedCommand.proposalId}</h3>
+                  <div className="ops-actions">
+                    {selectedCommand.status === "PENDING_APPROVAL" ? (
+                      <>
+                        <button
+                          type="button"
+                          className="primary"
+                          onClick={() => setApprovalDialogCommand(selectedCommand)}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary ghost"
+                          onClick={() => setRejectionDialogCommand(selectedCommand)}
+                        >
+                          Reject
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="grid two-col">
+                  <div className="field">
+                    <span className="small-text">Status</span>
+                    <strong>{selectedCommand.status}</strong>
+                  </div>
+                  <div className="field">
+                    <span className="small-text">Type</span>
+                    <span>{selectedCommand.command.commandType}</span>
+                  </div>
+                  <div className="field">
+                    <span className="small-text">Machine</span>
+                    <span>{selectedCommand.command.machineId}</span>
+                  </div>
+                  <div className="field">
+                    <span className="small-text">Target</span>
+                    <span>{selectedCommand.command.targetValue} {selectedCommand.command.targetUnit}</span>
+                  </div>
+                  <div className="field">
+                    <span className="small-text">Proposed By</span>
+                    <span>{selectedCommand.proposedBy} {selectedCommand.agentName ? `(${selectedCommand.agentName})` : ""}</span>
+                  </div>
+                  <div className="field">
+                    <span className="small-text">Session</span>
+                    <span>{selectedCommand.sessionId ?? "-"}</span>
+                  </div>
+                </div>
+
+                <div className="panel">
+                  <h4 className="panel-title">Reasoning</h4>
+                  <p>{selectedCommand.reasoning}</p>
+                </div>
+
+                <SafetyInfoPanel
+                  constraints={selectedCommand.command.constraints}
+                  commandType={selectedCommand.command.commandType}
+                  targetValue={selectedCommand.command.targetValue}
+                  targetUnit={selectedCommand.command.targetUnit}
+                />
+
+                {selectedCommand.executionDurationMs != null ? (
+                  <div className="panel">
+                    <h4 className="panel-title">Execution</h4>
+                    <div className="grid two-col small-text">
+                      <div>Started: {formatDate(selectedCommand.executionStartedAt)}</div>
+                      <div>Completed: {formatDate(selectedCommand.executionCompletedAt)}</div>
+                      <div>Duration: {selectedCommand.executionDurationMs}ms</div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {selectedCommand.outcome ? (
+                  <div className="panel">
+                    <h4 className="panel-title">Outcome</h4>
+                    <pre className="code-block">{JSON.stringify(selectedCommand.outcome, null, 2)}</pre>
+                  </div>
+                ) : null}
+
+                {commandSummary ? (
+                  <div className="panel">
+                    <h4 className="panel-title">Command Analytics Summary</h4>
+                    <div className="grid two-col small-text">
+                      <div>Pending Approvals: {commandSummary.pendingApprovals}</div>
+                      <div>Active Executions: {commandSummary.activeExecutions}</div>
+                      <div>24h Success Rate: {(commandSummary.last24Hours.successRate * 100).toFixed(1)}%</div>
+                      <div>24h Total: {commandSummary.last24Hours.totalCommands}</div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="empty">Select a command to inspect</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "missions" && showConfig ? (
         <div className="panel">
           <div className="panel-header">
             <h4 className="panel-title">Governor config (read-only)</h4>
@@ -384,6 +658,24 @@ export function OpsPanel({ pollIntervalMs = 8000 }: OpsPanelProps) {
       ) : null}
 
       {error ? <div className="error-text">{error}</div> : null}
+
+      {/* Command Approval Dialog */}
+      {approvalDialogCommand ? (
+        <CommandApprovalDialog
+          command={approvalDialogCommand}
+          onApprove={() => void handleApproveCommand()}
+          onCancel={() => setApprovalDialogCommand(null)}
+        />
+      ) : null}
+
+      {/* Command Rejection Dialog */}
+      {rejectionDialogCommand ? (
+        <CommandRejectionDialog
+          command={rejectionDialogCommand}
+          onReject={(reason) => void handleRejectCommand(reason)}
+          onCancel={() => setRejectionDialogCommand(null)}
+        />
+      ) : null}
     </div>
   );
 }

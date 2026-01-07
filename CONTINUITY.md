@@ -1,9 +1,13 @@
 Goal (incl. success criteria):
 - ✅ M4 (Safe Autopilot L3 Beta) COMPLETE
 - ✅ T-033 Agent Harness v1 (initializer + smoke + clean-state) COMPLETE
-- Implement effective harness for long-running agents
-- Enable multi-session continuity with durable artifacts
-- Ensure clean handoff state between sessions
+- ✅ **T-032 Command Analytics & Monitoring** COMPLETE
+  - Add CommandRecord/metrics/alerts schemas in libs/schemas with tests ✅
+  - Persist durable command read model (using existing command service SQLite) ✅
+  - Expose analytics endpoints (list/detail, metrics, alerts, session correlation) ✅
+  - Extend roaster-desktop Ops panel with Commands tab ✅
+  - Add comprehensive tests (Fastify routes, analytics service) ✅
+  - Run Node 20 gates and mark T-032 DONE with evidence ✅
 
 Constraints/Assumptions:
 - Full autonomy to make necessary changes
@@ -110,26 +114,63 @@ Done:
     - All commands require approval path (HITL)
     - No commands execute without validation + approval
     - Complete audit trail for regulatory compliance
+- **T-032 Command Analytics & Monitoring (2026-01-06):**
+  - **Analytics Schemas** (libs/schemas/src/kernel/command.ts)
+    - CommandMetrics: aggregated metrics with success rates, latency percentiles
+    - CommandTimeseriesMetrics: time-bucketed data for charting
+    - CommandAlert: safety violations, anomaly detection
+    - CommandSummary: dashboard statistics with 24h/7d windows
+    - ProposeCommandRequest: missing schema for proposal API
+    - 6 new schema tests (50 total tests passing)
+  - **Analytics Service** (services/command/src/core/analytics.ts)
+    - getMetrics(): success rates, latency p50/p95/p99, by command type/machine
+    - getTimeseriesMetrics(): bucketed data for charting
+    - getAlerts(): high failure rate and latency anomaly detection
+    - getSummary(): dashboard with 24h/7d metrics, pending approvals
+  - **Analytics API Routes** (services/command/src/routes/analytics.ts)
+    - GET /analytics/metrics
+    - GET /analytics/metrics/timeseries
+    - GET /analytics/alerts
+    - GET /analytics/summary
+  - **Analytics Tests** (services/command/tests/analytics.test.ts)
+    - 7 comprehensive tests covering all analytics functions
+    - 17 total command service tests passing
+  - **Desktop Commands Tab** (apps/roaster-desktop)
+    - Command API client (command-api.ts)
+    - Tabbed Ops panel (Missions | Commands)
+    - Command list with filters, detail panel, approval/rejection actions
+    - Analytics summary display (pending approvals, success rates, 24h totals)
+    - Desktop build successful
+- **T-030.5 Desktop Command Approval UX (2026-01-06):**
+  - **SafetyInfoPanel Component** (apps/roaster-desktop/src/components/SafetyInfoPanel.tsx)
+    - Displays command safety constraints and limits
+    - Shows value ranges, ramp rates, required/forbidden states, rate limits
+    - OUT OF RANGE warning when target value violates constraints
+    - 10 comprehensive tests covering all constraint types
+  - **CommandApprovalDialog Component** (apps/roaster-desktop/src/components/CommandApprovalDialog.tsx)
+    - Modal dialog for command approval with safety acknowledgment
+    - Shows command details, approval deadline (with urgency warning), reasoning
+    - Integrates SafetyInfoPanel for inline safety review
+    - Requires explicit checkbox acknowledgment before approval
+  - **CommandRejectionDialog Component** (apps/roaster-desktop/src/components/CommandRejectionDialog.tsx)
+    - Structured rejection reasons (7 predefined codes)
+    - Custom reason text for "OTHER" category
+    - Warning about permanent rejection with audit log recording
+  - **Enhanced OpsPanel** (apps/roaster-desktop/src/components/OpsPanel.tsx)
+    - Approve button opens CommandApprovalDialog
+    - Reject button opens CommandRejectionDialog
+    - SafetyInfoPanel integrated in command detail view
+    - Modal styling (apps/roaster-desktop/src/app.css)
+  - **15 desktop tests passing** (including 10 new SafetyInfoPanel tests)
+  - **Desktop build successful**
 
 Now:
-- M4 (Safe Autopilot L3 Beta) COMPLETE (2026-01-06)
-- **T-033 Agent Harness v1** COMPLETE and MERGED (2026-01-06)
-  - ✅ PROGRESS.md template created
-  - ✅ task-registry.json (machine-editable) created from markdown
-  - ✅ Harness scripts: init.mjs, smoke.mjs, clean-state.mjs
-  - ✅ Package.json wiring complete
-  - ✅ Documentation: docs/engineering/agent-harness.md
-  - ✅ AGENTS.md updated with harness protocol
-  - ✅ CONTINUITY.md updated
-  - ✅ All scripts tested successfully
-  - ✅ Commits pushed to origin/main
-  - Enables multi-session agent continuity
-  - Structured artifacts: CONTINUITY.md, PROGRESS.md, task-registry.json
-  - Deterministic smoke checks (--quick, --ui flags)
-  - Clean state verification for handoffs
+- **T-030.5 Desktop Command Approval UX** COMPLETE (2026-01-06)
+  - All deliverables complete: SafetyInfoPanel, approval/rejection dialogs, enhanced OpsPanel
+  - 15 desktop tests passing (10 new SafetyInfoPanel tests)
+  - M4 (Safe Autopilot L3 Beta) fully complete
 
 Next:
-- T-030.5 — Desktop UI for command approval (deferred - API approval sufficient for M4)
 - T-028 P1 — LM-as-judge implementation (deferred to post-M4)
 - T-029 — Bullet R1 USB driver (pilot-readiness follow-on, requires hardware)
 - M5 — Production Hardening (HSM integration, multi-node, monitoring)
@@ -185,6 +226,11 @@ Working set (files/ids/commands):
   - src/routes/execution.ts (execution endpoints)
   - src/server.ts (fastify server)
   - tests/command-service.test.ts (10 tests)
-- libs/schemas/src/kernel/command.ts (7 command schemas, 44 tests)
+- libs/schemas/src/kernel/command.ts (7 command schemas + 5 analytics schemas, 50 tests)
 - drivers/core/src/types.ts (extended Driver interface with write methods)
 - drivers/fake/src/fake-driver.ts (command support implementation)
+- services/command/src/core/analytics.ts (NEW — T-032 analytics engine)
+- services/command/src/routes/analytics.ts (NEW — T-032 analytics endpoints)
+- services/command/tests/analytics.test.ts (NEW — T-032 7 analytics tests)
+- apps/roaster-desktop/src/lib/command-api.ts (NEW — T-032 command API client)
+- apps/roaster-desktop/src/components/OpsPanel.tsx (T-032 Commands tab extension)

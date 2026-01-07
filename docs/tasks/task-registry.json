@@ -473,12 +473,23 @@
       "id": "T-030.5",
       "title": "Desktop approval UI",
       "milestone": "M4",
-      "status": "NEXT",
+      "status": "DONE",
+      "completedDate": "2026-01-06",
       "evidence": {
-        "commands": [],
-        "primaryArtifacts": []
+        "commands": [
+          "pnpm --filter @sim-corp/roaster-desktop test",
+          "pnpm --filter @sim-corp/roaster-desktop build"
+        ],
+        "primaryArtifacts": [
+          "apps/roaster-desktop/src/components/SafetyInfoPanel.tsx",
+          "apps/roaster-desktop/src/components/CommandApprovalDialog.tsx",
+          "apps/roaster-desktop/src/components/CommandRejectionDialog.tsx",
+          "apps/roaster-desktop/src/components/OpsPanel.tsx (enhanced approval UX)",
+          "apps/roaster-desktop/src/components/SafetyInfoPanel.test.tsx (10 tests)",
+          "apps/roaster-desktop/src/app.css (modal styles)"
+        ]
       },
-      "notes": "Deferred - API approval sufficient for M4"
+      "notes": "Enhanced command approval UX: SafetyInfoPanel with constraints visualization, CommandApprovalDialog with safety acknowledgment, CommandRejectionDialog with structured reasons. 15 desktop tests passing."
     },
     {
       "id": "T-030.6",
@@ -544,12 +555,25 @@
       "id": "T-032",
       "title": "Command analytics & monitoring",
       "milestone": "M4",
-      "status": "PLANNED",
+      "status": "DONE",
+      "completedDate": "2026-01-06",
       "evidence": {
-        "commands": [],
-        "primaryArtifacts": []
+        "commands": [
+          "pnpm --filter @sim-corp/schemas test",
+          "pnpm --filter @sim-corp/command test",
+          "pnpm --filter @sim-corp/roaster-desktop test",
+          "pnpm --filter @sim-corp/roaster-desktop build"
+        ],
+        "primaryArtifacts": [
+          "libs/schemas/src/kernel/command.ts (CommandMetrics, CommandTimeseriesMetrics, CommandAlert, CommandSummary)",
+          "services/command/src/core/analytics.ts",
+          "services/command/src/routes/analytics.ts",
+          "services/command/tests/analytics.test.ts",
+          "apps/roaster-desktop/src/lib/command-api.ts",
+          "apps/roaster-desktop/src/components/OpsPanel.tsx (Commands tab)"
+        ]
       },
-      "notes": "Command dashboards, latency tracking, safety gate violation alerts"
+      "notes": "50 schema tests, 17 command service tests (7 analytics), desktop Commands tab with analytics summary, metrics/timeseries/alerts endpoints"
     },
     {
       "id": "T-033",

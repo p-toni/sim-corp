@@ -32,7 +32,12 @@ import {
   CommandApprovalRequestSchema,
   CommandApprovalResponseSchema,
   CommandBatchSchema,
-  CommandConstraintsPresetSchema
+  CommandConstraintsPresetSchema,
+  ProposeCommandRequestSchema,
+  CommandMetricsSchema,
+  CommandTimeseriesMetricsSchema,
+  CommandAlertSchema,
+  CommandSummarySchema
 } from "./index";
 
 const baseTelemetry = {
@@ -872,5 +877,137 @@ describe("command schemas", () => {
 
       expect(proposal.status).toBe(status);
     });
+  });
+});
+
+describe("command analytics schemas", () => {
+  it("validates command metrics", () => {
+    const metrics = CommandMetricsSchema.parse({
+      startTime: "2025-01-01T00:00:00.000Z",
+      endTime: "2025-01-01T01:00:00.000Z",
+      totalCommands: 100,
+      completedCount: 80,
+      failedCount: 15,
+      rejectedCount: 5,
+      successRate: 0.8,
+      failureRate: 0.15,
+      rejectionRate: 0.05,
+      avgExecutionDurationMs: 1500,
+      p95ExecutionDurationMs: 3000
+    });
+
+    expect(metrics.totalCommands).toBe(100);
+    expect(metrics.successRate).toBe(0.8);
+    expect(metrics.avgExecutionDurationMs).toBe(1500);
+  });
+
+  it("validates timeseries metrics", () => {
+    const timeseries = CommandTimeseriesMetricsSchema.parse({
+      metric: "command_count",
+      startTime: "2025-01-01T00:00:00.000Z",
+      endTime: "2025-01-01T01:00:00.000Z",
+      bucketSizeSeconds: 300,
+      dataPoints: [
+        {
+          timestamp: "2025-01-01T00:00:00.000Z",
+          value: 10
+        },
+        {
+          timestamp: "2025-01-01T00:05:00.000Z",
+          value: 15
+        }
+      ]
+    });
+
+    expect(timeseries.dataPoints).toHaveLength(2);
+    expect(timeseries.metric).toBe("command_count");
+  });
+
+  it("validates command alerts", () => {
+    const alert = CommandAlertSchema.parse({
+      alertId: "alert-1",
+      severity: "WARNING",
+      alertType: "HIGH_FAILURE_RATE",
+      title: "High failure rate detected",
+      message: "Command failure rate exceeded 20% threshold",
+      timestamp: "2025-01-01T00:00:00.000Z",
+      machineId: "machine-1",
+      metadata: {
+        threshold: 0.2,
+        currentRate: 0.25
+      }
+    });
+
+    expect(alert.severity).toBe("WARNING");
+    expect(alert.alertType).toBe("HIGH_FAILURE_RATE");
+    expect(alert.machineId).toBe("machine-1");
+  });
+
+  it("validates command summary", () => {
+    const summary = CommandSummarySchema.parse({
+      pendingApprovals: 5,
+      activeExecutions: 2,
+      recentFailures: 3,
+      last24Hours: {
+        startTime: "2025-01-01T00:00:00.000Z",
+        endTime: "2025-01-02T00:00:00.000Z",
+        totalCommands: 200,
+        successRate: 0.85,
+        failureRate: 0.10,
+        rejectionRate: 0.05
+      },
+      last7Days: {
+        startTime: "2024-12-25T00:00:00.000Z",
+        endTime: "2025-01-01T00:00:00.000Z",
+        totalCommands: 1000,
+        successRate: 0.90,
+        failureRate: 0.08,
+        rejectionRate: 0.02
+      },
+      activeAlerts: [],
+      topCommandTypes: [
+        {
+          commandType: "SET_POWER",
+          count: 50,
+          successRate: 0.95
+        }
+      ],
+      generatedAt: "2025-01-01T00:00:00.000Z"
+    });
+
+    expect(summary.pendingApprovals).toBe(5);
+    expect(summary.last24Hours.totalCommands).toBe(200);
+    expect(summary.topCommandTypes).toHaveLength(1);
+  });
+
+  it("rejects invalid success rate", () => {
+    const result = CommandMetricsSchema.safeParse({
+      startTime: "2025-01-01T00:00:00.000Z",
+      endTime: "2025-01-01T01:00:00.000Z",
+      totalCommands: 100,
+      successRate: 1.5, // Invalid - must be 0-1
+      failureRate: 0.15,
+      rejectionRate: 0.05
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("validates propose command request", () => {
+    const request = ProposeCommandRequestSchema.parse({
+      command: {
+        commandId: "cmd-1",
+        commandType: "SET_POWER",
+        machineId: "machine-1",
+        targetValue: 75,
+        timestamp: "2025-01-01T00:00:00.000Z"
+      },
+      reasoning: "Increasing power to reach target temperature",
+      sessionId: "session-1"
+    });
+
+    expect(request.proposedBy).toBe("HUMAN"); // Default
+    expect(request.approvalRequired).toBe(true); // Default
+    expect(request.reasoning).toBe("Increasing power to reach target temperature");
   });
 });
