@@ -47,10 +47,30 @@ export interface CommandService {
   ): CommandProposal;
 }
 
+export interface GovernorCheck {
+  evaluateCommand: (proposal: {
+    commandType: string;
+    targetValue?: number;
+    machineId?: string;
+    sessionId?: string;
+    actor?: { kind: string; id: string };
+  }, context: {
+    recentFailureRate?: number;
+    commandsInSession?: number;
+  }) => {
+    action: string;
+    confidence: string;
+    reasons: Array<{ code: string; message: string; details?: Record<string, unknown> }>;
+    decidedAt: string;
+    decidedBy: string;
+  };
+}
+
 export interface CommandServiceOptions {
   db: Database.Database;
   getCurrentState?: (machineId: string) => Promise<Record<string, any>>;
   getRecentCommands?: (machineId: string) => Promise<RoasterCommand[]>;
+  governor?: GovernorCheck;
 }
 
 export function createCommandService(
@@ -62,6 +82,50 @@ export function createCommandService(
   return {
     proposeCommand(request: ProposeCommandRequest): CommandProposal {
       const now = new Date().toISOString();
+
+      // Check Governor autonomy level and signals
+      if (options.governor) {
+        const commandsInSession = request.sessionId
+          ? repo.findBySession(request.sessionId).length
+          : undefined;
+
+        // Calculate recent failure rate from proposals in this session
+        let recentFailureRate: number | undefined;
+        if (request.sessionId) {
+          const sessionProposals = repo.findBySession(request.sessionId);
+          const executedCount = sessionProposals.filter(p => p.executedAt).length;
+          const failedCount = sessionProposals.filter(p => p.executionStatus === "FAILED").length;
+          if (executedCount > 0) {
+            recentFailureRate = failedCount / executedCount;
+          }
+        }
+
+        const governorDecision = options.governor.evaluateCommand(
+          {
+            commandType: request.command.commandType,
+            targetValue: request.command.targetValue,
+            machineId: request.command.machineId,
+            sessionId: request.sessionId,
+            actor: request.proposedByActor
+          },
+          {
+            recentFailureRate,
+            commandsInSession
+          }
+        );
+
+        if (governorDecision.action === "BLOCK") {
+          const reasonMessages = governorDecision.reasons.map(r => r.message).join("; ");
+          const proposal = createRejectedProposal(
+            request,
+            now,
+            `Blocked by Governor: ${reasonMessages}`,
+            governorDecision.reasons[0]?.code
+          );
+          repo.create(proposal);
+          return proposal;
+        }
+      }
 
       // Validate constraints
       const constraintValidation = safetyGates.validateConstraints(
@@ -214,7 +278,8 @@ export function createCommandService(
 function createRejectedProposal(
   request: ProposeCommandRequest,
   timestamp: string,
-  reason: string
+  reason: string,
+  code?: string
 ): CommandProposal {
   const systemActor: Actor = {
     kind: "SYSTEM",
@@ -223,7 +288,7 @@ function createRejectedProposal(
   };
 
   const rejectionReason: CommandRejectionReason = {
-    code: "CONSTRAINT_VIOLATION",
+    code: code ?? "CONSTRAINT_VIOLATION",
     message: reason,
     details: {},
   };

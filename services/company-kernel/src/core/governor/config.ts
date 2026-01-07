@@ -16,9 +16,27 @@ export const ReportGateConfigSchema = z.object({
 });
 export type ReportGateConfig = z.infer<typeof ReportGateConfigSchema>;
 
+export const AutonomyLevelSchema = z.enum(["L1", "L2", "L3", "L4", "L5"]);
+export type AutonomyLevel = z.infer<typeof AutonomyLevelSchema>;
+
+export const CommandAutonomyConfigSchema = z.object({
+  autonomyLevel: AutonomyLevelSchema.default("L3"),
+  requireApprovalForAll: z.boolean().default(true),
+  maxCommandsPerSession: z.number().int().positive().optional(),
+  commandFailureThreshold: z.number().min(0).max(1).default(0.3), // downgrade if >30% failure rate
+  evaluationWindowMinutes: z.number().int().positive().default(60)
+});
+export type CommandAutonomyConfig = z.infer<typeof CommandAutonomyConfigSchema>;
+
 export const GovernorConfigSchema = z.object({
   rateLimits: z.record(RateLimitRuleSchema).default({}),
   gates: z.record(ReportGateConfigSchema).default({}),
+  commandAutonomy: CommandAutonomyConfigSchema.default({
+    autonomyLevel: "L3",
+    requireApprovalForAll: true,
+    commandFailureThreshold: 0.3,
+    evaluationWindowMinutes: 60
+  }),
   policy: z
     .object({
       allowedGoals: z.array(z.string()).default([])
@@ -40,6 +58,12 @@ export const DEFAULT_GOVERNOR_CONFIG: GovernorConfig = {
       quarantineOnMissingSignals: true,
       quarantineOnSilenceClose: true
     }
+  },
+  commandAutonomy: {
+    autonomyLevel: "L3",
+    requireApprovalForAll: true,
+    commandFailureThreshold: 0.3,
+    evaluationWindowMinutes: 60
   },
   policy: {
     allowedGoals: ["generate-roast-report"]
@@ -87,6 +111,7 @@ function withDefaults(config: GovernorConfig): GovernorConfig {
   return {
     rateLimits: { ...DEFAULT_GOVERNOR_CONFIG.rateLimits, ...config.rateLimits },
     gates: { ...DEFAULT_GOVERNOR_CONFIG.gates, ...config.gates },
+    commandAutonomy: { ...DEFAULT_GOVERNOR_CONFIG.commandAutonomy, ...config.commandAutonomy },
     policy: { ...DEFAULT_GOVERNOR_CONFIG.policy, ...config.policy }
   };
 }

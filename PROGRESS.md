@@ -3,7 +3,7 @@
 This file tracks per-task/per-session progress. Keep it short and focused on the current work.
 
 ## Current objective
-M4 P1 Enhancements (Next: T-030.12 Governor Integration)
+M4 P1 Enhancements (Next: T-030.13 Emergency Abort UI)
 
 ## Current state (what is true now)
 - M4 (Safe Autopilot L3 Beta) complete and merged
@@ -136,3 +136,20 @@ pnpm harness:init  # Environment validation (Node 20.19.1, pnpm 9.11.0)
   - Updated ingestion server configuration to pass COMMAND_SERVICE_URL
   - All tests passing: Schemas 50, Eval 5, Ingestion 24
   - Eval harness now tracks command outcomes for promotion gates
+- 2026-01-07 15:45: **T-030.12 Governor Integration (Autonomy Level Gating)** (COMPLETE)
+  - Extended Governor config with command autonomy settings:
+    - AutonomyLevel enum (L1-L5)
+    - CommandAutonomyConfig with autonomy level, failure threshold, session limits
+    - Added commandAutonomy to GovernorConfig with L3 defaults
+  - Created evaluate-command.ts rules:
+    - checkAutonomyLevel() enforces L1-L5 autonomy policies
+    - evaluateCommandProposal() checks failure rates and session limits
+    - L1: blocks all commands, L2: blocks agent commands, L3: allows with approval
+  - Integrated Governor with command service:
+    - Added GovernorCheck interface to CommandServiceOptions
+    - proposeCommand() calls governor.evaluateCommand() before validation
+    - Blocks commands based on autonomy level, failure rates, session limits
+    - Governor decisions recorded in audit log with rejection codes
+  - Created governor.commands.test.ts with 6 comprehensive tests
+  - All tests passing: Command 17, Kernel 37 (including 6 new Governor tests)
+  - Dynamic autonomy control enables safe progressive automation

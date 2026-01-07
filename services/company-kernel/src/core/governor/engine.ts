@@ -3,12 +3,15 @@ import type { MissionStatus } from "../../db/repo";
 import { GovernorConfigStore, type GovernorConfig, DEFAULT_GOVERNOR_CONFIG } from "./config";
 import { RateLimiter } from "./rate-limit";
 import { evaluateReportMission } from "./rules/report-mission";
+import { evaluateCommandProposal, type CommandProposal, type CommandEvaluationContext } from "./rules/evaluate-command";
 
 export interface GovernorResult {
   decision: GovernanceDecision;
   status: MissionStatus;
   nextRetryAt?: string;
 }
+
+export type { CommandProposal } from "./rules/evaluate-command";
 
 export class GovernorEngine {
   constructor(
@@ -73,6 +76,30 @@ export class GovernorEngine {
     }
 
     return { decision: gateDecision, status: "PENDING" };
+  }
+
+  /**
+   * Evaluate a command proposal against Governor autonomy config
+   */
+  evaluateCommand(
+    proposal: CommandProposal,
+    context: {
+      recentFailureRate?: number;
+      commandsInSession?: number;
+    } = {},
+    now: Date = new Date()
+  ): GovernanceDecision {
+    const nowIso = now.toISOString();
+    const config = this.configStore.getConfig() ?? DEFAULT_GOVERNOR_CONFIG;
+
+    const evalContext: CommandEvaluationContext = {
+      proposal,
+      config: config.commandAutonomy,
+      recentFailureRate: context.recentFailureRate,
+      commandsInSession: context.commandsInSession
+    };
+
+    return evaluateCommandProposal(evalContext, nowIso);
   }
 
   private applyGate(goal: string, mission: Mission, config: GovernorConfig, nowIso: string): GovernanceDecision {

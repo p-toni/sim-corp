@@ -217,11 +217,47 @@ Done:
     - Command metrics calculated and included in detailed metrics
   - **50 schema tests, 5 eval tests, 24 ingestion tests passing**
   - **Impact**: Command outcomes now tracked for promotion gates. Regression detection possible (commands making outcomes worse). Foundation for L4+ autonomy levels.
+- **T-030.12 Governor Integration (Autonomy Level Gating) (2026-01-07):**
+  - **Extended Governor Config** (services/company-kernel/src/core/governor/config.ts)
+    - AutonomyLevel enum: L1 (assist), L2 (recommend), L3 (approve), L4 (veto), L5 (audit)
+    - CommandAutonomyConfig schema with settings:
+      - autonomyLevel (default: L3)
+      - requireApprovalForAll (default: true)
+      - maxCommandsPerSession (optional limit)
+      - commandFailureThreshold (default: 0.3 = 30%)
+      - evaluationWindowMinutes (default: 60)
+    - Added commandAutonomy field to GovernorConfig
+  - **Command Evaluation Rules** (services/company-kernel/src/core/governor/rules/evaluate-command.ts)
+    - checkAutonomyLevel(): Enforces L1-L5 policies
+      - L1: Blocks all commands (assist only)
+      - L2: Blocks agent commands, allows manual (recommend only)
+      - L3: Allows all with approval required (HITL)
+      - L4/L5: Future work (treated as L3 for now)
+    - evaluateCommandProposal(): Checks failure rates, session limits, autonomy level
+    - Returns GovernanceDecision with action (ALLOW/BLOCK) and detailed reasons
+  - **Governor Engine Integration** (services/company-kernel/src/core/governor/engine.ts)
+    - Added evaluateCommand() method to GovernorEngine
+    - Accepts command proposal + context (failure rate, commands in session)
+    - Returns governance decision for command service integration
+  - **Command Service Integration** (services/command/src/core/command-service.ts)
+    - Added GovernorCheck interface to CommandServiceOptions
+    - proposeCommand() calls governor.evaluateCommand() before constraint validation
+    - Calculates session failure rate from existing proposals
+    - Blocks commands with Governor rejection reason codes
+    - Governor decisions recorded in command audit log
+  - **Comprehensive Tests** (services/company-kernel/tests/governor.commands.test.ts)
+    - 6 tests covering all autonomy levels and failure scenarios
+    - Tests L1 blocking, L2 agent/manual distinction, L3 approval
+    - Tests failure rate threshold blocking (>30%)
+    - Tests session command limit enforcement
+  - **37 kernel tests passing** (including 6 new Governor command tests)
+  - **17 command service tests passing**
+  - **Impact**: Dynamic autonomy control. System can downgrade autonomy based on failure rates. Foundation for safe progressive automation (L2→L3→L4→L5). Complete safety gate before command execution.
 
 Now:
 - M4 (Safe Autopilot L3 Beta) P0 complete
-- T-030.10 and T-030.11 complete (P1 enhancements)
-- Remaining P1: T-030.12 (Governor), T-030.13 (Emergency Abort), T-030.14 (Command History)
+- T-030.10, T-030.11, T-030.12 complete (P1 enhancements)
+- Remaining P1: T-030.13 (Emergency Abort), T-030.14 (Command History)
 
 Next:
 - T-028 P1 — LM-as-judge implementation (deferred to post-M4)
@@ -296,3 +332,8 @@ Working set (files/ids/commands):
 - services/ingestion/src/core/eval-client.ts (T-030.11 command parameter)
 - services/ingestion/src/core/auto-evaluator.ts (T-030.11 fetchCommands integration)
 - services/ingestion/src/server.ts (T-030.11 COMMAND_SERVICE_URL config)
+- services/company-kernel/src/core/governor/config.ts (T-030.12 autonomy levels)
+- services/company-kernel/src/core/governor/rules/evaluate-command.ts (T-030.12 command eval logic)
+- services/company-kernel/src/core/governor/engine.ts (T-030.12 evaluateCommand method)
+- services/command/src/core/command-service.ts (T-030.12 Governor integration)
+- services/company-kernel/tests/governor.commands.test.ts (T-030.12 6 tests passing)

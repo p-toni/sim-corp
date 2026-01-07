@@ -405,6 +405,44 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 
 **Impact:** Command outcomes now tracked for promotion gates. Enables regression detection (commands making outcomes worse). Foundation for L4+ autonomy levels where promotion decisions can be automated based on command performance data.
 
+### T-030.12 — Governor integration (autonomy level gating)
+**Status:** DONE
+**Milestone:** M4 (P1)
+**Completed:** 2026-01-07
+
+**Scope:** Integrate Governor with command service to enforce autonomy level policies and dynamic safety gates
+
+**Deliverables:**
+- Extended Governor config (services/company-kernel/src/core/governor/config.ts):
+  - AutonomyLevel enum (L1: assist, L2: recommend, L3: approve, L4: veto, L5: audit)
+  - CommandAutonomyConfig schema with autonomy level, failure threshold, session limits
+  - Added commandAutonomy field to GovernorConfig (default: L3)
+- Command evaluation rules (services/company-kernel/src/core/governor/rules/evaluate-command.ts):
+  - checkAutonomyLevel() enforces L1-L5 policies
+  - evaluateCommandProposal() checks failure rates and session command limits
+  - Returns GovernanceDecision with detailed reasons for blocking/allowing
+- Governor engine integration (services/company-kernel/src/core/governor/engine.ts):
+  - Added evaluateCommand() method to GovernorEngine
+  - Accepts command proposal + context (failure rate, commands in session)
+- Command service integration (services/command/src/core/command-service.ts):
+  - Added GovernorCheck interface to CommandServiceOptions
+  - proposeCommand() calls governor before constraint validation
+  - Calculates session failure rate from existing proposals
+  - Blocks commands with Governor rejection codes in audit log
+
+**Evidence:**
+- `pnpm --filter @sim-corp/company-kernel test` (37 tests passing including 6 new Governor tests)
+- `pnpm --filter @sim-corp/command test` (17 tests passing)
+
+**Key artifacts:**
+- `services/company-kernel/src/core/governor/config.ts` — autonomy level config
+- `services/company-kernel/src/core/governor/rules/evaluate-command.ts` — evaluation logic
+- `services/company-kernel/src/core/governor/engine.ts` — evaluateCommand method
+- `services/command/src/core/command-service.ts` — Governor integration
+- `services/company-kernel/tests/governor.commands.test.ts` — 6 comprehensive tests
+
+**Impact:** Dynamic autonomy control. System can downgrade autonomy level based on failure rates (e.g., L3→L2 if >30% commands fail). Complete safety gate before command execution. Foundation for safe progressive automation (L2→L3→L4→L5). Governor decisions fully audited.
+
 ### T-031 — Fake driver command support (test infrastructure)
 **Status:** DONE
 **Milestone:** M4
