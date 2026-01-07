@@ -562,6 +562,26 @@
       "notes": "Agent analyzes simulation results with three heuristics (scorching, slow temp, rapid rise) and proposes commands with explainable reasoning. L3 autonomy complete: agent proposes → operator approves."
     },
     {
+      "id": "T-030.11",
+      "title": "Eval harness integration (command outcome tracking)",
+      "milestone": "M4",
+      "status": "DONE",
+      "completedDate": "2026-01-07",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/schemas test",
+          "pnpm --filter @sim-corp/eval test",
+          "pnpm --filter @sim-corp/ingestion test"
+        ],
+        "primaryArtifacts": [
+          "libs/schemas/src/kernel/eval.ts (command tracking schemas)",
+          "services/eval/src/core/metrics-calculator.ts (calculateCommandMetrics)",
+          "services/ingestion/src/core/auto-evaluator.ts (fetchCommands integration)"
+        ]
+      },
+      "notes": "Eval harness now tracks command proposals, approvals, executions, and outcomes. Commands included in eval runs with metrics (success rate, deviation from baseline). Foundation for promotion gates based on command performance."
+    },
+    {
       "id": "T-031",
       "title": "Fake driver command support (test infrastructure)",
       "milestone": "M4",

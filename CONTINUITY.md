@@ -195,10 +195,33 @@ Done:
     - Test: no proposal when simulation is normal
     - 4 total tests passing
   - **L3 Autonomy Complete**: Agent proposes → Desktop operator approves → Command executes
+- **T-030.11 Eval Harness Integration (Command Outcome Tracking) (2026-01-07):**
+  - **Extended Eval Schemas** (libs/schemas/src/kernel/eval.ts)
+    - baselineCommands array in GoldenCaseSchema (command types, timing, reasoning)
+    - Command performance metrics in DetailedEvalMetrics:
+      - commandsProposed, commandsApproved, commandsExecuted, commandsFailed
+      - commandSuccessRate (0-1), commandsDeviation from baseline
+      - commandImpactScore (positive = improvement, negative = regression)
+    - commands array in EvalRunSchema (full command lifecycle data)
+  - **Command Metrics Calculator** (services/eval/src/core/metrics-calculator.ts)
+    - calculateCommandMetrics() evaluates command performance
+    - Compares executed commands vs baseline golden case
+    - Calculates success rates and deviation metrics
+  - **Auto-Evaluator Integration** (services/ingestion/src/core/auto-evaluator.ts)
+    - fetchCommands() retrieves command data from command service
+    - Commands automatically included in eval runs when sessions close
+    - Environment-configurable COMMAND_SERVICE_URL
+  - **Eval Service Updates** (services/eval/src/core/eval-service.ts)
+    - runEvaluation() accepts and stores command data
+    - Commands persisted in eval runs for historical tracking
+    - Command metrics calculated and included in detailed metrics
+  - **50 schema tests, 5 eval tests, 24 ingestion tests passing**
+  - **Impact**: Command outcomes now tracked for promotion gates. Regression detection possible (commands making outcomes worse). Foundation for L4+ autonomy levels.
 
 Now:
 - M4 (Safe Autopilot L3 Beta) P0 complete
-- T-030.10 through T-030.14 are P1 enhancements
+- T-030.10 and T-030.11 complete (P1 enhancements)
+- Remaining P1: T-030.12 (Governor), T-030.13 (Emergency Abort), T-030.14 (Command History)
 
 Next:
 - T-028 P1 — LM-as-judge implementation (deferred to post-M4)
@@ -267,3 +290,9 @@ Working set (files/ids/commands):
 - agents/sim-roast-runner/src/tools.ts (T-030.10 proposeCommand tool)
 - agents/sim-roast-runner/src/agent.ts (T-030.10 simulation analysis + command proposal)
 - agents/sim-roast-runner/tests/agent.test.ts (T-030.10 4 tests passing)
+- libs/schemas/src/kernel/eval.ts (T-030.11 command tracking schemas)
+- services/eval/src/core/metrics-calculator.ts (T-030.11 command metrics)
+- services/eval/src/core/eval-service.ts (T-030.11 command data persistence)
+- services/ingestion/src/core/eval-client.ts (T-030.11 command parameter)
+- services/ingestion/src/core/auto-evaluator.ts (T-030.11 fetchCommands integration)
+- services/ingestion/src/server.ts (T-030.11 COMMAND_SERVICE_URL config)

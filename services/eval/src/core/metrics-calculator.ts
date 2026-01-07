@@ -4,11 +4,22 @@ export interface MetricsInput {
   goldenCase: GoldenCase;
   analysis: RoastAnalysis;
   telemetry?: TelemetryPoint[];
+  commands?: Array<{
+    proposalId: string;
+    commandType: string;
+    targetValue?: number;
+    proposedAt: string;
+    approvedAt?: string;
+    executedAt?: string;
+    status: string;
+    reasoning?: string;
+    outcome?: string;
+  }>;
 }
 
 export class MetricsCalculator {
   calculate(input: MetricsInput): DetailedEvalMetrics {
-    const { goldenCase, analysis, telemetry } = input;
+    const { goldenCase, analysis, telemetry, commands } = input;
 
     // Timing errors
     const fcSecondsError = this.calculateTimingError(
@@ -45,6 +56,9 @@ export class MetricsCalculator {
       rorStdDev: undefined
     };
 
+    // Command metrics (if commands available)
+    const commandMetrics = commands ? this.calculateCommandMetrics(commands, goldenCase) : {};
+
     return {
       fcSecondsError,
       dropSecondsError,
@@ -52,6 +66,7 @@ export class MetricsCalculator {
       fcTempError,
       dropTempError,
       ...rorStats,
+      ...commandMetrics,
       timingVariance: undefined, // TODO: Calculate vs historical baseline
       tempVariance: undefined,
       cuppingScore: undefined,
@@ -115,5 +130,48 @@ export class MetricsCalculator {
     }
 
     return { rorSpikes: spikes, rorCrashes: crashes, rorStdDev };
+  }
+
+  private calculateCommandMetrics(
+    commands: Array<{
+      proposalId: string;
+      commandType: string;
+      targetValue?: number;
+      proposedAt: string;
+      approvedAt?: string;
+      executedAt?: string;
+      status: string;
+      reasoning?: string;
+      outcome?: string;
+    }>,
+    goldenCase: GoldenCase
+  ): Partial<DetailedEvalMetrics> {
+    const commandsProposed = commands.length;
+    const commandsApproved = commands.filter(c => c.approvedAt).length;
+    const commandsExecuted = commands.filter(c => c.executedAt).length;
+    const commandsFailed = commands.filter(c => c.outcome === "FAILED").length;
+
+    const commandSuccessRate = commandsExecuted > 0
+      ? (commandsExecuted - commandsFailed) / commandsExecuted
+      : undefined;
+
+    // Calculate deviation from baseline commands
+    const baselineCommandCount = goldenCase.baselineCommands?.length ?? 0;
+    const commandsDeviation = Math.abs(commandsProposed - baselineCommandCount);
+
+    // Simple command impact score:
+    // Positive if fewer errors than baseline, negative if more
+    // This is a placeholder - real impact would compare actual outcome metrics
+    const commandImpactScore = undefined; // TODO: Implement based on timing/temp improvements
+
+    return {
+      commandsProposed,
+      commandsApproved,
+      commandsExecuted,
+      commandsFailed,
+      commandSuccessRate,
+      commandsDeviation,
+      commandImpactScore
+    };
   }
 }

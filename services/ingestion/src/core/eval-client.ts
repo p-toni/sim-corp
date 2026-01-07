@@ -42,6 +42,17 @@ export class EvalServiceClient {
     sessionId: string;
     goldenCaseId: string;
     analysis: RoastAnalysis;
+    commands?: Array<{
+      proposalId: string;
+      commandType: string;
+      targetValue?: number;
+      proposedAt: string;
+      approvedAt?: string;
+      executedAt?: string;
+      status: string;
+      reasoning?: string;
+      outcome?: string;
+    }>;
     orgId?: string;
     evaluatorId?: string;
   }): Promise<EvalRun> {

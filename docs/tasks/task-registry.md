@@ -375,6 +375,36 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 
 **Impact:** L3 autonomy complete. Agent analyzes simulation outcomes and proposes explainable commands. Operator reviews safety constraints and approves via desktop UX. Complete HITL workflow with full audit trail.
 
+### T-030.11 — Eval harness integration (command outcome tracking)
+**Status:** DONE
+**Milestone:** M4 (P1)
+**Completed:** 2026-01-07
+
+**Scope:** Track command proposals, approvals, and outcomes in eval harness for promotion gates
+
+**Deliverables:**
+- Extended eval schemas (libs/schemas/src/kernel/eval.ts):
+  - baselineCommands array in GoldenCaseSchema
+  - Command performance metrics in DetailedEvalMetrics (proposed, approved, executed, failed, success rate, deviation, impact)
+  - commands array in EvalRunSchema (full command lifecycle data)
+- MetricsCalculator.calculateCommandMetrics() computes command performance metrics
+- AutoEvaluator.fetchCommands() retrieves command data from command service
+- Commands automatically included in eval runs when sessions close
+- Environment-configurable COMMAND_SERVICE_URL
+
+**Evidence:**
+- `pnpm --filter @sim-corp/schemas test` (50 tests passing)
+- `pnpm --filter @sim-corp/eval test` (5 tests passing)
+- `pnpm --filter @sim-corp/ingestion test` (24 tests passing)
+
+**Key artifacts:**
+- `libs/schemas/src/kernel/eval.ts` — command tracking schemas
+- `services/eval/src/core/metrics-calculator.ts` — calculateCommandMetrics()
+- `services/ingestion/src/core/auto-evaluator.ts` — fetchCommands() integration
+- `services/ingestion/src/server.ts` — COMMAND_SERVICE_URL configuration
+
+**Impact:** Command outcomes now tracked for promotion gates. Enables regression detection (commands making outcomes worse). Foundation for L4+ autonomy levels where promotion decisions can be automated based on command performance data.
+
 ### T-031 — Fake driver command support (test infrastructure)
 **Status:** DONE
 **Milestone:** M4

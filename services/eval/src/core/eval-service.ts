@@ -9,6 +9,17 @@ export interface RunEvaluationInput {
   goldenCaseId: string;
   analysis: RoastAnalysis;
   telemetry?: TelemetryPoint[];
+  commands?: Array<{
+    proposalId: string;
+    commandType: string;
+    targetValue?: number;
+    proposedAt: string;
+    approvedAt?: string;
+    executedAt?: string;
+    status: string;
+    reasoning?: string;
+    outcome?: string;
+  }>;
   orgId?: string;
   evaluatorId?: string;
 }
@@ -35,7 +46,8 @@ export class EvalService {
     const detailedMetrics = this.metricsCalculator.calculate({
       goldenCase,
       analysis: input.analysis,
-      telemetry: input.telemetry
+      telemetry: input.telemetry,
+      commands: input.commands
     });
 
     // Evaluate against golden case tolerances
@@ -52,6 +64,7 @@ export class EvalService {
       passedGates,
       failedGates,
       detailedMetrics,
+      commands: input.commands ?? [],
       metrics: [], // Legacy field
       orgId: input.orgId,
       humanReviewed: false

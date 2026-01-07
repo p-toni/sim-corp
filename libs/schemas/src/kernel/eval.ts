@@ -55,6 +55,14 @@ export const GoldenCaseSchema = z.object({
     })
     .optional(),
 
+  // Command tracking (baseline commands for comparison)
+  baselineCommands: z.array(z.object({
+    commandType: z.string(),
+    targetValue: z.number().optional(),
+    timestampSeconds: z.number(),
+    reasoning: z.string().optional()
+  })).default([]),
+
   // Metadata
   createdAt: IsoDateTimeSchema.optional(),
   createdBy: z.string().optional(),
@@ -93,6 +101,15 @@ export const DetailedEvalMetricsSchema = z.object({
   // Sensory (if available)
   cuppingScore: z.number().min(0).max(100).optional(),
   cuppingScoreDelta: z.number().optional(),
+
+  // Command performance metrics
+  commandsProposed: z.number().int().nonnegative().optional(),
+  commandsApproved: z.number().int().nonnegative().optional(),
+  commandsExecuted: z.number().int().nonnegative().optional(),
+  commandsFailed: z.number().int().nonnegative().optional(),
+  commandSuccessRate: z.number().min(0).max(1).optional(),
+  commandsDeviation: z.number().int().nonnegative().optional(), // deviation from baseline commands
+  commandImpactScore: z.number().optional(), // positive = improvement, negative = regression
 });
 
 export type DetailedEvalMetrics = z.infer<typeof DetailedEvalMetricsSchema>;
@@ -148,6 +165,19 @@ export const EvalRunSchema = z.object({
   humanNotes: z.string().optional(),
   reviewedBy: z.string().optional(),
   reviewedAt: IsoDateTimeSchema.optional(),
+
+  // Command tracking (commands executed during this eval run)
+  commands: z.array(z.object({
+    proposalId: z.string(),
+    commandType: z.string(),
+    targetValue: z.number().optional(),
+    proposedAt: IsoDateTimeSchema,
+    approvedAt: IsoDateTimeSchema.optional(),
+    executedAt: IsoDateTimeSchema.optional(),
+    status: z.string(),
+    reasoning: z.string().optional(),
+    outcome: z.string().optional() // "SUCCESS", "FAILED", "ABORTED"
+  })).default([]),
 
   // Metadata
   orgId: z.string().optional(),

@@ -56,11 +56,12 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   const evalServiceUrl = options.evalServiceUrl ?? process.env.EVAL_SERVICE_URL ?? "http://127.0.0.1:4007";
   const autoEvalEnabled = options.autoEvalEnabled ?? process.env.AUTO_EVAL_ENABLED === "true";
   const analyticsUrl = process.env.ANALYTICS_URL ?? "http://127.0.0.1:4006";
+  const commandServiceUrl = process.env.COMMAND_SERVICE_URL ?? "http://127.0.0.1:3004";
 
   const evalClient = autoEvalEnabled ? new EvalServiceClient({ baseUrl: evalServiceUrl }) : null;
   const autoEvaluator = new AutoEvaluator(
     evalClient,
-    { enabled: autoEvalEnabled, analyticsUrl },
+    { enabled: autoEvalEnabled, analyticsUrl, commandServiceUrl },
     app.log
   );
 

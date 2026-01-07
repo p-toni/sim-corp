@@ -3,7 +3,7 @@
 This file tracks per-task/per-session progress. Keep it short and focused on the current work.
 
 ## Current objective
-T-030.10 Sim-roast-runner Command Proposal Capability
+M4 P1 Enhancements (Next: T-030.12 Governor Integration)
 
 ## Current state (what is true now)
 - M4 (Safe Autopilot L3 Beta) complete and merged
@@ -119,3 +119,20 @@ pnpm harness:init  # Environment validation (Node 20.19.1, pnpm 9.11.0)
   - Added 3 comprehensive tests covering command proposal scenarios
   - All 4 sim-roast-runner tests passing
   - Agent now proposes explainable commands based on simulation outcomes
+- 2026-01-07 10:45: **T-030.11 Eval Harness Integration (Command Outcome Tracking)** (COMPLETE)
+  - Extended eval schemas (libs/schemas/src/kernel/eval.ts):
+    - Added baselineCommands to GoldenCase schema
+    - Added command performance metrics to DetailedEvalMetrics
+    - Added commands array to EvalRun schema
+  - Updated MetricsCalculator (services/eval/src/core/metrics-calculator.ts):
+    - Added calculateCommandMetrics() method
+    - Tracks commands proposed, approved, executed, failed
+    - Calculates success rate and deviation from baseline
+  - Updated EvalServiceClient (services/ingestion/src/core/eval-client.ts):
+    - Extended runEvaluation() to accept commands parameter
+  - Updated AutoEvaluator (services/ingestion/src/core/auto-evaluator.ts):
+    - Added fetchCommands() method to retrieve command data from command service
+    - Passes commands to eval service for inclusion in eval runs
+  - Updated ingestion server configuration to pass COMMAND_SERVICE_URL
+  - All tests passing: Schemas 50, Eval 5, Ingestion 24
+  - Eval harness now tracks command outcomes for promotion gates

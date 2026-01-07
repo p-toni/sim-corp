@@ -5,6 +5,7 @@ import type { Logger } from "fastify";
 export interface AutoEvaluatorConfig {
   enabled: boolean;
   analyticsUrl: string;
+  commandServiceUrl?: string;
 }
 
 /**
@@ -35,6 +36,9 @@ export class AutoEvaluator {
         return;
       }
 
+      // Fetch command data from command service
+      const commands = await this.fetchCommands(session.sessionId);
+
       // Find matching golden cases
       const batchSizeKg = undefined; // TODO: Extract from session metadata
       const goldenCases = await this.evalClient.findMatchingGoldenCases(session.machineId, batchSizeKg);
@@ -56,6 +60,7 @@ export class AutoEvaluator {
             sessionId: session.sessionId,
             goldenCaseId: goldenCase.id,
             analysis,
+            commands,
             orgId: session.orgId,
             evaluatorId: "auto-evaluator"
           })
@@ -117,6 +122,57 @@ export class AutoEvaluator {
     } catch (error) {
       this.logger?.error({ sessionId, error }, "Failed to fetch analysis");
       return null;
+    }
+  }
+
+  /**
+   * Fetch commands from command service for a session
+   */
+  private async fetchCommands(sessionId: string): Promise<Array<{
+    proposalId: string;
+    commandType: string;
+    targetValue?: number;
+    proposedAt: string;
+    approvedAt?: string;
+    executedAt?: string;
+    status: string;
+    reasoning?: string;
+    outcome?: string;
+  }>> {
+    if (!this.config.commandServiceUrl) {
+      return []; // No command service configured
+    }
+
+    try {
+      const url = `${this.config.commandServiceUrl}/proposals?sessionId=${encodeURIComponent(sessionId)}`;
+      const response = await fetch(url);
+
+      if (response.status === 404) {
+        return [];
+      }
+
+      if (!response.ok) {
+        this.logger?.warn({ sessionId, status: response.status }, "Failed to fetch commands");
+        return [];
+      }
+
+      const data = await response.json();
+      const proposals = data.items || [];
+
+      return proposals.map((p: any) => ({
+        proposalId: p.proposalId,
+        commandType: p.commandType,
+        targetValue: p.targetValue,
+        proposedAt: p.proposedAt,
+        approvedAt: p.approvedAt,
+        executedAt: p.executedAt,
+        status: p.status,
+        reasoning: p.reasoning,
+        outcome: p.executionStatus
+      }));
+    } catch (error) {
+      this.logger?.error({ sessionId, error }, "Failed to fetch commands");
+      return [];
     }
   }
 }
