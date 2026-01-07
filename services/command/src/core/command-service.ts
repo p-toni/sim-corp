@@ -9,6 +9,7 @@ import {
 import {
   createCommandProposalRepository,
   type CommandProposalRepository,
+  type FindAllOptions,
 } from "../db/repo.js";
 import { createSafetyGates, type SafetyGates } from "./validators.js";
 
@@ -35,6 +36,7 @@ export interface ProposeCommandRequest {
 
 export interface CommandService {
   proposeCommand(request: ProposeCommandRequest): CommandProposal;
+  getAllProposals(options?: FindAllOptions): CommandProposal[];
   getPendingApprovals(): CommandProposal[];
   getProposal(proposalId: string): CommandProposal | undefined;
   getProposalsByMachine(machineId: string): CommandProposal[];
@@ -187,6 +189,10 @@ export function createCommandService(
       repo.create(validated);
 
       return validated;
+    },
+
+    getAllProposals(options?: FindAllOptions): CommandProposal[] {
+      return repo.findAll(options);
     },
 
     getPendingApprovals(): CommandProposal[] {

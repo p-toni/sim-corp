@@ -3,7 +3,7 @@
 This file tracks per-task/per-session progress. Keep it short and focused on the current work.
 
 ## Current objective
-M4 P1 Enhancements (Next: T-030.14 Command History Viewer)
+M4 P1 Enhancements (All P1 tasks complete!)
 
 ## Current state (what is true now)
 - M4 (Safe Autopilot L3 Beta) complete and merged
@@ -162,3 +162,17 @@ pnpm harness:init  # Environment validation (Node 20.19.1, pnpm 9.11.0)
   - All 18 desktop tests passing, desktop build successful
   - Backend abort already existed (executor, audit logging)
   - Meets M4 success metric: Emergency abort functional in < 2s
+- 2026-01-07 16:25: **T-030.14 Command History Viewer** (COMPLETE)
+  - Added findAll() method to command repo with filtering (status, machine, session, type, limit, offset)
+  - Added getAllProposals() method to command service
+  - Added GET /proposals API endpoint with query parameter support
+  - Updated listCommands() client to use new endpoint with full filtering
+  - Enhanced OpsPanel Commands tab with status filters:
+    - Filter chips: All, Pending, Approved, Executing, Completed, Rejected, Failed
+    - Machine ID and Session ID text filters
+    - Improved status badges (success=green, error=red, warning=yellow)
+    - Default limit of 100 commands
+  - Added 4 comprehensive backend tests (all, by status, multiple criteria, limit)
+  - All 21 command service tests passing, 18 desktop tests passing
+  - Desktop build successful
+  - Complete audit trail now queryable with flexible filtering

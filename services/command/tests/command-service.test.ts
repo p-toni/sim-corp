@@ -369,4 +369,171 @@ describe("CommandService", () => {
     expect(approved.auditLog[0].event).toBe("PROPOSED");
     expect(approved.auditLog[1].event).toBe("APPROVED");
   });
+
+  it("retrieves all proposals with default options", () => {
+    const service = createCommandService({ db });
+
+    service.proposeCommand({
+      command: {
+        commandId: "cmd-14",
+        commandType: "SET_POWER",
+        machineId: "machine-1",
+        targetValue: 50,
+        targetUnit: "%",
+        timestamp: new Date().toISOString(),
+        constraints: {},
+      },
+      proposedBy: "AGENT",
+      reasoning: "Test 1",
+    });
+
+    service.proposeCommand({
+      command: {
+        commandId: "cmd-15",
+        commandType: "SET_FAN",
+        machineId: "machine-1",
+        targetValue: 3,
+        targetUnit: "level",
+        timestamp: new Date().toISOString(),
+        constraints: {},
+      },
+      proposedBy: "AGENT",
+      reasoning: "Test 2",
+    });
+
+    const allProposals = service.getAllProposals();
+    expect(allProposals).toHaveLength(2);
+  });
+
+  it("filters getAllProposals by status", () => {
+    const service = createCommandService({ db });
+
+    const proposal1 = service.proposeCommand({
+      command: {
+        commandId: "cmd-16",
+        commandType: "SET_POWER",
+        machineId: "machine-1",
+        targetValue: 50,
+        targetUnit: "%",
+        timestamp: new Date().toISOString(),
+        constraints: {},
+      },
+      proposedBy: "AGENT",
+      reasoning: "Test pending",
+      approvalRequired: true,
+    });
+
+    const proposal2 = service.proposeCommand({
+      command: {
+        commandId: "cmd-17",
+        commandType: "SET_FAN",
+        machineId: "machine-1",
+        targetValue: 3,
+        targetUnit: "level",
+        timestamp: new Date().toISOString(),
+        constraints: {},
+      },
+      proposedBy: "AGENT",
+      reasoning: "Test approved",
+      approvalRequired: true,
+    });
+
+    service.approveProposal(proposal2.proposalId, {
+      kind: "USER",
+      id: "user-1",
+      display: "Test User",
+    });
+
+    const pendingOnly = service.getAllProposals({ status: "PENDING_APPROVAL" });
+    expect(pendingOnly).toHaveLength(1);
+    expect(pendingOnly[0].proposalId).toBe(proposal1.proposalId);
+
+    const approvedOnly = service.getAllProposals({ status: "APPROVED" });
+    expect(approvedOnly).toHaveLength(1);
+    expect(approvedOnly[0].proposalId).toBe(proposal2.proposalId);
+  });
+
+  it("filters getAllProposals by multiple criteria", () => {
+    const service = createCommandService({ db });
+
+    service.proposeCommand({
+      command: {
+        commandId: "cmd-18",
+        commandType: "SET_POWER",
+        machineId: "machine-1",
+        targetValue: 50,
+        targetUnit: "%",
+        timestamp: new Date().toISOString(),
+        constraints: {},
+      },
+      proposedBy: "AGENT",
+      reasoning: "Machine 1, Power",
+      sessionId: "session-x",
+    });
+
+    service.proposeCommand({
+      command: {
+        commandId: "cmd-19",
+        commandType: "SET_FAN",
+        machineId: "machine-1",
+        targetValue: 3,
+        targetUnit: "level",
+        timestamp: new Date().toISOString(),
+        constraints: {},
+      },
+      proposedBy: "AGENT",
+      reasoning: "Machine 1, Fan",
+      sessionId: "session-x",
+    });
+
+    service.proposeCommand({
+      command: {
+        commandId: "cmd-20",
+        commandType: "SET_POWER",
+        machineId: "machine-2",
+        targetValue: 60,
+        targetUnit: "%",
+        timestamp: new Date().toISOString(),
+        constraints: {},
+      },
+      proposedBy: "AGENT",
+      reasoning: "Machine 2, Power",
+      sessionId: "session-y",
+    });
+
+    const filtered = service.getAllProposals({
+      machineId: "machine-1",
+      sessionId: "session-x",
+      commandType: "SET_POWER",
+    });
+
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].command.commandType).toBe("SET_POWER");
+    expect(filtered[0].command.machineId).toBe("machine-1");
+    expect(filtered[0].sessionId).toBe("session-x");
+  });
+
+  it("limits getAllProposals results", () => {
+    const service = createCommandService({ db });
+
+    // Create 5 proposals
+    for (let i = 0; i < 5; i++) {
+      service.proposeCommand({
+        command: {
+          commandId: `cmd-${21 + i}`,
+          commandType: "SET_POWER",
+          machineId: "machine-1",
+          targetValue: 50 + i,
+          targetUnit: "%",
+          timestamp: new Date().toISOString(),
+          constraints: {},
+        },
+        proposedBy: "AGENT",
+        reasoning: `Test ${i}`,
+      });
+    }
+
+    const limited = service.getAllProposals({ limit: 3 });
+    expect(limited).toHaveLength(3);
+  });
 });

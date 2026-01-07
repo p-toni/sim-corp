@@ -484,6 +484,57 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 
 **Impact:** Emergency abort capability with <2s response time (M4 success metric). Operator escalation ensures manual intervention when aborts fail. Backend support already existed (executor.abortCommand, audit logging). Complete L3 safety workflow: propose → approve → execute → abort (if needed).
 
+### T-030.14 — Command history viewer
+**Status:** DONE
+**Milestone:** M4 (P1)
+**Completed:** 2026-01-07
+
+**Scope:** Build queryable command history with flexible filtering for audit trail and compliance
+
+**Deliverables:**
+- Backend - Repository Layer (services/command/src/db/repo.ts):
+  - FindAllOptions interface (status, machineId, sessionId, commandType, limit, offset)
+  - findAll() method with dynamic WHERE clause construction
+  - Supports filtering by any combination of criteria
+  - ORDER BY created_at DESC for chronological display
+  - LIMIT/OFFSET support for pagination
+- Backend - Service Layer (services/command/src/core/command-service.ts):
+  - getAllProposals(options?) method added to CommandService interface
+  - Delegates to repo.findAll() with optional filtering
+- Backend - API Layer (services/command/src/routes/proposals.ts):
+  - GET /proposals endpoint with query parameter support
+  - Query params: status, machineId, sessionId, commandType, limit, offset
+  - Returns array of CommandProposal objects
+- Frontend - API Client (apps/roaster-desktop/src/lib/command-api.ts):
+  - Extended CommandListFilters with limit and offset fields
+  - Updated listCommands() to use GET /proposals with query params
+  - Supports single status or array (backend uses first if array)
+- Frontend - UI Enhancements (apps/roaster-desktop/src/components/OpsPanel.tsx):
+  - Added status filter chips: All, Pending, Approved, Executing, Completed, Rejected, Failed
+  - Added Machine ID and Session ID text filters
+  - Improved status badge colors (success=green, error=red, warning=yellow, neutral=gray)
+  - Default limit: 100 commands to prevent overwhelming UI
+- Tests (services/command/tests/command-service.test.ts):
+  - Test 1: retrieves all proposals with default options
+  - Test 2: filters getAllProposals by status (PENDING_APPROVAL vs APPROVED)
+  - Test 3: filters getAllProposals by multiple criteria (machine + session + type)
+  - Test 4: limits getAllProposals results (pagination)
+
+**Evidence:**
+- `pnpm --filter @sim-corp/command test` (21 tests passing including 4 new history tests)
+- `pnpm --filter @sim-corp/roaster-desktop test` (18 tests passing)
+- `pnpm --filter @sim-corp/roaster-desktop build` (successful build)
+
+**Key artifacts:**
+- `services/command/src/db/repo.ts` — findAll method with flexible filtering
+- `services/command/src/core/command-service.ts` — getAllProposals service method
+- `services/command/src/routes/proposals.ts` — GET /proposals endpoint
+- `apps/roaster-desktop/src/lib/command-api.ts` — filtering support in client
+- `apps/roaster-desktop/src/components/OpsPanel.tsx` — enhanced Commands tab with filters
+- `services/command/tests/command-service.test.ts` — 4 history tests
+
+**Impact:** Complete audit trail now queryable with flexible filtering. Operators can view full command history filtered by status, machine, session, or type. Supports investigation, compliance auditing, and pattern analysis. Meets M4 exit criteria for 100% audit trail completeness. Foundation for advanced analytics and ML-based anomaly detection.
+
 ### T-031 — Fake driver command support (test infrastructure)
 **Status:** DONE
 **Milestone:** M4

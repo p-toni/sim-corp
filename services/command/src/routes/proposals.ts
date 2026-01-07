@@ -13,6 +13,23 @@ export async function proposalsRoutes(
 ) {
   const { commandService } = opts;
 
+  // GET /proposals - Get all proposals with optional filtering
+  fastify.get("/proposals", async (request, reply) => {
+    const query = request.query as any;
+
+    const options = {
+      status: query.status,
+      machineId: query.machineId,
+      sessionId: query.sessionId,
+      commandType: query.commandType,
+      limit: query.limit ? parseInt(query.limit, 10) : undefined,
+      offset: query.offset ? parseInt(query.offset, 10) : undefined,
+    };
+
+    const proposals = commandService.getAllProposals(options);
+    return proposals;
+  });
+
   // POST /proposals - Propose a new command
   fastify.post("/proposals", async (request, reply) => {
     const body = request.body as any;

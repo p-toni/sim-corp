@@ -16,9 +16,19 @@ interface AuditLogEntry {
   details?: Record<string, unknown>;
 }
 
+export interface FindAllOptions {
+  status?: string;
+  machineId?: string;
+  sessionId?: string;
+  commandType?: string;
+  limit?: number;
+  offset?: number;
+}
+
 export interface CommandProposalRepository {
   create(proposal: CommandProposal): void;
   findById(proposalId: string): CommandProposal | undefined;
+  findAll(options?: FindAllOptions): CommandProposal[];
   findByStatus(status: string): CommandProposal[];
   findByMachine(machineId: string): CommandProposal[];
   findBySession(sessionId: string): CommandProposal[];
@@ -94,6 +104,46 @@ export function createCommandProposalRepository(
       );
       const row = stmt.get(proposalId) as any;
       return row ? rowToProposal(row) : undefined;
+    },
+
+    findAll(options: FindAllOptions = {}): CommandProposal[] {
+      const conditions: string[] = [];
+      const params: any[] = [];
+
+      if (options.status) {
+        conditions.push("status = ?");
+        params.push(options.status);
+      }
+
+      if (options.machineId) {
+        conditions.push("machine_id = ?");
+        params.push(options.machineId);
+      }
+
+      if (options.sessionId) {
+        conditions.push("session_id = ?");
+        params.push(options.sessionId);
+      }
+
+      if (options.commandType) {
+        conditions.push("command_type = ?");
+        params.push(options.commandType);
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      const limitClause = options.limit ? `LIMIT ${options.limit}` : "";
+      const offsetClause = options.offset ? `OFFSET ${options.offset}` : "";
+
+      const query = `
+        SELECT * FROM command_proposals
+        ${whereClause}
+        ORDER BY created_at DESC
+        ${limitClause} ${offsetClause}
+      `;
+
+      const stmt = db.prepare(query);
+      const rows = stmt.all(...params) as any[];
+      return rows.map(rowToProposal);
     },
 
     findByStatus(status: string): CommandProposal[] {

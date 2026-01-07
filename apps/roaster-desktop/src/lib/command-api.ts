@@ -15,6 +15,8 @@ export interface CommandListFilters {
   machineId?: string;
   sessionId?: string;
   commandType?: string;
+  limit?: number;
+  offset?: number;
 }
 
 export interface CommandListResponse {
@@ -41,28 +43,37 @@ export async function listCommands(
   const baseUrl = getCommandServiceUrl();
   const params = new URLSearchParams();
 
-  if (filters.machineId) {
-    const url = `${baseUrl}/proposals/machine/${filters.machineId}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch commands: ${response.statusText}`);
+  if (filters.status) {
+    if (Array.isArray(filters.status)) {
+      // For now, just use the first status if multiple are provided
+      // Backend doesn't support multiple status filters yet
+      params.append("status", filters.status[0]);
+    } else {
+      params.append("status", filters.status);
     }
-    const items = await response.json();
-    return { items, total: items.length };
+  }
+
+  if (filters.machineId) {
+    params.append("machineId", filters.machineId);
   }
 
   if (filters.sessionId) {
-    const url = `${baseUrl}/proposals/session/${filters.sessionId}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch commands: ${response.statusText}`);
-    }
-    const items = await response.json();
-    return { items, total: items.length };
+    params.append("sessionId", filters.sessionId);
   }
 
-  // For now, get pending approvals as default
-  const url = `${baseUrl}/proposals/pending`;
+  if (filters.commandType) {
+    params.append("commandType", filters.commandType);
+  }
+
+  if (filters.limit) {
+    params.append("limit", filters.limit.toString());
+  }
+
+  if (filters.offset) {
+    params.append("offset", filters.offset.toString());
+  }
+
+  const url = `${baseUrl}/proposals?${params.toString()}`;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Failed to fetch commands: ${response.statusText}`);

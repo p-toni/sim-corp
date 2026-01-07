@@ -622,6 +622,29 @@
       "notes": "Emergency abort button for EXECUTING commands with red styling, double confirmation dialog, and operator escalation alerts. Failed aborts show persistent error with manual intervention prompt. Meets M4 success metric: abort functional in <2s."
     },
     {
+      "id": "T-030.14",
+      "title": "Command history viewer",
+      "milestone": "M4",
+      "status": "DONE",
+      "completedDate": "2026-01-07",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/command test",
+          "pnpm --filter @sim-corp/roaster-desktop test",
+          "pnpm --filter @sim-corp/roaster-desktop build"
+        ],
+        "primaryArtifacts": [
+          "services/command/src/db/repo.ts (findAll method)",
+          "services/command/src/core/command-service.ts (getAllProposals method)",
+          "services/command/src/routes/proposals.ts (GET /proposals endpoint)",
+          "apps/roaster-desktop/src/lib/command-api.ts (filtering support)",
+          "apps/roaster-desktop/src/components/OpsPanel.tsx (status filters, enhanced UI)",
+          "services/command/tests/command-service.test.ts (4 history tests, 21 total passing)"
+        ]
+      },
+      "notes": "Complete audit trail now queryable. Enhanced Commands tab with status filters (All, Pending, Approved, Executing, Completed, Rejected, Failed), machine/session filters, improved status badges, and pagination (default 100). Backend supports flexible filtering by any combination of criteria. Foundation for compliance auditing and pattern analysis."
+    },
+    {
       "id": "T-031",
       "title": "Fake driver command support (test infrastructure)",
       "milestone": "M4",

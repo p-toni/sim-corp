@@ -65,7 +65,7 @@ export function OpsPanel({ pollIntervalMs = 8000 }: OpsPanelProps) {
   // Command state
   const [commands, setCommands] = useState<CommandProposal[]>([]);
   const [commandsLoading, setCommandsLoading] = useState(false);
-  const [commandFilters, setCommandFilters] = useState<CommandListFilters>({});
+  const [commandFilters, setCommandFilters] = useState<CommandListFilters>({ limit: 100 });
   const [selectedCommandId, setSelectedCommandId] = useState<string | null>(null);
   const [commandSummary, setCommandSummary] = useState<CommandSummary | null>(null);
 
@@ -550,6 +550,82 @@ export function OpsPanel({ pollIntervalMs = 8000 }: OpsPanelProps) {
         /* Commands Tab */
         <div className="ops-grid">
           <div className="ops-list">
+            <div className="ops-filters">
+              <div className="filter-group">
+                <label className="small-text">Status</label>
+                <div className="chip-row">
+                  <button
+                    type="button"
+                    className={`chip ${!commandFilters.status ? "active" : ""}`}
+                    onClick={() => setCommandFilters((prev) => ({ ...prev, status: undefined }))}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip ${commandFilters.status === "PENDING_APPROVAL" ? "active" : ""}`}
+                    onClick={() => setCommandFilters((prev) => ({ ...prev, status: "PENDING_APPROVAL" }))}
+                  >
+                    Pending
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip ${commandFilters.status === "APPROVED" ? "active" : ""}`}
+                    onClick={() => setCommandFilters((prev) => ({ ...prev, status: "APPROVED" }))}
+                  >
+                    Approved
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip ${commandFilters.status === "EXECUTING" ? "active" : ""}`}
+                    onClick={() => setCommandFilters((prev) => ({ ...prev, status: "EXECUTING" }))}
+                  >
+                    Executing
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip ${commandFilters.status === "COMPLETED" ? "active" : ""}`}
+                    onClick={() => setCommandFilters((prev) => ({ ...prev, status: "COMPLETED" }))}
+                  >
+                    Completed
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip ${commandFilters.status === "REJECTED" ? "active" : ""}`}
+                    onClick={() => setCommandFilters((prev) => ({ ...prev, status: "REJECTED" }))}
+                  >
+                    Rejected
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip ${commandFilters.status === "FAILED" ? "active" : ""}`}
+                    onClick={() => setCommandFilters((prev) => ({ ...prev, status: "FAILED" }))}
+                  >
+                    Failed
+                  </button>
+                </div>
+              </div>
+              <div className="filter-grid">
+                <label className="form-field">
+                  <span>Machine</span>
+                  <input
+                    type="text"
+                    placeholder="machine id"
+                    value={commandFilters.machineId ?? ""}
+                    onChange={(event) => setCommandFilters((prev) => ({ ...prev, machineId: event.target.value || undefined }))}
+                  />
+                </label>
+                <label className="form-field">
+                  <span>Session</span>
+                  <input
+                    type="text"
+                    placeholder="session id"
+                    value={commandFilters.sessionId ?? ""}
+                    onChange={(event) => setCommandFilters((prev) => ({ ...prev, sessionId: event.target.value || undefined }))}
+                  />
+                </label>
+              </div>
+            </div>
             <div className="ops-table" role="table">
               <div className="ops-row header" role="row">
                 <div>Created</div>
@@ -571,7 +647,12 @@ export function OpsPanel({ pollIntervalMs = 8000 }: OpsPanelProps) {
                   >
                     <div>{formatDate(cmd.createdAt)}</div>
                     <div>
-                      <span className={`status ${cmd.status === "COMPLETED" ? "status-success" : cmd.status === "FAILED" || cmd.status === "REJECTED" ? "status-error" : "status-neutral"}`}>
+                      <span className={`status ${
+                        cmd.status === "COMPLETED" ? "status-success" :
+                        cmd.status === "FAILED" || cmd.status === "REJECTED" ? "status-error" :
+                        cmd.status === "EXECUTING" || cmd.status === "PENDING_APPROVAL" ? "status-warning" :
+                        "status-neutral"
+                      }`}>
                         {cmd.status}
                       </span>
                     </div>

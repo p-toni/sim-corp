@@ -277,11 +277,44 @@ Done:
   - **18 desktop tests passing, desktop build successful**
   - **Backend support already existed**: executor.abortCommand(), audit logging (ABORTED/ABORT_FAILED events)
   - **Meets M4 success metric**: Emergency abort functional in < 2s (UI action immediate, backend < 1s)
+- **T-030.14 Command History Viewer (2026-01-07):**
+  - **Backend - Repository Layer** (services/command/src/db/repo.ts)
+    - Added FindAllOptions interface (status, machineId, sessionId, commandType, limit, offset)
+    - Implemented findAll() method with dynamic WHERE clause construction
+    - Supports filtering by any combination of criteria
+    - ORDER BY created_at DESC for chronological display
+    - LIMIT/OFFSET support for pagination
+  - **Backend - Service Layer** (services/command/src/core/command-service.ts)
+    - Added getAllProposals(options?) method to CommandService interface
+    - Delegates to repo.findAll() with optional filtering
+  - **Backend - API Layer** (services/command/src/routes/proposals.ts)
+    - Added GET /proposals endpoint with query parameter support
+    - Query params: status, machineId, sessionId, commandType, limit, offset
+    - Returns array of CommandProposal objects
+  - **Frontend - API Client** (apps/roaster-desktop/src/lib/command-api.ts)
+    - Extended CommandListFilters with limit and offset fields
+    - Updated listCommands() to use GET /proposals with query params
+    - Supports single status or array (backend uses first if array)
+  - **Frontend - UI Enhancements** (apps/roaster-desktop/src/components/OpsPanel.tsx)
+    - Added status filter chips: All, Pending, Approved, Executing, Completed, Rejected, Failed
+    - Added Machine ID and Session ID text filters
+    - Improved status badge colors:
+      - Completed: green (status-success)
+      - Failed/Rejected: red (status-error)
+      - Executing/Pending: yellow (status-warning)
+      - Others: gray (status-neutral)
+    - Default limit: 100 commands to prevent overwhelming UI
+  - **Tests** (services/command/tests/command-service.test.ts)
+    - Test 1: retrieves all proposals with default options
+    - Test 2: filters getAllProposals by status (PENDING_APPROVAL vs APPROVED)
+    - Test 3: filters getAllProposals by multiple criteria (machine + session + type)
+    - Test 4: limits getAllProposals results (5 created, 3 returned with limit=3)
+  - **21 command service tests passing, 18 desktop tests passing, desktop build successful**
+  - **Impact**: Complete audit trail now queryable. Operators can view full command history with flexible filtering by status, machine, session, or type. Supports investigation, compliance auditing, and pattern analysis. Foundation for advanced analytics and ML-based anomaly detection.
 
 Now:
 - M4 (Safe Autopilot L3 Beta) P0 complete
-- T-030.10, T-030.11, T-030.12, T-030.13 complete (P1 enhancements)
-- Remaining P1: T-030.14 (Command History)
+- M4 P1 enhancements complete (T-030.10, T-030.11, T-030.12, T-030.13, T-030.14)
 
 Next:
 - T-028 P1 — LM-as-judge implementation (deferred to post-M4)
@@ -361,7 +394,11 @@ Working set (files/ids/commands):
 - services/company-kernel/src/core/governor/engine.ts (T-030.12 evaluateCommand method)
 - services/command/src/core/command-service.ts (T-030.12 Governor integration)
 - services/company-kernel/tests/governor.commands.test.ts (T-030.12 6 tests passing)
-- apps/roaster-desktop/src/lib/command-api.ts (T-030.13 abortCommand client)
+- apps/roaster-desktop/src/lib/command-api.ts (T-030.13 abortCommand client, T-030.14 filtering)
 - apps/roaster-desktop/src/components/EmergencyAbortDialog.tsx (T-030.13 dialog component)
-- apps/roaster-desktop/src/components/OpsPanel.tsx (T-030.13 abort button & handler)
+- apps/roaster-desktop/src/components/OpsPanel.tsx (T-030.13 abort button, T-030.14 filters)
 - apps/roaster-desktop/tests/ops-panel.test.tsx (T-030.13 3 abort tests, 18 total passing)
+- services/command/src/db/repo.ts (T-030.14 findAll method)
+- services/command/src/core/command-service.ts (T-030.14 getAllProposals method)
+- services/command/src/routes/proposals.ts (T-030.14 GET /proposals endpoint)
+- services/command/tests/command-service.test.ts (T-030.14 4 history tests, 21 total passing)
