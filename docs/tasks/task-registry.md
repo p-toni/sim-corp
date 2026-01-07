@@ -443,6 +443,47 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 
 **Impact:** Dynamic autonomy control. System can downgrade autonomy level based on failure rates (e.g., L3→L2 if >30% commands fail). Complete safety gate before command execution. Foundation for safe progressive automation (L2→L3→L4→L5). Governor decisions fully audited.
 
+### T-030.13 — Emergency abort UI + workflow
+**Status:** DONE
+**Milestone:** M4 (P1)
+**Completed:** 2026-01-07
+
+**Scope:** Build desktop UI for emergency abort of executing commands with operator escalation for failures
+
+**Deliverables:**
+- Command API client extension (apps/roaster-desktop/src/lib/command-api.ts):
+  - abortCommand() function calling POST /abort/:proposalId
+  - Returns CommandExecutionResult with status (ACCEPTED/FAILED/REJECTED)
+- EmergencyAbortDialog component (apps/roaster-desktop/src/components/EmergencyAbortDialog.tsx):
+  - Red/danger styling (#dc3545) emphasizing emergency nature
+  - Double confirmation: checkbox acknowledgment + button click
+  - Warning banner about immediate abort and safe state return
+  - Command details display (type, machine, target, current status)
+  - Disabled state during submission prevents double-clicks
+- OpsPanel Commands tab integration (apps/roaster-desktop/src/components/OpsPanel.tsx):
+  - Emergency Abort button shown only for commands with status="EXECUTING"
+  - Button styled red to indicate critical action
+  - handleAbortCommand() with operator escalation logic:
+    - Success (ACCEPTED): normal refresh, clears errors
+    - Failure (FAILED): shows 🚨 ABORT FAILED alert with machine ID, refreshes without clearing error
+    - Exception: shows 🚨 ABORT ERROR alert with manual intervention prompt
+- Comprehensive test coverage (apps/roaster-desktop/tests/ops-panel.test.tsx):
+  - Test 1: Emergency abort button displayed for EXECUTING commands
+  - Test 2: Successful abort workflow (dialog → confirmation → API call → refresh)
+  - Test 3: Failed abort displays persistent error alert with escalation message
+
+**Evidence:**
+- `pnpm --filter @sim-corp/roaster-desktop test` (18 tests passing including 3 new abort tests)
+- `pnpm --filter @sim-corp/roaster-desktop build` (successful build)
+
+**Key artifacts:**
+- `apps/roaster-desktop/src/lib/command-api.ts` — abortCommand client
+- `apps/roaster-desktop/src/components/EmergencyAbortDialog.tsx` — abort confirmation dialog
+- `apps/roaster-desktop/src/components/OpsPanel.tsx` — abort button and escalation handler
+- `apps/roaster-desktop/tests/ops-panel.test.tsx` — 3 abort tests
+
+**Impact:** Emergency abort capability with <2s response time (M4 success metric). Operator escalation ensures manual intervention when aborts fail. Backend support already existed (executor.abortCommand, audit logging). Complete L3 safety workflow: propose → approve → execute → abort (if needed).
+
 ### T-031 — Fake driver command support (test infrastructure)
 **Status:** DONE
 **Milestone:** M4

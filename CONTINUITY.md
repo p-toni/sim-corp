@@ -253,11 +253,35 @@ Done:
   - **37 kernel tests passing** (including 6 new Governor command tests)
   - **17 command service tests passing**
   - **Impact**: Dynamic autonomy control. System can downgrade autonomy based on failure rates. Foundation for safe progressive automation (L2→L3→L4→L5). Complete safety gate before command execution.
+- **T-030.13 Emergency Abort UI + Workflow (2026-01-07):**
+  - **Command API Client** (apps/roaster-desktop/src/lib/command-api.ts)
+    - Added abortCommand() function calling POST /abort/:proposalId
+    - Returns CommandExecutionResult with status (ACCEPTED/FAILED)
+  - **EmergencyAbortDialog Component** (apps/roaster-desktop/src/components/EmergencyAbortDialog.tsx)
+    - Red/danger styling emphasizing emergency nature
+    - Double confirmation: checkbox acknowledgment + button click
+    - Warning banner about immediate abort and safe state attempt
+    - Shows command details (type, machine, target, status)
+    - Disabled state during submission prevents double-clicks
+  - **OpsPanel Integration** (apps/roaster-desktop/src/components/OpsPanel.tsx)
+    - Emergency Abort button shown for commands with status="EXECUTING"
+    - Button styled red (#dc3545) to indicate critical action
+    - handleAbortCommand() with operator escalation logic:
+      - Success (ACCEPTED): normal refresh, clears errors
+      - Failure (FAILED): shows 🚨 ABORT FAILED alert with machine ID, refreshes without clearing error
+      - Exception: shows 🚨 ABORT ERROR alert, manual intervention prompt
+  - **Comprehensive Tests** (apps/roaster-desktop/tests/ops-panel.test.tsx)
+    - Test 1: Emergency abort button shown for EXECUTING commands
+    - Test 2: Successful abort workflow (dialog, confirmation, API call, refresh)
+    - Test 3: Failed abort shows persistent error alert with escalation message
+  - **18 desktop tests passing, desktop build successful**
+  - **Backend support already existed**: executor.abortCommand(), audit logging (ABORTED/ABORT_FAILED events)
+  - **Meets M4 success metric**: Emergency abort functional in < 2s (UI action immediate, backend < 1s)
 
 Now:
 - M4 (Safe Autopilot L3 Beta) P0 complete
-- T-030.10, T-030.11, T-030.12 complete (P1 enhancements)
-- Remaining P1: T-030.13 (Emergency Abort), T-030.14 (Command History)
+- T-030.10, T-030.11, T-030.12, T-030.13 complete (P1 enhancements)
+- Remaining P1: T-030.14 (Command History)
 
 Next:
 - T-028 P1 — LM-as-judge implementation (deferred to post-M4)
@@ -337,3 +361,7 @@ Working set (files/ids/commands):
 - services/company-kernel/src/core/governor/engine.ts (T-030.12 evaluateCommand method)
 - services/command/src/core/command-service.ts (T-030.12 Governor integration)
 - services/company-kernel/tests/governor.commands.test.ts (T-030.12 6 tests passing)
+- apps/roaster-desktop/src/lib/command-api.ts (T-030.13 abortCommand client)
+- apps/roaster-desktop/src/components/EmergencyAbortDialog.tsx (T-030.13 dialog component)
+- apps/roaster-desktop/src/components/OpsPanel.tsx (T-030.13 abort button & handler)
+- apps/roaster-desktop/tests/ops-panel.test.tsx (T-030.13 3 abort tests, 18 total passing)

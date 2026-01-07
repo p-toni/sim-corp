@@ -7,11 +7,13 @@ import {
   getCommandSummary,
   approveCommand as approveCommandAPI,
   rejectCommand as rejectCommandAPI,
+  abortCommand as abortCommandAPI,
   type CommandListFilters,
 } from "../lib/command-api";
 import { SafetyInfoPanel } from "./SafetyInfoPanel";
 import { CommandApprovalDialog } from "./CommandApprovalDialog";
 import { CommandRejectionDialog } from "./CommandRejectionDialog";
+import { EmergencyAbortDialog } from "./EmergencyAbortDialog";
 
 const NEEDS_ATTENTION: Array<KernelMissionRecord["status"]> = ["QUARANTINED", "RETRY", "BLOCKED"];
 const ALL_STATUSES: Array<KernelMissionRecord["status"]> = [
@@ -70,6 +72,7 @@ export function OpsPanel({ pollIntervalMs = 8000 }: OpsPanelProps) {
   // Command approval dialog state
   const [approvalDialogCommand, setApprovalDialogCommand] = useState<CommandProposal | null>(null);
   const [rejectionDialogCommand, setRejectionDialogCommand] = useState<CommandProposal | null>(null);
+  const [abortDialogCommand, setAbortDialogCommand] = useState<CommandProposal | null>(null);
 
   const selectedMission = useMemo(
     () => missions.find((m) => m.missionId === selectedId || m.id === selectedId) ?? null,
@@ -234,6 +237,43 @@ export function OpsPanel({ pollIntervalMs = 8000 }: OpsPanelProps) {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Action failed";
       setError(message);
+    }
+  };
+
+  const handleAbortCommand = async (): Promise<void> => {
+    if (!abortDialogCommand) return;
+
+    setError(null);
+    try {
+      const result = await abortCommandAPI(abortDialogCommand.proposalId);
+
+      setAbortDialogCommand(null);
+
+      // Check if abort failed and show critical alert
+      if (result.status === "FAILED") {
+        setError(
+          `🚨 ABORT FAILED: ${result.message ?? "Unknown error"}. Manual intervention required for machine ${abortDialogCommand.command.machineId}.`
+        );
+        // Still refresh to show updated status, but error remains visible
+        setCommandsLoading(true);
+        try {
+          const [list, summary] = await Promise.all([
+            listCommands(commandFilters),
+            getCommandSummary(),
+          ]);
+          setCommands(list.items);
+          setCommandSummary(summary);
+        } finally {
+          setCommandsLoading(false);
+        }
+      } else {
+        // Success - do normal refresh which clears errors
+        await handleRefreshCommands();
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Abort failed";
+      setAbortDialogCommand(null);
+      setError(`🚨 ABORT ERROR: ${message}. Manual intervention may be required.`);
     }
   };
 
@@ -569,6 +609,16 @@ export function OpsPanel({ pollIntervalMs = 8000 }: OpsPanelProps) {
                         </button>
                       </>
                     ) : null}
+                    {selectedCommand.status === "EXECUTING" ? (
+                      <button
+                        type="button"
+                        className="primary"
+                        style={{ backgroundColor: "#dc3545", borderColor: "#dc3545" }}
+                        onClick={() => setAbortDialogCommand(selectedCommand)}
+                      >
+                        Emergency Abort
+                      </button>
+                    ) : null}
                   </div>
                 </div>
                 <div className="grid two-col">
@@ -674,6 +724,15 @@ export function OpsPanel({ pollIntervalMs = 8000 }: OpsPanelProps) {
           command={rejectionDialogCommand}
           onReject={(reason) => void handleRejectCommand(reason)}
           onCancel={() => setRejectionDialogCommand(null)}
+        />
+      ) : null}
+
+      {/* Emergency Abort Dialog */}
+      {abortDialogCommand ? (
+        <EmergencyAbortDialog
+          command={abortDialogCommand}
+          onAbort={() => void handleAbortCommand()}
+          onCancel={() => setAbortDialogCommand(null)}
         />
       ) : null}
     </div>

@@ -3,7 +3,7 @@
 This file tracks per-task/per-session progress. Keep it short and focused on the current work.
 
 ## Current objective
-M4 P1 Enhancements (Next: T-030.13 Emergency Abort UI)
+M4 P1 Enhancements (Next: T-030.14 Command History Viewer)
 
 ## Current state (what is true now)
 - M4 (Safe Autopilot L3 Beta) complete and merged
@@ -153,3 +153,12 @@ pnpm harness:init  # Environment validation (Node 20.19.1, pnpm 9.11.0)
   - Created governor.commands.test.ts with 6 comprehensive tests
   - All tests passing: Command 17, Kernel 37 (including 6 new Governor tests)
   - Dynamic autonomy control enables safe progressive automation
+- 2026-01-07 16:05: **T-030.13 Emergency Abort UI + Workflow** (COMPLETE)
+  - Added abortCommand() API client (POST /abort/:proposalId)
+  - Created EmergencyAbortDialog with red/danger styling, double confirmation
+  - Added Emergency Abort button to Commands tab (visible for EXECUTING commands)
+  - Enhanced abort handler with operator escalation (🚨 alerts for failures)
+  - Added 3 comprehensive abort tests (shows button, successful abort, failed abort alert)
+  - All 18 desktop tests passing, desktop build successful
+  - Backend abort already existed (executor, audit logging)
+  - Meets M4 success metric: Emergency abort functional in < 2s

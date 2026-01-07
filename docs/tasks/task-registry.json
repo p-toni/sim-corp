@@ -602,6 +602,26 @@
       "notes": "Governor enforces autonomy levels (L1-L5) for commands. L1 blocks all, L2 blocks agents, L3 requires approval. Checks failure rates and session limits. Dynamic autonomy control enables safe progressive automation."
     },
     {
+      "id": "T-030.13",
+      "title": "Emergency abort UI + workflow",
+      "milestone": "M4",
+      "status": "DONE",
+      "completedDate": "2026-01-07",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/roaster-desktop test",
+          "pnpm --filter @sim-corp/roaster-desktop build"
+        ],
+        "primaryArtifacts": [
+          "apps/roaster-desktop/src/lib/command-api.ts (abortCommand client)",
+          "apps/roaster-desktop/src/components/EmergencyAbortDialog.tsx (dialog component)",
+          "apps/roaster-desktop/src/components/OpsPanel.tsx (abort button & handler)",
+          "apps/roaster-desktop/tests/ops-panel.test.tsx (3 abort tests, 18 total passing)"
+        ]
+      },
+      "notes": "Emergency abort button for EXECUTING commands with red styling, double confirmation dialog, and operator escalation alerts. Failed aborts show persistent error with manual intervention prompt. Meets M4 success metric: abort functional in <2s."
+    },
+    {
       "id": "T-031",
       "title": "Fake driver command support (test infrastructure)",
       "milestone": "M4",

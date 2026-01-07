@@ -7,6 +7,7 @@ import type {
   CommandMetrics,
   CommandSummary,
   CommandAlert,
+  CommandExecutionResult,
 } from "@sim-corp/schemas";
 
 export interface CommandListFilters {
@@ -161,6 +162,20 @@ export async function executeCommand(proposalId: string): Promise<unknown> {
   });
   if (!response.ok) {
     throw new Error(`Failed to execute command: ${response.statusText}`);
+  }
+  return await response.json();
+}
+
+export async function abortCommand(
+  proposalId: string
+): Promise<CommandExecutionResult> {
+  const baseUrl = getCommandServiceUrl();
+  const url = `${baseUrl}/abort/${proposalId}`;
+  const response = await fetch(url, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to abort command: ${response.statusText}`);
   }
   return await response.json();
 }
