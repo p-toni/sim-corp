@@ -3,7 +3,7 @@
 This file tracks per-task/per-session progress. Keep it short and focused on the current work.
 
 ## Current objective
-T-030.5 Desktop Command Approval UX — COMPLETE
+T-026 Auth & Tenancy Verification — COMPLETE
 
 ## Current state (what is true now)
 - M4 (Safe Autopilot L3 Beta) complete and merged
@@ -63,9 +63,16 @@ T-030.5 Desktop Command Approval UX — COMPLETE
   - All 15 desktop tests passing
   - Desktop build successful
   - Smoke tests passing
+- **T-026 Auth & Tenancy (Clerk) Verification** (COMPLETE)
+  - Verified Clerk JWT integration with jose library
+  - Confirmed multi-tenancy enforcement with ensureOrgAccess
+  - Tested auth routes in ingestion service
+  - Verified desktop auth provider with ClerkProvider
+  - All tests passing: Ingestion 24 tests, Desktop 15 tests
+  - M2 (Trust & Provenance) now fully verified
 
 ## Next step (single step)
-T-030.5 complete. M4 (Safe Autopilot L3 Beta) fully complete.
+T-026 complete. M2 fully verified. Ready for next priority task.
 
 ## Commands run (copy/paste)
 ```bash
@@ -86,3 +93,8 @@ pnpm harness:init  # Environment validation (Node 20.19.1, pnpm 9.11.0)
 - 2026-01-06 20:30: All desktop tests passing (15 total), build successful
 - 2026-01-06 20:35: Smoke tests passing, updated task registries with T-030.5 evidence
 - 2026-01-06 20:35: T-030.5 complete - M4 (Safe Autopilot L3 Beta) fully complete
+- 2026-01-06 20:40: Committed T-032 and T-030.5 to git
+- 2026-01-06 20:45: Started T-026 Auth & Tenancy verification
+- 2026-01-06 20:50: Verified Clerk implementation - ingestion and desktop tests passing
+- 2026-01-06 20:55: Updated task registries with T-026 verification evidence
+- 2026-01-06 20:55: T-026 complete - M2 (Trust & Provenance) fully verified

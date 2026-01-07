@@ -336,15 +336,21 @@
       "id": "T-026",
       "title": "Auth & tenancy (Clerk) + permissions",
       "milestone": "M2",
-      "status": "PENDING_VERIFICATION",
+      "status": "DONE",
+      "completedDate": "2026-01-06",
       "evidence": {
         "commands": [
           "pnpm --filter @sim-corp/ingestion test",
           "pnpm --filter @sim-corp/roaster-desktop test"
         ],
-        "primaryArtifacts": ["Clerk auth integration"]
+        "primaryArtifacts": [
+          "services/ingestion/src/auth/index.ts",
+          "services/ingestion/src/auth/clerk-verifier.ts",
+          "apps/roaster-desktop/src/lib/auth.tsx",
+          "apps/roaster-desktop/tests/api-auth.test.ts"
+        ]
       },
-      "notes": "Offline env: vitest missing - requires verification"
+      "notes": "Clerk JWT verification with jose, multi-tenancy enforcement, dev mode fallback. Ingestion: 24 tests passing, Desktop: 15 tests passing."
     },
     {
       "id": "T-027",

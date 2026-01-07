@@ -38,6 +38,15 @@ Done:
 - M1 (Mission Inbox + Profiles + Predictive Assist + Tauri) — COMPLETE
 - M2 (Trust & Provenance) — COMPLETE
 - M3 (Design Partner Pilot: Eval Harness + Vendor Driver) — COMPLETE
+- **T-026 Auth & Tenancy (Clerk) + Permissions (Verified 2026-01-06):**
+  - Clerk JWT verification with jose library and JWKS validation
+  - Multi-tenancy enforcement via `ensureOrgAccess` helper
+  - Dev mode fallback for local development (AUTH_MODE=dev)
+  - Desktop ClerkProvider integration with token attachment
+  - AuthContext and useAuthInfo hook for app-wide auth state
+  - Organization support from Clerk metadata
+  - 24 ingestion tests passing, 15 desktop tests passing
+  - Routes properly use `ensureOrgAccess` for org-level isolation
 - **T-027 Deliverables:**
   - Device identity library (192 LOC, 13 tests passing)
   - Sim-publisher signing integration (3 tests passing)
@@ -165,9 +174,11 @@ Done:
   - **Desktop build successful**
 
 Now:
-- **T-030.5 Desktop Command Approval UX** COMPLETE (2026-01-06)
-  - All deliverables complete: SafetyInfoPanel, approval/rejection dialogs, enhanced OpsPanel
-  - 15 desktop tests passing (10 new SafetyInfoPanel tests)
+- **T-026 Auth & Tenancy Verification** COMPLETE (2026-01-06)
+  - Verified Clerk JWT integration with jose library
+  - Multi-tenancy enforcement working with ensureOrgAccess
+  - All tests passing: Ingestion 24 tests, Desktop 15 tests
+  - M2 (Trust & Provenance) fully verified and complete
   - M4 (Safe Autopilot L3 Beta) fully complete
 
 Next:

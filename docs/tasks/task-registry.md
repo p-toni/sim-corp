@@ -221,7 +221,27 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 ### T-026 — Auth & tenancy (Clerk) + permissions
 **Status:** DONE
 **Milestone:** M2
-**Evidence:** `pnpm --filter @sim-corp/ingestion test`, `pnpm --filter @sim-corp/roaster-desktop test` (offline env: vitest missing)
+**Completed:** 2026-01-06
+
+**Delivered:**
+- Clerk JWT verification using jose library with JWKS validation
+- Actor extraction from JWT claims (userId, orgId, name)
+- Multi-tenancy enforcement with `ensureOrgAccess` helper
+- Dev mode fallback for local development
+- Desktop ClerkProvider integration with token attachment
+- AuthContext and useAuthInfo hook for app-wide auth state
+- AuthControls component (SignIn button + UserButton)
+- Organization support from Clerk metadata
+
+**Evidence:**
+- `pnpm --filter @sim-corp/ingestion test` (24 tests passing)
+- `pnpm --filter @sim-corp/roaster-desktop test` (15 tests passing)
+
+**Primary artifacts:**
+- `services/ingestion/src/auth/index.ts` (auth middleware + org access)
+- `services/ingestion/src/auth/clerk-verifier.ts` (JWT verification)
+- `apps/roaster-desktop/src/lib/auth.tsx` (React auth provider)
+- `apps/roaster-desktop/tests/api-auth.test.ts` (auth integration test)
 
 ### T-027 — Device identity + signed telemetry
 **Status:** DONE
