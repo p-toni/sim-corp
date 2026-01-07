@@ -546,6 +546,22 @@
       "notes": "Comprehensive ops guide, 600+ lines, API reference, troubleshooting"
     },
     {
+      "id": "T-030.10",
+      "title": "Sim-roast-runner command proposal capability",
+      "milestone": "M4",
+      "status": "DONE",
+      "completedDate": "2026-01-07",
+      "evidence": {
+        "commands": ["pnpm --filter @sim-corp/sim-roast-runner test"],
+        "primaryArtifacts": [
+          "agents/sim-roast-runner/src/tools.ts (proposeCommand tool)",
+          "agents/sim-roast-runner/src/agent.ts (simulation analysis + command proposal logic)",
+          "agents/sim-roast-runner/tests/agent.test.ts (4 tests passing)"
+        ]
+      },
+      "notes": "Agent analyzes simulation results with three heuristics (scorching, slow temp, rapid rise) and proposes commands with explainable reasoning. L3 autonomy complete: agent proposes → operator approves."
+    },
+    {
       "id": "T-031",
       "title": "Fake driver command support (test infrastructure)",
       "milestone": "M4",

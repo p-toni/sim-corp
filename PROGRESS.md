@@ -3,7 +3,7 @@
 This file tracks per-task/per-session progress. Keep it short and focused on the current work.
 
 ## Current objective
-T-026 Auth & Tenancy Verification — COMPLETE
+T-030.10 Sim-roast-runner Command Proposal Capability
 
 ## Current state (what is true now)
 - M4 (Safe Autopilot L3 Beta) complete and merged
@@ -70,9 +70,16 @@ T-026 Auth & Tenancy Verification — COMPLETE
   - Verified desktop auth provider with ClerkProvider
   - All tests passing: Ingestion 24 tests, Desktop 15 tests
   - M2 (Trust & Provenance) now fully verified
+- **T-030.10 Sim-roast-runner Command Proposal Capability** (COMPLETE)
+  - Added proposeCommand tool calling command service POST /proposals
+  - Implemented simulation analysis with three intelligent heuristics
+  - Agent proposes commands with full explainable reasoning
+  - 3 new tests covering proposal scenarios (scorching, slow temp, normal)
+  - 4 total sim-roast-runner tests passing
+  - L3 autonomy: agent proposes, operator approves via desktop UX
 
 ## Next step (single step)
-T-026 complete. M2 fully verified. Ready for next priority task.
+Continue with M4 P1 tasks or address next priority
 
 ## Commands run (copy/paste)
 ```bash
@@ -98,3 +105,17 @@ pnpm harness:init  # Environment validation (Node 20.19.1, pnpm 9.11.0)
 - 2026-01-06 20:50: Verified Clerk implementation - ingestion and desktop tests passing
 - 2026-01-06 20:55: Updated task registries with T-026 verification evidence
 - 2026-01-06 20:55: T-026 complete - M2 (Trust & Provenance) fully verified
+- 2026-01-06 21:00: Committed T-026 verification
+- 2026-01-06 21:05: Started T-030.10 Sim-roast-runner command proposal capability
+- 2026-01-07 10:15: **T-030.10 Sim-roast-runner Command Proposal** (COMPLETE)
+  - Added PROPOSE_COMMAND tool to agents/sim-roast-runner/src/tools.ts
+  - Implemented callCommandService() function (POST /proposals endpoint)
+  - Extended agent logic with simulation analysis
+  - Added analyzeSimulationResults() with three heuristics:
+    - Scorching detected → propose power reduction to 75%
+    - Slow temperature development (avg < 180°F) → propose power increase to 90%
+    - Rapid temperature rise (>25°F/min) → propose fan increase to level 8
+  - Updated handleObserve() to invoke proposeCommand tool with full reasoning
+  - Added 3 comprehensive tests covering command proposal scenarios
+  - All 4 sim-roast-runner tests passing
+  - Agent now proposes explainable commands based on simulation outcomes

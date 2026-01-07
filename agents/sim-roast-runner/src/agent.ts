@@ -1,7 +1,7 @@
 import type { LoopStep, Reasoner, StepContext, StepOutput } from "@sim-corp/agent-runtime";
-import type { Mission } from "@sim-corp/schemas";
+import type { Mission, TelemetryPoint, RoastEvent, ProposeCommandRequest } from "@sim-corp/schemas";
 import { SimRoastRequestSchema, type SimRoastRequest } from "../../../services/sim-twin/src/client";
-import { SIMULATE_ROAST_TOOL_NAME } from "./tools";
+import { SIMULATE_ROAST_TOOL_NAME, PROPOSE_COMMAND_TOOL_NAME } from "./tools";
 
 const SIM_TWIN_DEFAULT_URL = "http://127.0.0.1:4002";
 
@@ -9,6 +9,10 @@ interface SimRoastState {
   missionParams?: Record<string, unknown>;
   simTwinUrl?: string;
   simRequest?: SimRoastRequest;
+  simulationResults?: {
+    telemetry: TelemetryPoint[];
+    events: RoastEvent[];
+  };
 }
 
 function mergeState(ctx: StepContext, patch: SimRoastState): Record<string, unknown> {
@@ -74,11 +78,137 @@ async function handleAct(ctx: StepContext): Promise<StepOutput> {
   };
 }
 
+interface SimulationAnalysis {
+  shouldPropose: boolean;
+  commandType?: "SET_POWER" | "SET_FAN" | "SET_DRUM";
+  targetValue?: number;
+  reasoning?: string;
+  targetUnit?: string;
+}
+
+function analyzeSimulationResults(
+  telemetry: TelemetryPoint[],
+  events: RoastEvent[]
+): SimulationAnalysis {
+  // Analyze telemetry for temperature trends
+  const beanTemps = telemetry
+    .filter(t => t.metric === "bean_temp" && typeof t.value === "number")
+    .map(t => ({ timestamp: t.timestamp, value: t.value as number }))
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  // Check for dangerous events
+  const hasScorc = events.some(e => e.eventType === "SCORCH");
+  const hasTipping = events.some(e => e.eventType === "TIPPING");
+
+  // If scorching detected, recommend power reduction
+  if (hasScorc) {
+    return {
+      shouldPropose: true,
+      commandType: "SET_POWER",
+      targetValue: 75,
+      targetUnit: "%",
+      reasoning: "Simulation detected scorching event. Reducing power to 75% may prevent bean damage and improve roast quality."
+    };
+  }
+
+  // If tipping not detected by expected time, recommend power increase
+  if (!hasTipping && telemetry.length > 0) {
+    const avgBeanTemp = beanTemps.length > 0
+      ? beanTemps.reduce((sum, t) => sum + t.value, 0) / beanTemps.length
+      : 0;
+
+    if (avgBeanTemp < 180) {
+      return {
+        shouldPropose: true,
+        commandType: "SET_POWER",
+        targetValue: 90,
+        targetUnit: "%",
+        reasoning: "Simulation shows slow temperature development (avg bean temp < 180°F). Increasing power to 90% may improve roast progression."
+      };
+    }
+  }
+
+  // Check for rapid temperature rise (need fan adjustment)
+  if (beanTemps.length >= 2) {
+    const recentTemps = beanTemps.slice(-10);
+    if (recentTemps.length >= 2) {
+      const tempChange = recentTemps[recentTemps.length - 1].value - recentTemps[0].value;
+      const timeChange = recentTemps[recentTemps.length - 1].timestamp - recentTemps[0].timestamp;
+      const rateOfRise = timeChange > 0 ? (tempChange / timeChange) * 60 : 0; // per minute
+
+      if (rateOfRise > 25) {
+        return {
+          shouldPropose: true,
+          commandType: "SET_FAN",
+          targetValue: 8,
+          targetUnit: "speed",
+          reasoning: `Simulation shows rapid temperature rise (${rateOfRise.toFixed(1)}°F/min). Increasing fan to level 8 may moderate heat and improve roast control.`
+        };
+      }
+    }
+  }
+
+  return { shouldPropose: false };
+}
+
 async function handleObserve(ctx: StepContext): Promise<StepOutput> {
+  // Extract simulation results from tool results
+  const simToolResult = ctx.toolResults?.find(r => r.toolName === SIMULATE_ROAST_TOOL_NAME);
+
+  if (!simToolResult || !simToolResult.result) {
+    return {
+      state: { ...ctx.state },
+      done: true,
+      notes: "completed - no simulation results"
+    };
+  }
+
+  const simulationResults = simToolResult.result as {
+    telemetry: TelemetryPoint[];
+    events: RoastEvent[];
+  };
+
+  // Analyze simulation results
+  const analysis = analyzeSimulationResults(simulationResults.telemetry, simulationResults.events);
+
+  // If we should propose a command, prepare the proposal
+  if (analysis.shouldPropose && analysis.commandType && analysis.targetValue !== undefined) {
+    const proposalRequest: ProposeCommandRequest = {
+      commandType: analysis.commandType,
+      targetValue: analysis.targetValue,
+      targetUnit: analysis.targetUnit,
+      reasoning: analysis.reasoning ?? "Command proposed based on simulation analysis",
+      machineId: ctx.mission.machineId ?? "unknown",
+      sessionId: ctx.sessionId,
+      missionId: ctx.mission.missionId,
+      actor: {
+        kind: "AGENT",
+        id: "sim-roast-runner",
+        display: "Sim Roast Runner Agent"
+      },
+      constraints: {
+        minValue: analysis.commandType === "SET_POWER" ? 0 : undefined,
+        maxValue: analysis.commandType === "SET_POWER" ? 100 :
+                  analysis.commandType === "SET_FAN" ? 10 : undefined
+      }
+    };
+
+    return {
+      state: mergeState(ctx, { simulationResults }),
+      toolInvocations: [
+        {
+          toolName: PROPOSE_COMMAND_TOOL_NAME,
+          input: proposalRequest
+        }
+      ],
+      notes: `Proposing ${analysis.commandType} command: ${analysis.reasoning}`
+    };
+  }
+
   return {
-    state: { ...ctx.state },
+    state: mergeState(ctx, { simulationResults }),
     done: true,
-    notes: "completed"
+    notes: "completed - no command proposal needed"
   };
 }
 

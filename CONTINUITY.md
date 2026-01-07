@@ -172,14 +172,33 @@ Done:
     - Modal styling (apps/roaster-desktop/src/app.css)
   - **15 desktop tests passing** (including 10 new SafetyInfoPanel tests)
   - **Desktop build successful**
+- **T-030.10 Sim-roast-runner Command Proposal (2026-01-07):**
+  - **PROPOSE_COMMAND Tool** (agents/sim-roast-runner/src/tools.ts)
+    - callCommandService() function POSTs to command service /proposals endpoint
+    - ProposeCommandRequest schema validation
+    - Environment-configurable COMMAND_SERVICE_URL (default: http://127.0.0.1:3004)
+  - **Simulation Analysis Logic** (agents/sim-roast-runner/src/agent.ts)
+    - analyzeSimulationResults() evaluates telemetry and events
+    - Three intelligent heuristics:
+      1. Scorching detected → propose SET_POWER to 75% (prevent bean damage)
+      2. Slow temperature development (avg < 180°F) → propose SET_POWER to 90%
+      3. Rapid temperature rise (>25°F/min) → propose SET_FAN to level 8
+    - Full explainable reasoning for each proposal
+  - **Agent Integration** (handleObserve step)
+    - Extracts simulation results from tool invocations
+    - Analyzes results to determine if command warranted
+    - Invokes proposeCommand tool with full context (machineId, sessionId, missionId, actor)
+    - Includes constraints (min/max values) in proposal
+  - **Comprehensive Tests** (agents/sim-roast-runner/tests/agent.test.ts)
+    - Test: proposes power reduction when scorching detected
+    - Test: proposes power increase when temperature development is slow
+    - Test: no proposal when simulation is normal
+    - 4 total tests passing
+  - **L3 Autonomy Complete**: Agent proposes → Desktop operator approves → Command executes
 
 Now:
-- **T-026 Auth & Tenancy Verification** COMPLETE (2026-01-06)
-  - Verified Clerk JWT integration with jose library
-  - Multi-tenancy enforcement working with ensureOrgAccess
-  - All tests passing: Ingestion 24 tests, Desktop 15 tests
-  - M2 (Trust & Provenance) fully verified and complete
-  - M4 (Safe Autopilot L3 Beta) fully complete
+- M4 (Safe Autopilot L3 Beta) P0 complete
+- T-030.10 through T-030.14 are P1 enhancements
 
 Next:
 - T-028 P1 — LM-as-judge implementation (deferred to post-M4)
@@ -245,3 +264,6 @@ Working set (files/ids/commands):
 - services/command/tests/analytics.test.ts (NEW — T-032 7 analytics tests)
 - apps/roaster-desktop/src/lib/command-api.ts (NEW — T-032 command API client)
 - apps/roaster-desktop/src/components/OpsPanel.tsx (T-032 Commands tab extension)
+- agents/sim-roast-runner/src/tools.ts (T-030.10 proposeCommand tool)
+- agents/sim-roast-runner/src/agent.ts (T-030.10 simulation analysis + command proposal)
+- agents/sim-roast-runner/tests/agent.test.ts (T-030.10 4 tests passing)

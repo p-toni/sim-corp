@@ -349,6 +349,32 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 
 **See:** `docs/tasks/M4-PLAN.md` for full planning document
 
+### T-030.10 — Sim-roast-runner command proposal capability
+**Status:** DONE
+**Milestone:** M4 (P1)
+**Completed:** 2026-01-07
+
+**Scope:** Enable sim-roast-runner agent to propose commands based on simulation analysis
+
+**Deliverables:**
+- PROPOSE_COMMAND tool integrated in agent tool registry
+- callCommandService() function POSTs to command service /proposals endpoint
+- analyzeSimulationResults() with three intelligent heuristics:
+  1. Scorching detected → propose SET_POWER to 75%
+  2. Slow temperature development (avg < 180°F) → propose SET_POWER to 90%
+  3. Rapid temperature rise (>25°F/min) → propose SET_FAN to level 8
+- handleObserve() invokes proposeCommand with full explainable reasoning
+- 3 new tests covering command proposal scenarios
+
+**Evidence:** `pnpm --filter @sim-corp/sim-roast-runner test` (4 tests passing)
+
+**Key artifacts:**
+- `agents/sim-roast-runner/src/tools.ts` — proposeCommand tool
+- `agents/sim-roast-runner/src/agent.ts` — simulation analysis + command proposal logic
+- `agents/sim-roast-runner/tests/agent.test.ts` — command proposal tests
+
+**Impact:** L3 autonomy complete. Agent analyzes simulation outcomes and proposes explainable commands. Operator reviews safety constraints and approves via desktop UX. Complete HITL workflow with full audit trail.
+
 ### T-031 — Fake driver command support (test infrastructure)
 **Status:** DONE
 **Milestone:** M4
