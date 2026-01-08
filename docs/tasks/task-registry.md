@@ -288,9 +288,69 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 - `pnpm --filter @sim-corp/roaster-desktop build` (successful with eval UI)
 
 **Deferred to P1/P2:**
-- LM-as-judge implementation
 - Historical baseline variance
 - Governor integration for autonomy promotion (L2→L3 gates)
+
+### T-028.1 — LM-as-Judge for eval harness
+**Status:** DONE
+**Milestone:** M3
+**Completed:** 2026-01-07
+
+**Scope:** Add optional LM-as-judge evaluation using Claude to assess roast quality on qualitative dimensions beyond numeric metrics
+
+**Deliverables:**
+- LMJudge class (services/eval/src/core/lm-judge.ts):
+  - Anthropic SDK integration for qualitative roast evaluation
+  - Four scoring dimensions (0-100 scale):
+    - planClarity: How well-defined and explainable is the roast progression
+    - physicsPlausibility: Realistic temperature curves and RoR patterns
+    - constraintRespect: Adherence to golden case tolerances
+    - safetyScore: Detection of dangerous patterns (scorching, underdevelopment, extreme RoR)
+  - buildPrompt() constructs detailed evaluation prompts with golden case context
+  - Returns LMJudgeScore with scores, warnings, violations, reasoning
+  - Graceful degradation: returns null if disabled or no API key
+- EvalService integration (services/eval/src/core/eval-service.ts):
+  - Added LMJudgeConfig parameter to constructor
+  - runEvaluation() calls lmJudge.evaluate() before persisting eval run
+  - Results stored in evalRun.lmJudge optional field
+- Server configuration (services/eval/src/server.ts):
+  - BuildServerOptions: lmJudgeEnabled, lmJudgeApiKey, lmJudgeModel
+  - Reads from environment: LM_JUDGE_ENABLED, ANTHROPIC_API_KEY, LM_JUDGE_MODEL
+  - Default model: claude-3-5-sonnet-20241022
+  - Disabled by default (opt-in feature)
+- Dependency: @anthropic-ai/sdk ^0.32.1 added to services/eval/package.json
+- Unit tests (services/eval/tests/lm-judge.test.ts):
+  - Test: returns null when disabled
+  - Test: returns null when enabled but no API key
+  - Test: constructs judge with custom model
+- Documentation (docs/ops/eval-harness.md):
+  - Comprehensive "LM-as-Judge (T-028 P1)" section added
+  - Documents 4 evaluation dimensions with explanations
+  - Shows example JSON output format
+  - Configuration instructions (environment variables)
+  - Cost considerations (~$0.01-0.03 per evaluation)
+  - Use cases: quality assurance, training datasets, explainability, safety detection
+
+**Evidence:**
+- `pnpm --filter @sim-corp/eval test` (8 tests passing: 5 existing + 3 new)
+
+**Key artifacts:**
+- `services/eval/src/core/lm-judge.ts` — LMJudge class implementation
+- `services/eval/src/core/eval-service.ts` — LM judge integration
+- `services/eval/src/server.ts` — environment configuration
+- `services/eval/tests/lm-judge.test.ts` — unit tests
+- `services/eval/package.json` — @anthropic-ai/sdk dependency
+- `docs/ops/eval-harness.md` — comprehensive documentation (lines 372-449)
+
+**Impact:** Eval harness now supports optional qualitative evaluation beyond numeric metrics. LM-as-judge catches subtle quality issues not captured by numeric gates, provides explainable reasoning for eval outcomes, and detects potentially dangerous roasting patterns. Opt-in design with cost awareness (~$0.01-0.03 per eval). Foundation for training datasets and future ML model development. M3 Design Partner Pilot now fully unblocked.
+
+**Design Decisions:**
+- Optional/opt-in by default (no API key required for basic operation)
+- Environment-driven configuration (no code changes needed to enable)
+- Graceful degradation (evaluations work normally without LM judge)
+- Cost-aware documentation (helps operators use selectively)
+- Temperature 0.3 for consistent judging across evaluations
+- Prompt includes full golden case context for informed evaluation
 
 ### T-029 — Bullet R1 read-only driver (vendor-specific)
 **Status:** PLANNED

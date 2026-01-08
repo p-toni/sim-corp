@@ -8,6 +8,9 @@ import { registerEvaluationRoutes } from "./routes/evaluations";
 export interface BuildServerOptions {
   logger?: boolean;
   dbPath?: string;
+  lmJudgeEnabled?: boolean;
+  lmJudgeApiKey?: string;
+  lmJudgeModel?: string;
 }
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -16,7 +19,15 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   // Initialize database and repository
   const db = openDatabase(options.dbPath);
   const repo = new EvalRepository(db);
-  const evalService = new EvalService(repo);
+
+  // Configure LM judge (read from environment if not provided)
+  const lmJudgeConfig = {
+    enabled: options.lmJudgeEnabled ?? process.env.LM_JUDGE_ENABLED === "true",
+    apiKey: options.lmJudgeApiKey ?? process.env.ANTHROPIC_API_KEY,
+    model: options.lmJudgeModel ?? process.env.LM_JUDGE_MODEL,
+  };
+
+  const evalService = new EvalService(repo, lmJudgeConfig);
 
   // Health check
   app.get("/health", () => ({ status: "ok", service: "eval" }));

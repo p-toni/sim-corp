@@ -369,8 +369,81 @@ pnpm --filter @sim-corp/eval dev
 # Service runs on http://127.0.0.1:4007
 ```
 
+## LM-as-Judge (T-028 P1)
+
+The evaluation harness supports optional **LM-as-judge** evaluation using Claude to assess roast quality on dimensions beyond numeric metrics.
+
+### What LM-as-Judge Evaluates
+
+When enabled, Claude evaluates each roast session on four dimensions (0-100 scale):
+
+1. **Plan Clarity**: How well-defined and explainable is the roast progression? Are key events (TP, FC, drop) clearly identified?
+
+2. **Physics Plausibility**: Does the roast follow realistic physics? Are temperature progressions, RoR patterns, and timing plausible for this bean/machine/batch?
+
+3. **Constraint Respect**: How well does the roast adhere to the golden case tolerances? Are errors within acceptable ranges?
+
+4. **Safety Score**: Are there any dangerous patterns (extreme RoR spikes/crashes, scorching risk, underdevelopment risk)?
+
+### Output Format
+
+LM judge scores are included in the `lmJudge` field of EvalRun responses:
+
+```json
+{
+  "id": "eval-xyz789",
+  "sessionId": "session-123",
+  "outcome": "PASS",
+  "lmJudge": {
+    "planClarity": 85,
+    "physicsPlausibility": 92,
+    "constraintRespect": 78,
+    "safetyScore": 95,
+    "safetyWarnings": [],
+    "physicsViolations": [],
+    "constraintViolations": ["Drop time 15s beyond tolerance"],
+    "modelId": "claude-3-5-sonnet-20241022",
+    "evaluatedAt": "2026-01-07T21:00:00Z",
+    "reasoning": "Solid roast with good physics adherence. Minor timing deviation but within safe ranges. Clean temperature curve with no concerning patterns."
+  }
+}
+```
+
+### Enabling LM-as-Judge
+
+Set the following environment variables:
+
+```bash
+# Enable LM-as-judge evaluation
+LM_JUDGE_ENABLED=true
+
+# Anthropic API key (required if enabled)
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Optional: Override default model
+LM_JUDGE_MODEL=claude-3-5-sonnet-20241022
+```
+
+**Note:** LM-as-judge is **optional** and disabled by default. Evaluations run normally without it, using only numeric metrics. This feature is most valuable for:
+
+- **Quality assurance**: Catching subtle issues not captured by numeric gates
+- **Training datasets**: Generating labeled data for future ML models
+- **Explainability**: Providing human-readable reasoning for eval outcomes
+- **Safety**: Detecting potentially dangerous roasting patterns
+
+### Cost Considerations
+
+Each LM-as-judge evaluation costs approximately **$0.01-0.03** depending on telemetry size (Claude 3.5 Sonnet pricing). For high-volume evaluation:
+
+- Use selectively (e.g., only for FAIL/WARN cases or spot checks)
+- Consider caching results for identical golden case + analysis pairs
+- Monitor API costs via Anthropic Console
+
 ## Environment Variables
 
 - `PORT`: HTTP port (default: 4007)
 - `HOST`: Bind address (default: 127.0.0.1)
 - `EVAL_DB_PATH`: SQLite database path (default: ./data/eval.db)
+- `LM_JUDGE_ENABLED`: Enable LM-as-judge evaluation (default: false)
+- `ANTHROPIC_API_KEY`: Anthropic API key for LM judge (required if LM_JUDGE_ENABLED=true)
+- `LM_JUDGE_MODEL`: Claude model ID (default: claude-3-5-sonnet-20241022)

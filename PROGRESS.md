@@ -3,7 +3,7 @@
 This file tracks per-task/per-session progress. Keep it short and focused on the current work.
 
 ## Current objective
-M4 P1 Enhancements (All P1 tasks complete!)
+T-028.1 LM-as-Judge for Eval Harness (COMPLETE)
 
 ## Current state (what is true now)
 - M4 (Safe Autopilot L3 Beta) complete and merged
@@ -16,6 +16,37 @@ M4 P1 Enhancements (All P1 tasks complete!)
 - Need to build analytics layer on top of existing command infrastructure
 
 ## What changed in this session
+- **T-028.1 LM-as-Judge for Eval Harness** (COMPLETE)
+  - Implemented LMJudge class (services/eval/src/core/lm-judge.ts):
+    - Anthropic SDK integration for qualitative roast evaluation
+    - Four scoring dimensions (0-100): planClarity, physicsPlausibility, constraintRespect, safetyScore
+    - buildPrompt() constructs detailed evaluation prompts with golden case context
+    - Returns LMJudgeScore with scores, warnings, violations, reasoning
+    - Graceful degradation: returns null if disabled or no API key
+  - Integrated LM judge into EvalService (services/eval/src/core/eval-service.ts):
+    - Added LMJudgeConfig parameter to constructor
+    - runEvaluation() calls lmJudge.evaluate() before persisting
+    - Results stored in evalRun.lmJudge field
+  - Added server configuration (services/eval/src/server.ts):
+    - BuildServerOptions: lmJudgeEnabled, lmJudgeApiKey, lmJudgeModel
+    - Reads from environment: LM_JUDGE_ENABLED, ANTHROPIC_API_KEY, LM_JUDGE_MODEL
+    - Default model: claude-3-5-sonnet-20241022
+    - Disabled by default (opt-in feature)
+  - Added @anthropic-ai/sdk dependency to services/eval/package.json
+  - Created unit tests (services/eval/tests/lm-judge.test.ts):
+    - Test: returns null when disabled
+    - Test: returns null when enabled but no API key
+    - Test: constructs judge with custom model
+    - All 8 eval service tests passing (5 existing + 3 new)
+  - Updated documentation (docs/ops/eval-harness.md):
+    - Added comprehensive "LM-as-Judge (T-028 P1)" section
+    - Documents 4 evaluation dimensions with explanations
+    - Shows example JSON output format
+    - Configuration instructions (environment variables)
+    - Cost considerations (~$0.01-0.03 per evaluation)
+    - Use cases: quality assurance, training datasets, explainability, safety
+  - Updated task registries and continuity files
+  - M3 Design Partner Pilot now fully unblocked
 - **T-032 Command Analytics & Monitoring** (COMPLETE)
   - Updated CONTINUITY.md with T-032 goal and status
   - Updated task-registry.json (T-032: PLANNED → NOW → DONE)
@@ -176,3 +207,14 @@ pnpm harness:init  # Environment validation (Node 20.19.1, pnpm 9.11.0)
   - All 21 command service tests passing, 18 desktop tests passing
   - Desktop build successful
   - Complete audit trail now queryable with flexible filtering
+- 2026-01-07 17:00: **T-028.1 LM-as-Judge for Eval Harness** (COMPLETE)
+  - Implemented LMJudge class with Anthropic SDK integration (services/eval/src/core/lm-judge.ts)
+  - Four scoring dimensions: planClarity, physicsPlausibility, constraintRespect, safetyScore
+  - Integrated into EvalService with LMJudgeConfig parameter
+  - Added server configuration (LM_JUDGE_ENABLED, ANTHROPIC_API_KEY, LM_JUDGE_MODEL env vars)
+  - Added @anthropic-ai/sdk dependency to services/eval/package.json
+  - Created 3 unit tests (services/eval/tests/lm-judge.test.ts)
+  - All 8 eval service tests passing (5 existing + 3 new)
+  - Updated docs/ops/eval-harness.md with comprehensive LM-as-Judge section
+  - Updated CONTINUITY.md with T-028.1 implementation details
+  - M3 Design Partner Pilot now fully unblocked

@@ -311,13 +311,53 @@ Done:
     - Test 4: limits getAllProposals results (5 created, 3 returned with limit=3)
   - **21 command service tests passing, 18 desktop tests passing, desktop build successful**
   - **Impact**: Complete audit trail now queryable. Operators can view full command history with flexible filtering by status, machine, session, or type. Supports investigation, compliance auditing, and pattern analysis. Foundation for advanced analytics and ML-based anomaly detection.
+- **T-028.1 LM-as-Judge for Eval Harness (2026-01-07):**
+  - **Core LMJudge Implementation** (services/eval/src/core/lm-judge.ts)
+    - LMJudge class with Anthropic SDK integration
+    - Four scoring dimensions (0-100 scale):
+      - planClarity: How well-defined the roast progression is
+      - physicsPlausibility: Realistic temperature curves and RoR patterns
+      - constraintRespect: Adherence to golden case tolerances
+      - safetyScore: Detection of dangerous patterns
+    - buildPrompt() constructs detailed evaluation prompts with golden case context
+    - Returns LMJudgeScore with scores, warnings, violations, reasoning
+    - Graceful degradation: returns null if disabled or no API key
+  - **Schema Support** (libs/schemas/src/kernel/eval.ts)
+    - LMJudgeScore schema already existed from T-028 P0
+    - Integrated into EvalRun schema as optional field
+  - **Service Integration** (services/eval/src/core/eval-service.ts)
+    - Added LMJudgeConfig parameter to EvalService constructor
+    - runEvaluation() calls lmJudge.evaluate() before persisting eval run
+    - LM judge results stored in evalRun.lmJudge field
+  - **Server Configuration** (services/eval/src/server.ts)
+    - Added BuildServerOptions fields: lmJudgeEnabled, lmJudgeApiKey, lmJudgeModel
+    - Reads from environment: LM_JUDGE_ENABLED, ANTHROPIC_API_KEY, LM_JUDGE_MODEL
+    - Default model: claude-3-5-sonnet-20241022
+    - Disabled by default (opt-in feature)
+  - **Dependencies** (services/eval/package.json)
+    - Added @anthropic-ai/sdk ^0.32.1
+  - **Tests** (services/eval/tests/lm-judge.test.ts)
+    - Test 1: returns null when disabled
+    - Test 2: returns null when enabled but no API key
+    - Test 3: constructs judge with custom model
+    - All 8 eval service tests passing (5 existing + 3 new)
+  - **Documentation** (docs/ops/eval-harness.md)
+    - Added comprehensive "LM-as-Judge (T-028 P1)" section (lines 372-449)
+    - Documents 4 evaluation dimensions with explanations
+    - Shows example JSON output format
+    - Configuration instructions (environment variables)
+    - Cost considerations (~$0.01-0.03 per evaluation)
+    - Use cases: quality assurance, training datasets, explainability, safety
+    - Updated environment variables section
+  - **Impact**: Eval harness now supports optional qualitative evaluation beyond numeric metrics. LM-as-judge catches subtle quality issues, provides explainable reasoning, and detects dangerous patterns. Opt-in design with cost awareness. Foundation for training datasets and ML model development.
 
 Now:
 - M4 (Safe Autopilot L3 Beta) P0 complete
 - M4 P1 enhancements complete (T-030.10, T-030.11, T-030.12, T-030.13, T-030.14)
+- T-028.1 (LM-as-judge) complete - M3 fully unblocked
 
 Next:
-- T-028 P1 — LM-as-judge implementation (deferred to post-M4)
+- T-029a — Bullet R1 protocol recon/spec (doc-only, optional for M3)
 - T-029 — Bullet R1 USB driver (pilot-readiness follow-on, requires hardware)
 - M5 — Production Hardening (HSM integration, multi-node, monitoring)
 
@@ -331,8 +371,8 @@ Working set (files/ids/commands):
 - CONTINUITY.md
 - docs/tasks/task-registry.md
 - docs/ops/device-identity.md
-- docs/ops/eval-harness.md
-- docs/ops/command-service.md (NEW — M4 documentation)
+- docs/ops/eval-harness.md (updated with LM-as-judge docs)
+- docs/ops/command-service.md (M4 documentation)
 - libs/device-identity/* (device identity library)
 - libs/schemas/src/kernel/eval.ts (enhanced eval schemas)
 - libs/schemas/src/domain/roast-report.ts (TrustMetrics + evaluations)
@@ -343,10 +383,13 @@ Working set (files/ids/commands):
   - src/core/metrics-calculator.ts
   - src/core/evaluator.ts
   - src/core/eval-service.ts
+  - src/core/lm-judge.ts (NEW — LM-as-judge implementation)
   - src/routes/golden-cases.ts
   - src/routes/evaluations.ts
   - src/server.ts
   - tests/eval-service.test.ts (5 tests)
+  - tests/lm-judge.test.ts (NEW — 3 LM judge tests)
+  - package.json (added @anthropic-ai/sdk)
 - services/sim-publisher/src/core/publish.ts (signing integrated)
 - services/ingestion/src/core/signature-verifier.ts
 - services/ingestion/src/core/handlers.ts (verification integrated)

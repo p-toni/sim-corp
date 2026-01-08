@@ -2,6 +2,7 @@ import type { EvalRun, GoldenCase, RoastAnalysis, TelemetryPoint } from "@sim-co
 import type { EvalRepository } from "../db/repo";
 import { MetricsCalculator } from "./metrics-calculator";
 import { Evaluator } from "./evaluator";
+import { LMJudge, type LMJudgeConfig } from "./lm-judge";
 import { randomUUID } from "node:crypto";
 
 export interface RunEvaluationInput {
@@ -27,10 +28,15 @@ export interface RunEvaluationInput {
 export class EvalService {
   private readonly metricsCalculator: MetricsCalculator;
   private readonly evaluator: Evaluator;
+  private readonly lmJudge: LMJudge;
 
-  constructor(private readonly repo: EvalRepository) {
+  constructor(
+    private readonly repo: EvalRepository,
+    lmJudgeConfig?: LMJudgeConfig
+  ) {
     this.metricsCalculator = new MetricsCalculator();
     this.evaluator = new Evaluator();
+    this.lmJudge = new LMJudge(lmJudgeConfig ?? { enabled: false });
   }
 
   /**
@@ -53,6 +59,14 @@ export class EvalService {
     // Evaluate against golden case tolerances
     const { outcome, passedGates, failedGates } = this.evaluator.evaluate(goldenCase, detailedMetrics);
 
+    // Run LM-as-judge evaluation (if enabled)
+    const lmJudge = await this.lmJudge.evaluate({
+      goldenCase,
+      analysis: input.analysis,
+      telemetry: input.telemetry,
+      sessionId: input.sessionId
+    });
+
     // Create eval run
     const evalRun: EvalRun = {
       id: `eval-${randomUUID()}`,
@@ -64,6 +78,7 @@ export class EvalService {
       passedGates,
       failedGates,
       detailedMetrics,
+      lmJudge: lmJudge ?? undefined,
       commands: input.commands ?? [],
       metrics: [], // Legacy field
       orgId: input.orgId,

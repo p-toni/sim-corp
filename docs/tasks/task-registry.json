@@ -1,7 +1,7 @@
 {
   "$schema": "./task-registry-schema.json",
   "version": "1.0.0",
-  "lastUpdated": "2026-01-06T20:45:00Z",
+  "lastUpdated": "2026-01-07T17:00:00Z",
   "tasks": [
     {
       "id": "T-001",
@@ -394,6 +394,26 @@
         ]
       },
       "notes": "5 tests in eval service, 24 tests in ingestion, auto-eval on session close"
+    },
+    {
+      "id": "T-028.1",
+      "title": "LM-as-Judge for eval harness",
+      "milestone": "M3",
+      "status": "DONE",
+      "completedDate": "2026-01-07",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/eval test"
+        ],
+        "primaryArtifacts": [
+          "services/eval/src/core/lm-judge.ts (LMJudge class)",
+          "services/eval/src/core/eval-service.ts (integration)",
+          "services/eval/src/server.ts (configuration)",
+          "services/eval/tests/lm-judge.test.ts (3 tests)",
+          "docs/ops/eval-harness.md (LM-as-Judge section)"
+        ]
+      },
+      "notes": "Anthropic SDK integration, 4 scoring dimensions (planClarity, physicsPlausibility, constraintRespect, safetyScore), optional/opt-in feature, 8 eval tests passing"
     },
     {
       "id": "T-029",
