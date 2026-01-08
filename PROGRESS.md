@@ -3,7 +3,7 @@
 This file tracks per-task/per-session progress. Keep it short and focused on the current work.
 
 ## Current objective
-T-028.1 LM-as-Judge for Eval Harness (COMPLETE)
+T-029a Bullet R1 Protocol Recon/Spec (COMPLETE)
 
 ## Current state (what is true now)
 - M4 (Safe Autopilot L3 Beta) complete and merged
@@ -16,6 +16,31 @@ T-028.1 LM-as-Judge for Eval Harness (COMPLETE)
 - Need to build analytics layer on top of existing command infrastructure
 
 ## What changed in this session
+- **T-029a Bullet R1 Protocol Recon/Spec** (COMPLETE)
+  - Researched Aillio Bullet R1 V2 USB protocol (no official documentation available)
+  - Analyzed Artisan roasting software implementation (GitHub: artisan-roaster-scope/artisan)
+    - aillio_r1.py: R1 driver with comprehensive USB protocol details
+    - aillio_r2.py: R2 driver with protocol improvements (CRC32, expanded telemetry)
+  - Created comprehensive protocol specification (docs/specs/bullet-r1-usb-protocol.md):
+    - 16-section specification document
+    - USB device identification (VID: 0x0483, PID: 0x5741/0xa27e)
+    - Command structure and registry (10+ commands)
+    - Status data format (128-byte dual-packet, 40+ telemetry fields)
+    - Roaster state machine (6 states with transition rules)
+    - USB endpoints, timing requirements, platform-specific details
+    - Safety considerations and validation requirements
+    - Comprehensive references to Artisan source code
+  - Created implementation plan (docs/tasks/T-029-PLAN.md):
+    - 4-phase roadmap (Rust USB core, TS adapter, bridge integration, documentation)
+    - Architecture: Rust N-API module similar to tcp-line driver (T-020)
+    - TelemetryPoint field mapping for all Bullet R1 telemetry
+    - Error handling strategies (reconnection, validation, platform differences)
+    - Testing strategy (unit, integration, end-to-end)
+    - Deployment guide (local dev, Docker, production)
+    - Timeline estimate: 5-6 days with hardware access
+  - Updated task registries and continuity documentation
+  - T-029 driver implementation fully specced and ready for hardware phase
+  - M3 momentum maintained toward pilot hardware integration
 - **T-028.1 LM-as-Judge for Eval Harness** (COMPLETE)
   - Implemented LMJudge class (services/eval/src/core/lm-judge.ts):
     - Anthropic SDK integration for qualitative roast evaluation
@@ -110,7 +135,7 @@ T-028.1 LM-as-Judge for Eval Harness (COMPLETE)
   - L3 autonomy: agent proposes, operator approves via desktop UX
 
 ## Next step (single step)
-Continue with M4 P1 tasks or address next priority
+T-029 (Bullet R1 USB driver implementation) awaiting hardware access
 
 ## Commands run (copy/paste)
 ```bash
@@ -218,3 +243,19 @@ pnpm harness:init  # Environment validation (Node 20.19.1, pnpm 9.11.0)
   - Updated docs/ops/eval-harness.md with comprehensive LM-as-Judge section
   - Updated CONTINUITY.md with T-028.1 implementation details
   - M3 Design Partner Pilot now fully unblocked
+- 2026-01-07 21:15: **T-029a Bullet R1 Protocol Recon/Spec** (COMPLETE)
+  - Researched USB protocol (no official documentation from Aillio)
+  - Analyzed Artisan open-source roasting software implementation:
+    - aillio_r1.py: R1 driver with full USB protocol details
+    - aillio_r2.py: R2 driver showing protocol evolution
+  - Created comprehensive protocol specification (docs/specs/bullet-r1-usb-protocol.md):
+    - 16 sections covering USB IDs, commands, data format, state machine, timing, safety
+    - 128-byte dual-packet status data structure with 40+ telemetry fields
+    - Platform-specific driver requirements (libusb-1.0, WinUSB)
+    - Safety considerations and validation rules
+  - Created driver implementation plan (docs/tasks/T-029-PLAN.md):
+    - 4-phase roadmap with 5-6 day timeline (when hardware available)
+    - Architecture: Rust N-API module similar to tcp-line (T-020)
+    - Complete testing strategy and deployment guide
+  - Updated task registries (task-registry.json, task-registry.md)
+  - T-029 driver implementation fully specced and ready for hardware

@@ -424,7 +424,22 @@
         "commands": [],
         "primaryArtifacts": []
       },
-      "notes": "Blocked: USB protocol not documented, requires hardware. M3 uses tcp-line driver (T-020) instead."
+      "notes": "Blocked: Requires Bullet R1 hardware for testing. M3 uses tcp-line driver (T-020) instead. Protocol spec complete (T-029a)."
+    },
+    {
+      "id": "T-029a",
+      "title": "Bullet R1 protocol recon/spec (doc-only)",
+      "milestone": "M3",
+      "status": "DONE",
+      "completedDate": "2026-01-07",
+      "evidence": {
+        "commands": [],
+        "primaryArtifacts": [
+          "docs/specs/bullet-r1-usb-protocol.md (comprehensive USB protocol specification)",
+          "docs/tasks/T-029-PLAN.md (driver implementation plan)"
+        ]
+      },
+      "notes": "Reverse-engineered from Artisan roasting software (artisan-roaster-scope/artisan). Protocol fully documented: USB IDs, command structure, status data format, state machine, timing requirements. Ready for T-029 implementation when hardware available."
     },
     {
       "id": "T-030",

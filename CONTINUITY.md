@@ -311,6 +311,38 @@ Done:
     - Test 4: limits getAllProposals results (5 created, 3 returned with limit=3)
   - **21 command service tests passing, 18 desktop tests passing, desktop build successful**
   - **Impact**: Complete audit trail now queryable. Operators can view full command history with flexible filtering by status, machine, session, or type. Supports investigation, compliance auditing, and pattern analysis. Foundation for advanced analytics and ML-based anomaly detection.
+- **T-029a Bullet R1 Protocol Recon/Spec (2026-01-07):**
+  - **Protocol Specification** (docs/specs/bullet-r1-usb-protocol.md)
+    - Reverse-engineered from Artisan roasting software (GitHub: artisan-roaster-scope/artisan)
+    - Comprehensive 16-section USB protocol documentation
+    - USB device identification (VID: 0x0483, PID: 0x5741/0xa27e)
+    - Command structure and registry (info, status, control commands)
+    - Status data format (128-byte dual-packet, 40+ telemetry fields)
+    - Roaster state machine (6 states: OFF, Pre-heating, Charge, Roasting, Cooling, Shutdown)
+    - USB endpoints (EP_WRITE: 0x3, EP_READ: 0x81)
+    - Timing requirements (100ms polling frequency)
+    - Platform-specific driver requirements (libusb-1.0, WinUSB)
+    - Safety considerations and implementation recommendations
+  - **Implementation Plan** (docs/tasks/T-029-PLAN.md)
+    - 4-phase implementation roadmap (Rust USB core, TS adapter, bridge integration, docs)
+    - Architecture: Rust N-API module similar to tcp-line driver (T-020)
+    - TelemetryPoint field mapping for 40+ Bullet R1 telemetry fields
+    - Error handling and reconnection strategies
+    - Testing strategy (unit, integration, end-to-end)
+    - Deployment guide (local, Docker, production)
+    - Timeline estimate: 5-6 days with hardware
+  - **Key Findings:**
+    - Protocol NOT officially documented by Aillio (reverse-engineered)
+    - Heater/fan use increment/decrement commands only (no absolute setting)
+    - Dual 64-byte packet reads required for full status (128 bytes total)
+    - Validity flag (byte 41 = 0x0A) indicates data freshness
+    - No write acknowledgment (commands don't return success/failure)
+    - R2 protocol adds CRC32 validation and expanded telemetry
+  - **Sources Analyzed:**
+    - Artisan R1 driver (aillio_r1.py)
+    - Artisan R2 driver (aillio_r2.py)
+    - Artisan project documentation
+  - **Impact:** T-029 driver implementation fully specced and ready for hardware phase. Protocol details enable confident development without reverse-engineering during implementation. M3 momentum maintained toward pilot hardware integration.
 - **T-028.1 LM-as-Judge for Eval Harness (2026-01-07):**
   - **Core LMJudge Implementation** (services/eval/src/core/lm-judge.ts)
     - LMJudge class with Anthropic SDK integration
@@ -352,14 +384,14 @@ Done:
   - **Impact**: Eval harness now supports optional qualitative evaluation beyond numeric metrics. LM-as-judge catches subtle quality issues, provides explainable reasoning, and detects dangerous patterns. Opt-in design with cost awareness. Foundation for training datasets and ML model development.
 
 Now:
-- M4 (Safe Autopilot L3 Beta) P0 complete
-- M4 P1 enhancements complete (T-030.10, T-030.11, T-030.12, T-030.13, T-030.14)
+- M4 (Safe Autopilot L3 Beta) P0 + P1 complete
 - T-028.1 (LM-as-judge) complete - M3 fully unblocked
+- T-029a (Bullet R1 protocol recon) complete - T-029 ready for hardware phase
 
 Next:
-- T-029a — Bullet R1 protocol recon/spec (doc-only, optional for M3)
-- T-029 — Bullet R1 USB driver (pilot-readiness follow-on, requires hardware)
+- T-029 — Bullet R1 USB driver implementation (awaiting hardware access)
 - M5 — Production Hardening (HSM integration, multi-node, monitoring)
+- Additional pilot readiness tasks (TBD based on design partner feedback)
 
 Open questions (UNCONFIRMED if needed):
 - Event inference heuristics: May need machine-specific calibration for production
@@ -370,9 +402,12 @@ Open questions (UNCONFIRMED if needed):
 Working set (files/ids/commands):
 - CONTINUITY.md
 - docs/tasks/task-registry.md
+- docs/tasks/task-registry.json
 - docs/ops/device-identity.md
 - docs/ops/eval-harness.md (updated with LM-as-judge docs)
 - docs/ops/command-service.md (M4 documentation)
+- docs/specs/bullet-r1-usb-protocol.md (NEW — T-029a protocol spec)
+- docs/tasks/T-029-PLAN.md (NEW — T-029 implementation plan)
 - libs/device-identity/* (device identity library)
 - libs/schemas/src/kernel/eval.ts (enhanced eval schemas)
 - libs/schemas/src/domain/roast-report.ts (TrustMetrics + evaluations)

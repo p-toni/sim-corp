@@ -353,16 +353,74 @@ Rule: **Any PR that completes or changes scope of a T-task must update this file
 - Prompt includes full golden case context for informed evaluation
 
 ### T-029 — Bullet R1 read-only driver (vendor-specific)
-**Status:** PLANNED
+**Status:** PLANNED (blocked on hardware access)
 **Milestone:** Post-M3 (pilot-readiness)
 **Note:** M3 uses tcp-line driver (T-020) as "chosen vendor driver" — already supports real-hardware shadow ingestion via serial→TCP bridge with identical stack/pipeline regardless of machine.
 
 **Scope (when initiated):**
-- **Phase 1 - Research:** Reverse-engineer Aillio Bullet R1 V2 USB protocol (requires hardware access or Artisan source analysis)
-- **Phase 2 - Implementation:** USB driver implementation (likely Rust N-API similar to tcp-line)
+- **Phase 1 - Research:** ✅ DONE (T-029a) — Protocol fully documented from Artisan source analysis
+- **Phase 2 - Implementation:** USB driver implementation (Rust N-API similar to tcp-line)
 - **Phase 3 - Testing:** Validation with real Bullet R1 hardware
 
-**Blocker:** USB protocol not officially documented; requires hardware access for development
+**Blocker:** Requires physical Bullet R1 V2 hardware for development and testing
+**Prerequisite:** T-029a (Protocol Recon) — **COMPLETE**
+
+### T-029a — Bullet R1 protocol recon/spec (doc-only)
+**Status:** DONE
+**Milestone:** M3
+**Completed:** 2026-01-07
+
+**Scope:** Reverse-engineer and document Aillio Bullet R1 V2 USB protocol to enable future driver implementation
+
+**Deliverables:**
+- **Protocol Specification** (docs/specs/bullet-r1-usb-protocol.md):
+  - USB device identification (VID: 0x0483, PID: 0x5741/0xa27e)
+  - Command structure and registry (info queries, status polling, control commands)
+  - Status data format (128-byte dual-packet with 40+ telemetry fields)
+  - Roaster state machine (OFF, Pre-heating, Charge, Roasting, Cooling, Shutdown)
+  - USB endpoints and communication details (EP_WRITE: 0x3, EP_READ: 0x81)
+  - Timing requirements (100ms polling, timeout handling)
+  - Initialization sequence (info queries, device claiming)
+  - Control commands (heater, fan, drum, PRS button)
+  - Data validation (validity flags, range checks)
+  - Platform-specific considerations (Windows/Linux/macOS driver requirements)
+  - Safety considerations and implementation recommendations
+  - Comprehensive references to Artisan source code
+- **Implementation Plan** (docs/tasks/T-029-PLAN.md):
+  - Architecture overview and component structure
+  - 4-phase implementation roadmap
+  - Technical details (Rust USB core, TypeScript adapter, bridge integration)
+  - TelemetryPoint field mapping
+  - Error handling and reconnection strategies
+  - Testing strategy (unit, integration, end-to-end)
+  - Deployment guide (local, Docker, production)
+  - Blockers, risks, and mitigations
+  - Timeline estimate (5-6 days with hardware)
+
+**Evidence:**
+- Documentation artifacts in repository
+- Protocol specification reviewed and cross-referenced with Artisan source
+
+**Key artifacts:**
+- `docs/specs/bullet-r1-usb-protocol.md` — 16-section comprehensive protocol specification
+- `docs/tasks/T-029-PLAN.md` — Full implementation plan for T-029
+
+**Sources Analyzed:**
+- [Artisan R1 Driver (aillio_r1.py)](https://github.com/artisan-roaster-scope/artisan/blob/master/src/artisanlib/aillio_r1.py)
+- [Artisan R2 Driver (aillio_r2.py)](https://github.com/artisan-roaster-scope/artisan/blob/master/src/artisanlib/aillio_r2.py)
+- [Artisan Project Documentation](https://artisan-scope.org/machines/aillio/)
+
+**Impact:** T-029 (driver implementation) is now fully specced and ready to proceed when Bullet R1 hardware becomes available for testing. Protocol details enable confident driver development without reverse-engineering during implementation phase. M3 momentum maintained by documenting pilot hardware integration path.
+
+**Key Findings:**
+- Protocol is **not officially documented** by Aillio (reverse-engineered from Artisan)
+- Heater and fan use **increment/decrement commands** only (no absolute setting)
+- Status data requires **dual 64-byte packet reads** (128 bytes total)
+- **Validity flag** (byte 41 = 0x0A) indicates data freshness
+- State machine has 6 states with defined transitions
+- USB communication uses **libusb-1.0** (Linux/macOS) or **WinUSB/libusb-win32** (Windows)
+- **No write acknowledgment** — commands do not return success/failure
+- R2 protocol adds CRC32 validation and expanded telemetry fields (lessons learned)
 
 ### T-030 — Safe autopilot L3 beta (explicit approval + constrained writes)
 **Status:** DONE
