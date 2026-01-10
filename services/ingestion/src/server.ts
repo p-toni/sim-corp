@@ -24,6 +24,7 @@ import { DeviceKeyStore } from "@sim-corp/device-identity";
 import { SignatureVerifier } from "./core/signature-verifier";
 import { EvalServiceClient } from "./core/eval-client";
 import { AutoEvaluator } from "./core/auto-evaluator";
+import { initializeMetrics, metricsHandler, createCounter, createGauge, Registry as PrometheusRegistry } from "@sim-corp/metrics";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -38,6 +39,54 @@ interface BuildServerOptions {
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? true });
+
+  // Initialize Prometheus metrics
+  const metricsRegistry = new PrometheusRegistry();
+  const httpMetrics = initializeMetrics({
+    serviceName: 'ingestion',
+    collectDefaultMetrics: true,
+    prefix: 'simcorp',
+    registry: metricsRegistry,
+  });
+
+  // Add HTTP metrics middleware
+  app.addHook('onRequest', httpMetrics.middleware('ingestion'));
+
+  // Business metrics for ingestion
+  const telemetryPointsTotal = createCounter({
+    name: 'simcorp_telemetry_points_total',
+    help: 'Total number of telemetry points ingested',
+    labelNames: ['device_id', 'verified'],
+    registry: metricsRegistry,
+  });
+
+  const sessionsActiveGauge = createGauge({
+    name: 'simcorp_sessions_active',
+    help: 'Number of currently active roasting sessions',
+    registry: metricsRegistry,
+  });
+
+  const sessionsClosedTotal = createCounter({
+    name: 'simcorp_sessions_closed_total',
+    help: 'Total number of sessions closed',
+    labelNames: ['reason'],
+    registry: metricsRegistry,
+  });
+
+  const verificationRateGauge = createGauge({
+    name: 'simcorp_telemetry_verification_rate',
+    help: 'Percentage of telemetry points successfully verified',
+    registry: metricsRegistry,
+  });
+
+  // Expose metrics for pipeline instrumentation
+  app.decorate('metrics', {
+    telemetryPointsTotal,
+    sessionsActiveGauge,
+    sessionsClosedTotal,
+    verificationRateGauge,
+    registry: metricsRegistry,
+  });
 
   const telemetryStore = options.telemetryStore ?? new TelemetryStore();
   const eventStore = options.eventStore ?? new EventStore();
@@ -118,6 +167,13 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   registerSessionReportRoutes(app, { repo });
   registerProfileRoutes(app, { repo });
   registerEnvelopeStreamRoutes(app, { envelopeStream });
+
+  // Prometheus metrics endpoint
+  app.get('/metrics', async (_, reply) => {
+    const metrics = await metricsHandler(metricsRegistry);
+    reply.header('Content-Type', 'text/plain; version=0.0.4');
+    return metrics;
+  });
 
   return app;
 }

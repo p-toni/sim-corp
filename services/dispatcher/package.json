@@ -12,7 +12,8 @@
   "dependencies": {
     "@sim-corp/schemas": "workspace:*",
     "fastify": "^4.29.1",
-    "mqtt": "^5.10.1"
+    "mqtt": "^5.10.1",
+    "@sim-corp/metrics": "workspace:*"
   },
   "devDependencies": {
     "@types/mqtt": "^2.5.0",

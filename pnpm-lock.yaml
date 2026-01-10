@@ -266,6 +266,9 @@ importers:
 
   services/analytics:
     dependencies:
+      '@sim-corp/metrics':
+        specifier: workspace:*
+        version: link:../../libs/metrics
       '@sim-corp/schemas':
         specifier: workspace:*
         version: link:../../libs/schemas
@@ -288,6 +291,9 @@ importers:
       '@sim-corp/driver-core':
         specifier: workspace:*
         version: link:../../drivers/core
+      '@sim-corp/metrics':
+        specifier: workspace:*
+        version: link:../../libs/metrics
       '@sim-corp/schemas':
         specifier: workspace:*
         version: link:../../libs/schemas
@@ -353,6 +359,9 @@ importers:
 
   services/dispatcher:
     dependencies:
+      '@sim-corp/metrics':
+        specifier: workspace:*
+        version: link:../../libs/metrics
       '@sim-corp/schemas':
         specifier: workspace:*
         version: link:../../libs/schemas
@@ -387,6 +396,9 @@ importers:
       '@sim-corp/driver-tcp-line':
         specifier: workspace:*
         version: link:../../drivers/tcp-line
+      '@sim-corp/metrics':
+        specifier: workspace:*
+        version: link:../../libs/metrics
       '@sim-corp/schemas':
         specifier: workspace:*
         version: link:../../libs/schemas
@@ -415,6 +427,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.32.1
         version: 0.32.1
+      '@sim-corp/metrics':
+        specifier: workspace:*
+        version: link:../../libs/metrics
       '@sim-corp/schemas':
         specifier: workspace:*
         version: link:../../libs/schemas
@@ -446,6 +461,9 @@ importers:
 
   services/event-inference:
     dependencies:
+      '@sim-corp/metrics':
+        specifier: workspace:*
+        version: link:../../libs/metrics
       '@sim-corp/schemas':
         specifier: workspace:*
         version: link:../../libs/schemas
@@ -474,6 +492,9 @@ importers:
       '@sim-corp/device-identity':
         specifier: workspace:*
         version: link:../../libs/device-identity
+      '@sim-corp/metrics':
+        specifier: workspace:*
+        version: link:../../libs/metrics
       '@sim-corp/schemas':
         specifier: workspace:*
         version: link:../../libs/schemas
@@ -508,6 +529,9 @@ importers:
       '@sim-corp/agent-runtime':
         specifier: workspace:*
         version: link:../../libs/agent-runtime
+      '@sim-corp/metrics':
+        specifier: workspace:*
+        version: link:../../libs/metrics
       '@sim-corp/roast-report-agent':
         specifier: workspace:*
         version: link:../../agents/roast-report-agent
@@ -539,6 +563,9 @@ importers:
       '@sim-corp/device-identity':
         specifier: workspace:*
         version: link:../../libs/device-identity
+      '@sim-corp/metrics':
+        specifier: workspace:*
+        version: link:../../libs/metrics
       '@sim-corp/schemas':
         specifier: workspace:*
         version: link:../../libs/schemas
@@ -567,6 +594,9 @@ importers:
 
   services/sim-twin:
     dependencies:
+      '@sim-corp/metrics':
+        specifier: workspace:*
+        version: link:../../libs/metrics
       '@sim-corp/schemas':
         specifier: workspace:*
         version: link:../../libs/schemas

@@ -6,6 +6,7 @@ import { registerHealthRoutes } from "./routes/health";
 import { registerStartRoute } from "./routes/start";
 import { registerStopRoute } from "./routes/stop";
 import { registerStatusRoute } from "./routes/status";
+import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -16,6 +17,17 @@ interface BuildServerOptions {
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? true });
+  // Initialize Prometheus metrics
+  const metricsRegistry = new PrometheusRegistry();
+  const httpMetrics = initializeMetrics({
+    serviceName: 'driver-bridge',
+    collectDefaultMetrics: true,
+    prefix: 'simcorp',
+    registry: metricsRegistry,
+  });
+
+  // Add HTTP metrics middleware
+  app.addHook('onRequest', httpMetrics.middleware('driver-bridge'));
 
   const mqttPublisher = options.mqttPublisher ?? new RealMqttPublisher();
   const driverKind = process.env.DRIVER_KIND ?? "fake";
@@ -47,6 +59,13 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
         }
       })
     );
+  });
+
+  // Prometheus metrics endpoint
+  app.get('/metrics', async (_, reply) => {
+    const metrics = await metricsHandler(metricsRegistry);
+    reply.header('Content-Type', 'text/plain; version=0.0.4');
+    return metrics;
   });
 
   return app;

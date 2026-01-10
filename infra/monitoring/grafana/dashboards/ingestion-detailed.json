@@ -1,0 +1,67 @@
+{
+  "dashboard": {
+    "title": "Ingestion Service - Detailed",
+    "tags": ["simcorp", "ingestion"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Telemetry Points Ingested (rate)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(simcorp_telemetry_points_total[5m])",
+            "legendFormat": "{{ device_id }} (verified={{ verified }})"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Active Sessions",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "simcorp_sessions_active"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Sessions Closed by Reason",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(simcorp_sessions_closed_total[5m])",
+            "legendFormat": "{{ reason }}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Telemetry Verification Rate (%)",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "simcorp_telemetry_verification_rate"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "HTTP Request Duration by Route (p95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(simcorp_http_request_duration_seconds_bucket{service=\"ingestion\"}[5m])) by (route, le))",
+            "legendFormat": "{{ route }}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+      }
+    ]
+  }
+}

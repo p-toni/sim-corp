@@ -1,0 +1,67 @@
+{
+  "dashboard": {
+    "title": "Company Kernel - Missions",
+    "tags": ["simcorp", "missions", "company-kernel"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Missions Queued (rate)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(simcorp_missions_queued_total[5m])",
+            "legendFormat": "{{ agent_id }}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Active Missions",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(simcorp_missions_active)"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Missions Completed by Status",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(simcorp_missions_completed_total[5m])",
+            "legendFormat": "{{ status }}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Mission Success Rate (%)",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "sum(rate(simcorp_missions_completed_total{status=\"success\"}[5m])) / sum(rate(simcorp_missions_completed_total[5m])) * 100"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Mission Queue Depth by Agent",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "simcorp_missions_active",
+            "legendFormat": "{{ agent_id }}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+      }
+    ]
+  }
+}

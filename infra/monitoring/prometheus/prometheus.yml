@@ -1,0 +1,107 @@
+# Prometheus Configuration for Sim-Corp Production Stack
+# Scrapes metrics from all 11 services
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'sim-corp-production'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            # - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - 'alerts.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Company Kernel (Mission Queue, Governance)
+  - job_name: 'company-kernel'
+    static_configs:
+      - targets: ['company-kernel:3000']
+        labels:
+          service: 'company-kernel'
+          tier: 'core'
+
+  # Ingestion Service (Telemetry, Events, Sessions)
+  - job_name: 'ingestion'
+    static_configs:
+      - targets: ['ingestion:4001']
+        labels:
+          service: 'ingestion'
+          tier: 'data'
+
+  # Command Service (Command Proposals, Approval, Execution)
+  - job_name: 'command'
+    static_configs:
+      - targets: ['command:3004']
+        labels:
+          service: 'command'
+          tier: 'control'
+
+  # Eval Service (Golden Cases, Evaluations, LM-as-Judge)
+  - job_name: 'eval'
+    static_configs:
+      - targets: ['eval:4007']
+        labels:
+          service: 'eval'
+          tier: 'quality'
+
+  # Sim-Twin (Deterministic Simulation Engine)
+  - job_name: 'sim-twin'
+    static_configs:
+      - targets: ['sim-twin:4002']
+        labels:
+          service: 'sim-twin'
+          tier: 'simulation'
+
+  # Analytics Service (Variance Analysis, Predictions)
+  - job_name: 'analytics'
+    static_configs:
+      - targets: ['analytics:4006']
+        labels:
+          service: 'analytics'
+          tier: 'data'
+
+  # Event Inference (Heuristic Event Detection)
+  - job_name: 'event-inference'
+    static_configs:
+      - targets: ['event-inference:4005']
+        labels:
+          service: 'event-inference'
+          tier: 'data'
+
+  # Sim-Publisher (Telemetry Publisher for Dev/Testing)
+  - job_name: 'sim-publisher'
+    static_configs:
+      - targets: ['sim-publisher:4003']
+        labels:
+          service: 'sim-publisher'
+          tier: 'simulation'
+
+  # Driver Bridge (Hardware Driver Abstraction)
+  - job_name: 'driver-bridge'
+    static_configs:
+      - targets: ['driver-bridge:4004']
+        labels:
+          service: 'driver-bridge'
+          tier: 'hardware'
+
+  # Dispatcher (Ops Event Automation)
+  - job_name: 'dispatcher'
+    static_configs:
+      - targets: ['dispatcher:4010']
+        labels:
+          service: 'dispatcher'
+          tier: 'ops'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

@@ -7,6 +7,7 @@ import { createCommandAnalytics } from "./core/analytics.js";
 import { proposalsRoutes } from "./routes/proposals.js";
 import { executionRoutes } from "./routes/execution.js";
 import { analyticsRoutes } from "./routes/analytics.js";
+import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
 
 const PORT = parseInt(process.env.COMMAND_PORT ?? "3004", 10);
 const HOST = process.env.COMMAND_HOST ?? "0.0.0.0";

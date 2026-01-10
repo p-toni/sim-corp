@@ -7,6 +7,7 @@ import { registerHealthRoutes } from "./routes/health";
 import { registerStatusRoutes } from "./routes/status";
 import { registerConfigRoutes } from "./routes/config";
 import { registerReplayRoutes } from "./routes/replay";
+import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
 
 interface BuildServerOptions {
   mqttClient?: MqttSubscriber | null;
@@ -15,6 +16,17 @@ interface BuildServerOptions {
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: true });
+  // Initialize Prometheus metrics
+  const metricsRegistry = new PrometheusRegistry();
+  const httpMetrics = initializeMetrics({
+    serviceName: 'dispatcher',
+    collectDefaultMetrics: true,
+    prefix: 'simcorp',
+    registry: metricsRegistry,
+  });
+
+  // Add HTTP metrics middleware
+  app.addHook('onRequest', httpMetrics.middleware('dispatcher'));
   const topics = resolveTopics(process.env.DISPATCHER_TOPICS);
   const goals = resolveGoals(process.env.DISPATCHER_GOALS);
   const maxAttempts = resolveMaxAttempts(process.env.DISPATCHER_MAX_ATTEMPTS);
@@ -54,6 +66,13 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   if (shouldEnableReplay()) {
     await registerReplayRoutes(app, dispatcher);
   }
+
+  // Prometheus metrics endpoint
+  app.get('/metrics', async (_, reply) => {
+    const metrics = await metricsHandler(metricsRegistry);
+    reply.header('Content-Type', 'text/plain; version=0.0.4');
+    return metrics;
+  });
 
   return app;
 }

@@ -1,0 +1,118 @@
+# Prometheus Alert Rules for Sim-Corp Production Stack
+
+groups:
+  - name: service_health
+    interval: 30s
+    rules:
+      # Service Down Alerts
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "{{ $labels.job }} has been down for more than 1 minute."
+
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(simcorp_http_requests_total{status_code=~"5.."}[5m])) by (service)
+          /
+          sum(rate(simcorp_http_requests_total[5m])) by (service)
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on {{ $labels.service }}"
+          description: "{{ $labels.service }} has >5% error rate ({{ $value | humanizePercentage }})"
+
+      # High Latency (p95 > 1s)
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(simcorp_http_request_duration_seconds_bucket[5m])
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency on {{ $labels.service }}"
+          description: "{{ $labels.service }} p95 latency is {{ $value }}s (>1s threshold)"
+
+  - name: resource_alerts
+    interval: 30s
+    rules:
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: |
+          (simcorp_process_resident_memory_bytes / 1024 / 1024 / 1024) > 1.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.service }}"
+          description: "{{ $labels.service }} is using {{ $value | humanize }}GB of memory (>1.5GB)"
+
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: |
+          rate(simcorp_process_cpu_user_seconds_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.service }}"
+          description: "{{ $labels.service }} CPU usage is {{ $value | humanizePercentage }}"
+
+  - name: business_metrics
+    interval: 30s
+    rules:
+      # Mission Queue Backlog
+      - alert: MissionQueueBacklog
+        expr: simcorp_missions_active > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Large mission queue backlog"
+          description: "{{ $value }} missions are currently active (>100 threshold)"
+
+      # Session Close Rate Drop
+      - alert: LowSessionCloseRate
+        expr: |
+          rate(simcorp_sessions_closed_total[10m]) < 0.01
+        for: 15m
+        labels:
+          severity: info
+        annotations:
+          summary: "Low session close rate"
+          description: "Session close rate has dropped below expected levels"
+
+      # Command Approval Rate Low
+      - alert: LowCommandApprovalRate
+        expr: |
+          sum(rate(simcorp_missions_completed_total{status="approved"}[10m]))
+          /
+          sum(rate(simcorp_missions_queued_total[10m]))
+          < 0.5
+        for: 15m
+        labels:
+          severity: info
+        annotations:
+          summary: "Low command approval rate"
+          description: "Command approval rate is {{ $value | humanizePercentage }} (<50%)"
+
+  - name: data_quality
+    interval: 30s
+    rules:
+      # Low Telemetry Verification Rate
+      - alert: LowVerificationRate
+        expr: simcorp_telemetry_verification_rate < 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low telemetry verification rate"
+          description: "Only {{ $value }}% of telemetry points are verified (<80% threshold)"

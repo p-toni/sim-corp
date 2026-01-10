@@ -7,6 +7,7 @@ import { registerHealthRoutes } from "./routes/health";
 import { registerStartRoute } from "./routes/start";
 import { registerStopRoute } from "./routes/stop";
 import { registerStatusRoute } from "./routes/status";
+import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -18,6 +19,17 @@ interface BuildServerOptions {
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? true });
+  // Initialize Prometheus metrics
+  const metricsRegistry = new PrometheusRegistry();
+  const httpMetrics = initializeMetrics({
+    serviceName: 'sim-publisher',
+    collectDefaultMetrics: true,
+    prefix: 'simcorp',
+    registry: metricsRegistry,
+  });
+
+  // Add HTTP metrics middleware
+  app.addHook('onRequest', httpMetrics.middleware('sim-publisher'));
 
   const mqttPublisher = options.mqttPublisher ?? new RealMqttPublisher();
   const simTwinClient = options.simTwinClient ?? new HttpSimTwinClient();
@@ -35,6 +47,13 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
         app.log.error(error, "sim-publisher: failed to disconnect MQTT publisher");
       });
     }
+  });
+
+  // Prometheus metrics endpoint
+  app.get('/metrics', async (_, reply) => {
+    const metrics = await metricsHandler(metricsRegistry);
+    reply.header('Content-Type', 'text/plain; version=0.0.4');
+    return metrics;
   });
 
   return app;

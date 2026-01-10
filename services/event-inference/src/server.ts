@@ -5,6 +5,7 @@ import { attachSubscriber } from "./mqtt/subscriber";
 import { registerHealthRoute } from "./routes/health";
 import { registerStatusRoute } from "./routes/status";
 import { registerConfigRoute } from "./routes/config";
+import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -13,6 +14,17 @@ interface BuildServerOptions {
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? true });
+  // Initialize Prometheus metrics
+  const metricsRegistry = new PrometheusRegistry();
+  const httpMetrics = initializeMetrics({
+    serviceName: 'event-inference',
+    collectDefaultMetrics: true,
+    prefix: 'simcorp',
+    registry: metricsRegistry,
+  });
+
+  // Add HTTP metrics middleware
+  app.addHook('onRequest', httpMetrics.middleware('event-inference'));
   const engine = new InferenceEngine();
 
   const mqttClient = resolveMqttClient(options.mqttClient, app);
@@ -50,6 +62,13 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   registerHealthRoute(app);
   registerStatusRoute(app, { engine });
   registerConfigRoute(app, { engine });
+
+  // Prometheus metrics endpoint
+  app.get('/metrics', async (_, reply) => {
+    const metrics = await metricsHandler(metricsRegistry);
+    reply.header('Content-Type', 'text/plain; version=0.0.4');
+    return metrics;
+  });
 
   return app;
 }

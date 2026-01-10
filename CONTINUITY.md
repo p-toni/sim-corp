@@ -418,10 +418,10 @@ Now:
 - T-029a (Bullet R1 protocol recon) complete - T-029 ready for hardware phase
 - **M5 (Production Hardening) P0 in progress**
   - T-034 (Production Docker Images) COMPLETE
-  - **T-037 (Monitoring & Observability Foundation) NOW**
+  - T-037 (Monitoring & Observability Foundation) COMPLETE
 
 Next:
-- T-037 — Monitoring & Observability Foundation (P0, NOW)
+- T-038 — Health Checks & Graceful Shutdown (P0, next)
 - T-038 — Health Checks & Graceful Shutdown (P0)
 - T-035 — Database Migration (SQLite → PostgreSQL) (P0)
 - T-039 — Backup & Disaster Recovery (P0)

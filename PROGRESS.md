@@ -3,7 +3,7 @@
 This file tracks per-task/per-session progress. Keep it short and focused on the current work.
 
 ## Current objective
-M5 Production Hardening - T-037 Monitoring & Observability Foundation (NOW)
+M5 Production Hardening - T-037 Monitoring & Observability Foundation (COMPLETE)
 
 ## Current state (what is true now)
 - M4 (Safe Autopilot L3 Beta) complete and merged
@@ -135,7 +135,7 @@ M5 Production Hardening - T-037 Monitoring & Observability Foundation (NOW)
   - L3 autonomy: agent proposes, operator approves via desktop UX
 
 ## Next step (single step)
-Design metrics architecture and add Prometheus client to all services
+T-038 (Health Checks & Graceful Shutdown) - Add /ready endpoints and dependency checks
 
 ## Commands run (copy/paste)
 ```bash
@@ -281,3 +281,32 @@ pnpm harness:init  # Environment validation (Node 20.19.1, pnpm 9.11.0)
   - Fixed .env.example secret placeholders to pass GitHub push protection
   - All M5 P0 foundation work now in main branch
   - Ready to proceed with T-037 (Monitoring & Observability)
+- 2026-01-09 22:20: **T-037 Monitoring & Observability Foundation** (COMPLETE)
+  - Created @sim-corp/metrics library with Prometheus client
+    - Standard HTTP metrics (RED: Rate, Errors, Duration)
+    - Process metrics (CPU, memory, event loop lag)
+    - Custom metrics utilities (counters, gauges, histograms)
+    - Per-instance registry for test isolation
+    - 7 unit tests passing
+  - Integrated metrics into all 11 services
+    - company-kernel: missions queued/completed/active
+    - ingestion: telemetry points, sessions, verification rate
+    - command, eval, analytics, sim-twin, sim-publisher, driver-bridge, event-inference, dispatcher
+    - All service tests passing (company-kernel 37, ingestion 24, command 21, eval 8, analytics 9)
+  - Created Prometheus configuration
+    - prometheus.yml with all 11 service scrape configs
+    - alerts.yml with critical/warning/info alert rules
+    - 30-day retention, 15s scrape interval
+  - Created Grafana dashboards (3 dashboards)
+    - Service Overview: health, request rate, errors, latency, memory
+    - Ingestion Detailed: telemetry points, sessions, verification
+    - Missions Detailed: queue depth, success rate, agent metrics
+  - Updated production docker-compose.yml
+    - Added Prometheus container (port 9090)
+    - Added Grafana container (port 3001)
+    - Health checks and resource limits
+  - Created comprehensive monitoring documentation (docs/ops/monitoring.md)
+    - Quick start guide, dashboard descriptions
+    - Alert runbooks, troubleshooting procedures
+    - PromQL query examples, custom metrics guide
+  - T-037 complete - production observability operational
