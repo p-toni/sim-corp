@@ -789,12 +789,35 @@
       "id": "T-038",
       "title": "Health Checks & Graceful Shutdown",
       "milestone": "M5",
+      "status": "DONE",
+      "completedDate": "2026-01-10",
+      "evidence": {
+        "commands": [
+          "pnpm --filter @sim-corp/health build",
+          "pnpm --filter @sim-corp/company-kernel test",
+          "pnpm --filter @sim-corp/ingestion test",
+          "pnpm --filter @sim-corp/sim-twin test"
+        ],
+        "primaryArtifacts": [
+          "libs/health/* (health check utilities library)",
+          "scripts/add-health-to-services.mjs (automation script)",
+          "services/*/src/server.ts (10 services with health checks)",
+          "infra/production/docker-compose.yml (updated healthchecks)",
+          "docs/ops/health-checks.md (comprehensive guide)"
+        ]
+      },
+      "notes": "Dual health endpoints (/health liveness, /ready readiness) with dependency checking (database, MQTT, HTTP upstream). Graceful shutdown on SIGTERM/SIGINT with 10s timeout. All 10 HTTP services integrated. Docker healthchecks use /ready endpoint. Kubernetes-ready."
+    },
+    {
+      "id": "T-035",
+      "title": "Database Migration: SQLite → PostgreSQL",
+      "milestone": "M5",
       "status": "NOW",
       "evidence": {
         "commands": [],
         "primaryArtifacts": []
       },
-      "notes": "Add /ready endpoints with dependency checks, graceful shutdown on SIGTERM, connection draining. Enable zero-downtime deployments and Kubernetes orchestration."
+      "notes": "Migrate 4 service databases (company-kernel, ingestion, eval, command) from SQLite to PostgreSQL. Enable multi-node deployment with connection pooling, read replicas, and schema migrations. Maintain SQLite support for local dev."
     }
   ],
   "statusDefinitions": {

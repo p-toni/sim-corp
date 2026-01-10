@@ -470,6 +470,7 @@ Now:
   - T-034 (Production Docker Images) COMPLETE
   - T-037 (Monitoring & Observability Foundation) COMPLETE
   - T-038 (Health Checks & Graceful Shutdown) COMPLETE
+  - **T-035 (Database Migration: SQLite → PostgreSQL) NOW**
 
 Next:
 - T-035 — Database Migration (SQLite → PostgreSQL) (P0)
