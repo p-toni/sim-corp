@@ -1,0 +1,385 @@
+{
+  "dashboard": {
+    "title": "Backup & Disaster Recovery",
+    "tags": ["backup", "disaster-recovery", "infrastructure"],
+    "timezone": "utc",
+    "refresh": "1m",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Backup Status",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "(time() - simcorp_backup_last_success_timestamp_seconds) / 60",
+            "legendFormat": "Minutes since last backup",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "calcs": ["lastNotNull"]
+          },
+          "text": {},
+          "graphMode": "none",
+          "colorMode": "background",
+          "justifyMode": "center"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "m",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 65, "color": "yellow"},
+                {"value": 120, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Backup Service Health",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+        "targets": [
+          {
+            "expr": "up{job=\"backup\"}",
+            "legendFormat": "Service Status",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "calcs": ["lastNotNull"]
+          },
+          "graphMode": "none",
+          "colorMode": "background"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}}},
+              {"type": "value", "options": {"1": {"text": "UP", "color": "green"}}}
+            ],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 1, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Latest Backup Size",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "simcorp_backup_size_bytes",
+            "legendFormat": "Backup Size",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "calcs": ["lastNotNull"]
+          },
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Total Backups",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+        "targets": [
+          {
+            "expr": "simcorp_backup_total",
+            "legendFormat": "Total Backups",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "calcs": ["lastNotNull"]
+          },
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Backup Duration Over Time",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+        "targets": [
+          {
+            "expr": "simcorp_backup_duration_seconds",
+            "legendFormat": "Duration (seconds)",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"label": "Seconds", "format": "s"},
+          {"show": false}
+        ],
+        "xaxis": {"mode": "time"},
+        "lines": true,
+        "fill": 2,
+        "linewidth": 2,
+        "legend": {"show": true, "alignAsTable": true, "values": true, "avg": true, "max": true},
+        "tooltip": {"shared": true, "sort": 0}
+      },
+      {
+        "id": 6,
+        "title": "Backup Size Trend",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+        "targets": [
+          {
+            "expr": "simcorp_backup_size_bytes",
+            "legendFormat": "Size (bytes)",
+            "refId": "A"
+          },
+          {
+            "expr": "avg_over_time(simcorp_backup_size_bytes[7d])",
+            "legendFormat": "7-day average",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"label": "Bytes", "format": "bytes"},
+          {"show": false}
+        ],
+        "xaxis": {"mode": "time"},
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "legend": {"show": true, "alignAsTable": true, "values": true, "avg": true, "current": true},
+        "tooltip": {"shared": true, "sort": 0}
+      },
+      {
+        "id": 7,
+        "title": "Backup Success Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+        "targets": [
+          {
+            "expr": "sum(rate(simcorp_backup_successes_total[5m])) / (sum(rate(simcorp_backup_successes_total[5m])) + sum(rate(simcorp_backup_failures_total[5m])))",
+            "legendFormat": "Success Rate",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"label": "Rate", "format": "percentunit", "max": 1, "min": 0},
+          {"show": false}
+        ],
+        "xaxis": {"mode": "time"},
+        "lines": true,
+        "fill": 3,
+        "linewidth": 2,
+        "thresholds": [
+          {"value": 0.95, "colorMode": "critical", "op": "lt", "fill": true, "line": true}
+        ],
+        "legend": {"show": true},
+        "tooltip": {"shared": true, "sort": 0}
+      },
+      {
+        "id": 8,
+        "title": "Backup Failures",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+        "targets": [
+          {
+            "expr": "increase(simcorp_backup_failures_total[1h])",
+            "legendFormat": "Failures per hour",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"label": "Count", "format": "short", "min": 0},
+          {"show": false}
+        ],
+        "xaxis": {"mode": "time"},
+        "bars": true,
+        "lines": false,
+        "legend": {"show": true},
+        "tooltip": {"shared": true, "sort": 0},
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {"params": [0], "type": "gt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "1h", "now"]},
+              "reducer": {"params": [], "type": "last"},
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "name": "Backup Failures Alert",
+          "noDataState": "no_data",
+          "message": "Backup failures detected"
+        }
+      },
+      {
+        "id": 9,
+        "title": "Disk Space (Backup Volume)",
+        "type": "gauge",
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 20},
+        "targets": [
+          {
+            "expr": "(1 - (simcorp_backup_disk_free_bytes / simcorp_backup_disk_total_bytes)) * 100",
+            "legendFormat": "Disk Usage %",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "max": 100,
+            "min": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 70, "color": "yellow"},
+                {"value": 85, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "RTO/RPO Status",
+        "type": "table",
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 20},
+        "targets": [
+          {
+            "expr": "(time() - simcorp_backup_last_success_timestamp_seconds) / 60",
+            "legendFormat": "RPO (minutes)",
+            "refId": "A",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "simcorp_backup_duration_seconds / 60",
+            "legendFormat": "Estimated RTO (minutes)",
+            "refId": "B",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "options": {
+          "showHeader": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {"align": "center"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 15, "color": "yellow"},
+                {"value": 60, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Backup Verification Status",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 20},
+        "targets": [
+          {
+            "expr": "simcorp_backup_verification_last_status",
+            "legendFormat": "Last Verification",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "calcs": ["lastNotNull"]
+          },
+          "graphMode": "none",
+          "colorMode": "background"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {"type": "value", "options": {"0": {"text": "FAILED", "color": "red"}}},
+              {"type": "value", "options": {"1": {"text": "PASSED", "color": "green"}}}
+            ],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 1, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 12,
+        "title": "Active Alerts",
+        "type": "alertlist",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 26},
+        "options": {
+          "showOptions": "current",
+          "maxItems": 20,
+          "sortOrder": 1,
+          "dashboardAlerts": false,
+          "alertName": "",
+          "dashboardTitle": "",
+          "folderId": 0,
+          "tags": ["backup"],
+          "stateFilter": {
+            "firing": true,
+            "pending": true,
+            "ok": false
+          },
+          "alertInstanceLabelFilter": ""
+        }
+      }
+    ],
+    "schemaVersion": 27,
+    "version": 1
+  }
+}

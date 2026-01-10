@@ -116,3 +116,93 @@ groups:
         annotations:
           summary: "Low telemetry verification rate"
           description: "Only {{ $value }}% of telemetry points are verified (<80% threshold)"
+
+  - name: backup_health
+    interval: 1m
+    rules:
+      # Backup Service Down
+      - alert: BackupServiceDown
+        expr: up{job="backup"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup service is down"
+          description: "The backup service has been down for more than 5 minutes. Automated backups are not running."
+
+      # No Recent Backup (Critical)
+      - alert: NoRecentBackup
+        expr: |
+          (time() - simcorp_backup_last_success_timestamp_seconds) > 7200
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No successful backup in 2 hours"
+          description: "The last successful backup was {{ $value | humanizeDuration }} ago. RTO/RPO targets at risk."
+
+      # Old Backup (Warning)
+      - alert: BackupTooOld
+        expr: |
+          (time() - simcorp_backup_last_success_timestamp_seconds) > 3900
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No backup in over 1 hour"
+          description: "The last backup was {{ $value | humanizeDuration }} ago (expected hourly)."
+
+      # Backup Size Anomaly
+      - alert: BackupSizeAnomaly
+        expr: |
+          abs(simcorp_backup_size_bytes - avg_over_time(simcorp_backup_size_bytes[7d]))
+          >
+          0.5 * avg_over_time(simcorp_backup_size_bytes[7d])
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backup size changed significantly"
+          description: "Backup size is {{ $value | humanize }}B, which deviates >50% from 7-day average. Possible data loss or corruption."
+
+      # Backup Failures
+      - alert: BackupFailures
+        expr: |
+          increase(simcorp_backup_failures_total[1h]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backup failures detected"
+          description: "{{ $value }} backup failures in the last hour."
+
+      # Slow Backup
+      - alert: SlowBackup
+        expr: simcorp_backup_duration_seconds > 600
+        for: 1m
+        labels:
+          severity: info
+        annotations:
+          summary: "Backup taking longer than expected"
+          description: "Last backup took {{ $value }}s (>10 minutes). Database size may be growing."
+
+      # Low Backup Disk Space
+      - alert: LowBackupDiskSpace
+        expr: |
+          (1 - (simcorp_backup_disk_free_bytes / simcorp_backup_disk_total_bytes)) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space for backups"
+          description: "Backup volume is {{ $value | humanizePercentage }} full. Clean up old backups or increase storage."
+
+      # Failed Backup Verification
+      - alert: BackupVerificationFailed
+        expr: simcorp_backup_verification_last_status != 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup verification failed"
+          description: "The last backup verification test failed. Backups may not be restorable."

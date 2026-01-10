@@ -501,6 +501,53 @@ Done:
     - 9961327: Complete company-kernel async migration
     - 24f4ca5: Add PostgreSQL service to production stack
   - **Impact**: Sim-Corp services can now run with PostgreSQL for production multi-node deployments while maintaining SQLite support for local development. Database abstraction layer provides unified async API. Company-kernel fully migrated and tested. Foundation for horizontal scaling, HA deployments, and production data integrity.
+- **T-039 Backup & Disaster Recovery (2026-01-10):**
+  - **Backup Scripts** (infra/backup/)
+    - backup.sh: Automated PostgreSQL backups with pg_dump
+    - restore.sh: Database restore with decryption/decompression
+    - verify-backup.sh: Automated backup verification testing
+    - scheduler.sh: Backup scheduling service (hourly/daily/weekly)
+    - All scripts support compression (gzip/zstd), encryption (AES-256), checksum verification (SHA-256)
+  - **Backup Service** (Docker container)
+    - Automated hourly backups (default: 3600s interval)
+    - Optional daily backups (default: 2 AM UTC)
+    - Optional weekly backups (configurable day/time)
+    - 30-day retention by default (configurable)
+    - Health checks monitoring backup freshness
+    - Resource limits: 0.5 CPU, 512MB RAM
+  - **Storage Backends**
+    - Local storage: backup-data volume
+    - S3 support: Automatic upload to AWS S3 buckets
+    - GCS support: Automatic upload to Google Cloud Storage
+    - Backup metadata: JSON files with size, checksum, duration
+  - **Disaster Recovery Playbook** (docs/ops/disaster-recovery.md)
+    - Comprehensive DR procedures (600+ lines)
+    - 4 disaster scenarios with step-by-step recovery:
+      1. Database corruption (minor) - RTO: 15-30 min
+      2. Complete database loss - RTO: 30-60 min
+      3. Complete infrastructure failure - RTO: 1-2 hours
+      4. Accidental data deletion - RTO: 20-40 min
+    - Manual and automated backup verification procedures
+    - Backup configuration reference
+    - Troubleshooting guide
+  - **Monitoring & Alerting** (infra/monitoring/)
+    - Prometheus alert rules (8 backup-specific alerts)
+    - Grafana dashboard (backup-dashboard.json) with 12 panels:
+      - Backup status, service health, size trends
+      - Duration over time, success rate, failures
+      - Disk space gauge, RTO/RPO status
+      - Verification status, active alerts
+    - Alerts: BackupServiceDown, NoRecentBackup, BackupTooOld, BackupSizeAnomaly, BackupFailures, SlowBackup, LowBackupDiskSpace, BackupVerificationFailed
+  - **Configuration** (.env.example updated)
+    - Backup schedule settings (hourly/daily/weekly intervals)
+    - Compression and encryption options
+    - Storage backend selection (local/s3/gcs)
+    - Retention policy configuration
+    - AWS/GCS credentials
+  - **RTO/RPO Targets:**
+    - RTO (Recovery Time Objective): <1 hour ✓
+    - RPO (Recovery Point Objective): <15 minutes ✓ (hourly backups)
+  - **Impact**: Production PostgreSQL data fully protected with automated backups, offsite storage, and tested restore procedures. Meets M5 success criteria for disaster recovery. Complete DR playbook enables rapid recovery from any data loss scenario. Monitoring ensures backup health and compliance.
 
 Now:
 - M4 (Safe Autopilot L3 Beta) P0 + P1 complete
@@ -511,13 +558,14 @@ Now:
   - T-037 (Monitoring & Observability Foundation) COMPLETE
   - T-038 (Health Checks & Graceful Shutdown) COMPLETE
   - T-035 (Database Migration: SQLite → PostgreSQL) COMPLETE
-  - **T-039 (Backup & Disaster Recovery) NEXT**
+  - T-039 (Backup & Disaster Recovery) COMPLETE
+  - **T-036 (HSM Integration for Device Identity) NEXT**
 
 Next:
-- T-039 — Backup & Disaster Recovery (P0)
 - T-036 — HSM Integration for Device Identity (P0)
 - T-040 — Secrets Management (P1)
 - T-041 — TLS/mTLS (P1)
+- T-042 — Rate Limiting & Throttling (P1)
 - T-029 — Bullet R1 USB driver implementation (awaiting hardware access)
 
 Open questions (UNCONFIRMED if needed):

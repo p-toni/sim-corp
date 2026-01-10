@@ -61,6 +61,63 @@ services:
           cpus: '1.0'
           memory: 1G
 
+  backup:
+    build:
+      context: ../backup
+      dockerfile: Dockerfile
+    image: simcorp/backup:latest
+    container_name: sim-backup-prod
+    restart: unless-stopped
+    environment:
+      # PostgreSQL connection
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-simcorp}
+      POSTGRES_USER: ${POSTGRES_USER:-simcorp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-simcorp_dev_password}
+      # Backup settings
+      BACKUP_DIR: /backups
+      BACKUP_TYPE: full
+      RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      COMPRESSION: ${BACKUP_COMPRESSION:-gzip}
+      ENCRYPTION: ${BACKUP_ENCRYPTION:-false}
+      ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
+      # Scheduler settings
+      HOURLY_BACKUP: ${HOURLY_BACKUP:-true}
+      HOURLY_INTERVAL: ${HOURLY_INTERVAL:-3600}
+      DAILY_BACKUP: ${DAILY_BACKUP:-true}
+      DAILY_TIME: ${DAILY_TIME:-02:00}
+      WEEKLY_BACKUP: ${WEEKLY_BACKUP:-false}
+      WEEKLY_DAY: ${WEEKLY_DAY:-0}
+      WEEKLY_TIME: ${WEEKLY_TIME:-03:00}
+      # Storage backend (local, s3, gcs)
+      BACKUP_STORAGE: ${BACKUP_STORAGE:-local}
+      S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      GCS_BUCKET: ${BACKUP_GCS_BUCKET:-}
+      # AWS credentials (if using S3)
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+    volumes:
+      - backup-data:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "test", "-f", "/backups/backup.log"]
+      interval: 5m
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
   # ============================================================================
   # Core Services
   # ============================================================================
@@ -543,6 +600,8 @@ volumes:
   mosquitto-log:
     driver: local
   postgres-data:
+    driver: local
+  backup-data:
     driver: local
   kernel-data:
     driver: local
