@@ -33,6 +33,34 @@ services:
           cpus: '0.5'
           memory: 256M
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: sim-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-simcorp}
+      POSTGRES_USER: ${POSTGRES_USER:-simcorp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-simcorp_dev_password}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+
   # ============================================================================
   # Core Services
   # ============================================================================
@@ -47,6 +75,16 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      # Database configuration (PostgreSQL in production)
+      DATABASE_TYPE: ${DATABASE_TYPE:-postgres}
+      DATABASE_HOST: ${DATABASE_HOST:-postgres}
+      DATABASE_PORT: ${DATABASE_PORT:-5432}
+      DATABASE_NAME: ${DATABASE_NAME:-simcorp}
+      DATABASE_USER: ${DATABASE_USER:-simcorp}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-simcorp_dev_password}
+      DATABASE_POOL_MIN: ${DATABASE_POOL_MIN:-2}
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+      # Legacy SQLite path (for DATABASE_TYPE=sqlite)
       KERNEL_DB_PATH: /app/var/kernel/kernel.db
       LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
@@ -54,6 +92,8 @@ services:
     ports:
       - "3000:3000"
     depends_on:
+      postgres:
+        condition: service_healthy
       mosquitto:
         condition: service_healthy
     healthcheck:
@@ -501,6 +541,8 @@ volumes:
   mosquitto-data:
     driver: local
   mosquitto-log:
+    driver: local
+  postgres-data:
     driver: local
   kernel-data:
     driver: local
