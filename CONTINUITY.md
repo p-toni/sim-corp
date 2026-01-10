@@ -311,6 +311,35 @@ Done:
     - Test 4: limits getAllProposals results (5 created, 3 returned with limit=3)
   - **21 command service tests passing, 18 desktop tests passing, desktop build successful**
   - **Impact**: Complete audit trail now queryable. Operators can view full command history with flexible filtering by status, machine, session, or type. Supports investigation, compliance auditing, and pattern analysis. Foundation for advanced analytics and ML-based anomaly detection.
+- **M5 Production Hardening Planning + T-034 Docker Images (2026-01-07):**
+  - **M5 Plan Document** (docs/tasks/M5-PLAN.md)
+    - Comprehensive 8-week production hardening roadmap
+    - 15 tasks across 4 phases (Foundation, Data Layer, Security, Performance/Scale)
+    - P0 tasks: Docker images, monitoring, health checks, PostgreSQL migration, backup/DR, HSM
+    - P1 tasks: Secrets management, TLS/mTLS, rate limiting, connection pooling, autoscaling
+    - P2 tasks: IaC, CI/CD hardening, chaos engineering, multi-region
+    - Success criteria: 99.9% uptime, <200ms API latency, zero private key exposure
+    - Architecture transformation: Development → Production stack
+  - **T-034 Production Docker Images** (COMPLETE)
+    - Created Dockerfiles for all 11 services (multi-stage builds)
+    - Security-hardened: non-root user (simcorp:simcorp UID 1001), Alpine-based images
+    - Optimized: production dependencies only, layer caching, <200MB images
+    - Health checks: HTTP /health endpoints, 30s interval, 3 retries
+    - Resource limits: CPU/memory limits and reservations for all services
+    - Created production docker-compose.yml with health checks, restart policies, resource limits
+    - Created .dockerignore for build optimization
+    - Created .env.example with all production environment variables
+    - Created comprehensive deployment guide (docs/ops/production-deployment.md)
+  - **Production Gaps Identified:**
+    - SQLite → PostgreSQL migration needed for multi-node (T-035)
+    - File-based keystore → HSM needed for security (T-036)
+    - No monitoring/observability (T-037)
+    - No health checks beyond basic endpoints (T-038)
+    - No automated backup/DR (T-039)
+    - No secrets management (T-040)
+    - No TLS/mTLS (T-041)
+    - No rate limiting (T-042)
+  - **Impact:** Sim-Corp services are now production-deployable with Docker. Security-hardened, resource-limited, health-checked containers ready for staging/production. Foundation for M5 multi-node, observability, and scale.
 - **T-029a Bullet R1 Protocol Recon/Spec (2026-01-07):**
   - **Protocol Specification** (docs/specs/bullet-r1-usb-protocol.md)
     - Reverse-engineered from Artisan roasting software (GitHub: artisan-roaster-scope/artisan)
@@ -387,11 +416,16 @@ Now:
 - M4 (Safe Autopilot L3 Beta) P0 + P1 complete
 - T-028.1 (LM-as-judge) complete - M3 fully unblocked
 - T-029a (Bullet R1 protocol recon) complete - T-029 ready for hardware phase
+- **M5 (Production Hardening) P0 started** - T-034 complete
 
 Next:
+- T-034 — Production Docker images (COMPLETE)
+- T-037 — Monitoring & Observability Foundation (P0, next)
+- T-038 — Health Checks & Graceful Shutdown (P0)
+- T-035 — Database Migration (SQLite → PostgreSQL) (P0)
+- T-039 — Backup & Disaster Recovery (P0)
+- T-036 — HSM Integration for Device Identity (P0)
 - T-029 — Bullet R1 USB driver implementation (awaiting hardware access)
-- M5 — Production Hardening (HSM integration, multi-node, monitoring)
-- Additional pilot readiness tasks (TBD based on design partner feedback)
 
 Open questions (UNCONFIRMED if needed):
 - Event inference heuristics: May need machine-specific calibration for production

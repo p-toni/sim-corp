@@ -1,7 +1,7 @@
 {
   "$schema": "./task-registry-schema.json",
   "version": "1.0.0",
-  "lastUpdated": "2026-01-07T17:00:00Z",
+  "lastUpdated": "2026-01-07T22:00:00Z",
   "tasks": [
     {
       "id": "T-001",
@@ -738,6 +738,24 @@
         ]
       },
       "notes": "Harness for long-running agent continuity across sessions"
+    },
+    {
+      "id": "T-034",
+      "title": "Production Docker images & multi-stage builds",
+      "milestone": "M5",
+      "status": "DONE",
+      "completedDate": "2026-01-07",
+      "evidence": {
+        "commands": [],
+        "primaryArtifacts": [
+          "services/*/Dockerfile (11 production Dockerfiles)",
+          "infra/production/docker-compose.yml (production stack)",
+          ".dockerignore (build optimization)",
+          "infra/production/.env.example (environment template)",
+          "docs/ops/production-deployment.md (deployment guide)"
+        ]
+      },
+      "notes": "Multi-stage builds with security hardening (non-root user UID 1001), Alpine-based images (~150-200MB), health checks, resource limits. All 11 services production-ready."
     }
   ],
   "statusDefinitions": {

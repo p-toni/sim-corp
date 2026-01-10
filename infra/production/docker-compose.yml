@@ -1,0 +1,396 @@
+version: "3.9"
+
+# Sim-Corp Production Stack
+# Uses production Docker images with health checks, resource limits, and restart policies
+
+services:
+  # ============================================================================
+  # Infrastructure
+  # ============================================================================
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: sim-mosquitto-prod
+    restart: unless-stopped
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # ============================================================================
+  # Core Services
+  # ============================================================================
+
+  company-kernel:
+    build:
+      context: ../../
+      dockerfile: services/company-kernel/Dockerfile
+    image: simcorp/company-kernel:latest
+    container_name: sim-company-kernel-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      KERNEL_DB_PATH: /app/var/kernel/kernel.db
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - kernel-data:/app/var/kernel
+    ports:
+      - "3000:3000"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  ingestion:
+    build:
+      context: ../../
+      dockerfile: services/ingestion/Dockerfile
+    image: simcorp/ingestion:latest
+    container_name: sim-ingestion-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4001
+      INGESTION_DB_PATH: /app/var/ingestion/ingestion.db
+      INGESTION_MQTT_URL: mqtt://mosquitto:1883
+      INGESTION_MQTT_CLIENT_ID: ingestion-prod
+      INGESTION_KERNEL_URL: http://company-kernel:3000
+      INGESTION_OPS_EVENTS_ENABLED: "true"
+      INGESTION_OPS_MQTT_URL: mqtt://mosquitto:1883
+      INGESTION_KERNEL_ENQUEUE_FALLBACK_ENABLED: "true"
+      AUTO_REPORT_MISSIONS_ENABLED: "true"
+      AUTO_EVAL_ENABLED: ${AUTO_EVAL_ENABLED:-false}
+      EVAL_SERVICE_URL: ${EVAL_SERVICE_URL:-http://eval:4007}
+      COMMAND_SERVICE_URL: ${COMMAND_SERVICE_URL:-http://command:3004}
+      AUTH_MODE: ${AUTH_MODE:-clerk}
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - ingestion-data:/app/var/ingestion
+    ports:
+      - "4001:4001"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      company-kernel:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+
+  command:
+    build:
+      context: ../../
+      dockerfile: services/command/Dockerfile
+    image: simcorp/command:latest
+    container_name: sim-command-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3004
+      COMMAND_DB_PATH: /app/var/command/command.db
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - command-data:/app/var/command
+    ports:
+      - "3004:3004"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  eval:
+    build:
+      context: ../../
+      dockerfile: services/eval/Dockerfile
+    image: simcorp/eval:latest
+    container_name: sim-eval-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4007
+      EVAL_DB_PATH: /app/var/eval/eval.db
+      LM_JUDGE_ENABLED: ${LM_JUDGE_ENABLED:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      LM_JUDGE_MODEL: ${LM_JUDGE_MODEL:-claude-3-5-sonnet-20241022}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - eval-data:/app/var/eval
+    ports:
+      - "4007:4007"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ============================================================================
+  # Processing Services
+  # ============================================================================
+
+  sim-twin:
+    build:
+      context: ../../
+      dockerfile: services/sim-twin/Dockerfile
+    image: simcorp/sim-twin:latest
+    container_name: sim-twin-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4002
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "4002:4002"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '1.0'
+          memory: 512M
+
+  analytics:
+    build:
+      context: ../../
+      dockerfile: services/analytics/Dockerfile
+    image: simcorp/analytics:latest
+    container_name: sim-analytics-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4006
+      ANALYTICS_PORT: 4006
+      INGESTION_URL: http://ingestion:4001
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "4006:4006"
+    depends_on:
+      ingestion:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  event-inference:
+    build:
+      context: ../../
+      dockerfile: services/event-inference/Dockerfile
+    image: simcorp/event-inference:latest
+    container_name: sim-event-inference-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4005
+      EVENT_INFERENCE_PORT: 4005
+      MQTT_URL: mqtt://mosquitto:1883
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "4005:4005"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # ============================================================================
+  # Publishing & Integration
+  # ============================================================================
+
+  sim-publisher:
+    build:
+      context: ../../
+      dockerfile: services/sim-publisher/Dockerfile
+    image: simcorp/sim-publisher:latest
+    container_name: sim-publisher-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4003
+      MQTT_URL: mqtt://mosquitto:1883
+      SIM_TWIN_URL: http://sim-twin:4002
+      DEVICE_KEYSTORE_PATH: ${DEVICE_KEYSTORE_PATH:-/app/var/device-keys}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "4003:4003"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      sim-twin:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  driver-bridge:
+    build:
+      context: ../../
+      dockerfile: services/driver-bridge/Dockerfile
+    image: simcorp/driver-bridge:latest
+    container_name: sim-driver-bridge-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4004
+      MQTT_URL: mqtt://mosquitto:1883
+      DRIVER_TYPE: ${DRIVER_TYPE:-fake}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "4004:4004"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # ============================================================================
+  # Workers & Automation
+  # ============================================================================
+
+  report-worker:
+    build:
+      context: ../../
+      dockerfile: services/report-worker/Dockerfile
+    image: simcorp/report-worker:latest
+    container_name: sim-report-worker-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4007
+      REPORT_WORKER_PORT: 4007
+      KERNEL_URL: http://company-kernel:3000
+      INGESTION_URL: http://ingestion:4001
+      ANALYTICS_URL: http://analytics:4006
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "4008:4007"
+    depends_on:
+      company-kernel:
+        condition: service_healthy
+      ingestion:
+        condition: service_healthy
+      analytics:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+
+  dispatcher:
+    build:
+      context: ../../
+      dockerfile: services/dispatcher/Dockerfile
+    image: simcorp/dispatcher:latest
+    container_name: sim-dispatcher-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4010
+      DISPATCHER_PORT: 4010
+      DISPATCHER_MQTT_URL: mqtt://mosquitto:1883
+      KERNEL_URL: http://company-kernel:3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "4010:4010"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      company-kernel:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+# ============================================================================
+# Volumes (Persistent Data)
+# ============================================================================
+volumes:
+  mosquitto-data:
+    driver: local
+  mosquitto-log:
+    driver: local
+  kernel-data:
+    driver: local
+  ingestion-data:
+    driver: local
+  command-data:
+    driver: local
+  eval-data:
+    driver: local
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  default:
+    name: sim-prod
+    driver: bridge

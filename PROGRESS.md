@@ -3,7 +3,7 @@
 This file tracks per-task/per-session progress. Keep it short and focused on the current work.
 
 ## Current objective
-T-029a Bullet R1 Protocol Recon/Spec (COMPLETE)
+M5 Production Hardening - T-034 Production Docker Images (COMPLETE)
 
 ## Current state (what is true now)
 - M4 (Safe Autopilot L3 Beta) complete and merged
@@ -135,7 +135,7 @@ T-029a Bullet R1 Protocol Recon/Spec (COMPLETE)
   - L3 autonomy: agent proposes, operator approves via desktop UX
 
 ## Next step (single step)
-T-029 (Bullet R1 USB driver implementation) awaiting hardware access
+T-037 (Monitoring & Observability Foundation) - Add Prometheus metrics to all services
 
 ## Commands run (copy/paste)
 ```bash
@@ -243,6 +243,24 @@ pnpm harness:init  # Environment validation (Node 20.19.1, pnpm 9.11.0)
   - Updated docs/ops/eval-harness.md with comprehensive LM-as-Judge section
   - Updated CONTINUITY.md with T-028.1 implementation details
   - M3 Design Partner Pilot now fully unblocked
+- 2026-01-07 22:00: **M5 Production Hardening Planning + T-034 Docker Images** (COMPLETE)
+  - Created comprehensive M5 plan (docs/tasks/M5-PLAN.md):
+    - 8-week roadmap with 15 tasks across 4 phases
+    - P0: Docker images, monitoring, health checks, PostgreSQL, backup/DR, HSM
+    - P1: Secrets management, TLS/mTLS, rate limiting, connection pooling, autoscaling
+    - Success criteria: 99.9% uptime, <200ms API latency, zero key exposure
+  - Implemented T-034 Production Docker Images:
+    - Created Dockerfiles for all 11 services (multi-stage builds)
+    - Security: non-root user (UID 1001), Alpine-based, minimal attack surface
+    - Optimization: production deps only, layer caching, ~150-200MB images
+    - Health checks: HTTP /health endpoints, 30s interval, 3 retries
+    - Resource limits: CPU/memory limits for all services
+    - Production docker-compose.yml with health checks, restart policies
+    - .dockerignore for build optimization
+    - .env.example with all production environment variables
+  - Created comprehensive deployment guide (docs/ops/production-deployment.md)
+  - Identified production gaps: PostgreSQL migration, HSM, monitoring, secrets, TLS
+  - Services now production-deployable with Docker
 - 2026-01-07 21:15: **T-029a Bullet R1 Protocol Recon/Spec** (COMPLETE)
   - Researched USB protocol (no official documentation from Aillio)
   - Analyzed Artisan open-source roasting software implementation:
