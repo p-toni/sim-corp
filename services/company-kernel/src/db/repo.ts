@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import Database from "better-sqlite3";
+import type { Database } from "@sim-corp/database";
 import type { Actor, GovernanceDecision, Mission, MissionSignals } from "@sim-corp/schemas";
 
 export type MissionStatus = "PENDING" | "RUNNING" | "RETRY" | "DONE" | "FAILED" | "QUARANTINED" | "BLOCKED" | "CANCELED";
@@ -28,6 +28,7 @@ interface MissionRow {
   completed_at: string | null;
   failed_at: string | null;
   result_json: string | null;
+  actor_json: string | null;
 }
 
 export interface MissionRecord extends Mission {
@@ -80,12 +81,12 @@ export interface FailOptions {
 }
 
 export class MissionRepository {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: Database) {}
 
-  createMission(input: MissionCreateInput, actor?: Actor): {
+  async createMission(input: MissionCreateInput, actor?: Actor): Promise<{
     mission: MissionRecord;
     created: boolean;
-  } {
+  }> {
     const now = new Date().toISOString();
     const id = input.missionId ?? input.id ?? this.generateMissionId();
     const goal = this.normalizeGoal(input.goal);
@@ -100,36 +101,37 @@ export class MissionRepository {
 
     const stmt = this.db.prepare(
       `INSERT INTO missions (id, goal, status, subject_id, context_json, signals_json, governance_json, params_json, idempotency_key, attempts, max_attempts, next_retry_at, created_at, updated_at, last_error_json, result_json, actor_json)
-       VALUES (@id, @goal, @status, @subjectId, @contextJson, @signalsJson, @governanceJson, @paramsJson, @idempotencyKey, 0, @maxAttempts, @nextRetryAt, @createdAt, @updatedAt, @lastErrorJson, @resultJson, @actorJson)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`
     );
     try {
-      stmt.run({
+      await stmt.run([
         id,
         goal,
         status,
-        subjectId: input.subjectId ?? null,
+        input.subjectId ?? null,
         contextJson,
         signalsJson,
         governanceJson,
-        paramsJson: paramsJson,
+        paramsJson,
         idempotencyKey,
         maxAttempts,
         nextRetryAt,
-        createdAt: input.createdAt ?? now,
-        updatedAt: now,
-        lastErrorJson: null,
-        resultJson: null,
-        actorJson: actor ? JSON.stringify(actor) : null
-      });
-      const row = this.getMissionRowById(id);
+        input.createdAt ?? now,
+        now,
+        null, // lastErrorJson
+        null, // resultJson
+        actor ? JSON.stringify(actor) : null
+      ]);
+      const row = await this.getMissionRowById(id);
       if (!row) throw new Error("failed to fetch created mission");
       return { mission: this.mapRow(row), created: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      if (!/UNIQUE constraint failed: missions.idempotency_key/.test(message)) {
+      if (!/UNIQUE constraint failed: missions.idempotency_key/.test(message) &&
+          !/duplicate key value violates unique constraint/.test(message)) {
         throw err;
       }
-      const existing = this.getMissionByIdempotencyKey(idempotencyKey);
+      const existing = await this.getMissionByIdempotencyKey(idempotencyKey);
       if (!existing) {
         throw err;
       }
@@ -137,12 +139,12 @@ export class MissionRepository {
     }
   }
 
-  getMission(id: string): MissionRecord | null {
-    const row = this.getMissionRowById(id);
+  async getMission(id: string): Promise<MissionRecord | null> {
+    const row = await this.getMissionRowById(id);
     return row ? this.mapRow(row) : null;
   }
 
-  listMissions(filters: {
+  async listMissions(filters: {
     statuses?: MissionStatus[];
     goal?: string;
     agent?: string;
@@ -153,60 +155,58 @@ export class MissionRepository {
     machineId?: string;
     limit?: number;
     offset?: number;
-  } = {}): MissionRecord[] {
+  } = {}): Promise<MissionRecord[]> {
     const conditions: string[] = [];
-    const params: Record<string, unknown> = {};
+    const params: unknown[] = [];
     const statuses = Array.isArray(filters.statuses) ? filters.statuses.filter(Boolean) : [];
     if (statuses.length > 0) {
-      const placeholders = statuses.map((_, idx) => `@status${idx}`);
+      const placeholders = statuses.map(() => '?');
       conditions.push(`status IN (${placeholders.join(",")})`);
-      statuses.forEach((status, idx) => {
-        params[`status${idx}`] = status;
-      });
+      params.push(...statuses);
     }
     if (filters.goal) {
-      conditions.push("goal = @goal");
-      params.goal = this.normalizeGoal(filters.goal);
+      conditions.push("goal = ?");
+      params.push(this.normalizeGoal(filters.goal));
     }
     if (filters.agent) {
-      conditions.push("claimed_by = @agent");
-      params.agent = filters.agent;
+      conditions.push("claimed_by = ?");
+      params.push(filters.agent);
     }
     if (filters.subjectId) {
-      conditions.push("subject_id = @subjectId");
-      params.subjectId = filters.subjectId;
+      conditions.push("subject_id = ?");
+      params.push(filters.subjectId);
     }
     if (filters.sessionId) {
-      conditions.push("json_extract(params_json, '$.sessionId') = @sessionId");
-      params.sessionId = filters.sessionId;
+      conditions.push("json_extract(params_json, '$.sessionId') = ?");
+      params.push(filters.sessionId);
     }
     if (filters.orgId) {
-      conditions.push("json_extract(context_json, '$.orgId') = @orgId");
-      params.orgId = filters.orgId;
+      conditions.push("json_extract(context_json, '$.orgId') = ?");
+      params.push(filters.orgId);
     }
     if (filters.siteId) {
-      conditions.push("json_extract(context_json, '$.siteId') = @siteId");
-      params.siteId = filters.siteId;
+      conditions.push("json_extract(context_json, '$.siteId') = ?");
+      params.push(filters.siteId);
     }
     if (filters.machineId) {
-      conditions.push("json_extract(context_json, '$.machineId') = @machineId");
-      params.machineId = filters.machineId;
+      conditions.push("json_extract(context_json, '$.machineId') = ?");
+      params.push(filters.machineId);
     }
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const requestedLimit = Number.isInteger(filters.limit) ? (filters.limit as number) : 50;
     const limit = Math.min(Math.max(requestedLimit, 1), 200);
     const offset = Number.isInteger(filters.offset) ? (filters.offset as number) : 0;
-    const rows = this.db
-      .prepare(
-        `SELECT * FROM missions ${where}
-         ORDER BY created_at DESC
-         LIMIT @limit OFFSET @offset`
-      )
-      .all({ ...params, limit, offset }) as MissionRow[];
-    return rows.map((row) => this.mapRow(row));
+
+    const result = await this.db.query<MissionRow>(
+      `SELECT * FROM missions ${where}
+       ORDER BY created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+    return result.rows.map((row) => this.mapRow(row));
   }
 
-  claimNext(options: ClaimOptions): MissionRecord | null {
+  async claimNext(options: ClaimOptions): Promise<MissionRecord | null> {
     const { agentName, goals, nowIso, leaseDurationMs } = options;
     const now = nowIso;
     const leaseExpiresAt = new Date(new Date(now).getTime() + leaseDurationMs).toISOString();
@@ -219,11 +219,10 @@ export class MissionRepository {
         (
           status = 'PENDING'
         ) OR (
-          status = 'RETRY' AND (next_retry_at IS NULL OR next_retry_at <= @now)
+          status = 'RETRY' AND (next_retry_at IS NULL OR next_retry_at <= ?)
         ) OR (
-          status = 'RUNNING' AND lease_expires_at IS NOT NULL AND lease_expires_at <= @now
-        )
-        ${goalFilter ? "AND goal IN (" + goalFilter.map((_, idx) => `@goal${idx}`).join(",") + ")" : ""}
+          status = 'RUNNING' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?)
+        ${goalFilter ? "AND goal IN (" + goalFilter.map(() => '?').join(",") + ")" : ""}
       ORDER BY
         CASE status WHEN 'PENDING' THEN 0 WHEN 'RETRY' THEN 1 ELSE 2 END,
         CASE status WHEN 'RETRY' THEN next_retry_at ELSE created_at END ASC,
@@ -231,110 +230,95 @@ export class MissionRepository {
       LIMIT 1
     `;
 
-    const candidateStmt = this.db.prepare(runnableQuery);
-
-    const params: Record<string, unknown> = { now };
+    const params: unknown[] = [now, now];
     if (goalFilter) {
-      goalFilter.forEach((g, idx) => {
-        params[`goal${idx}`] = g;
-      });
+      params.push(...goalFilter);
     }
 
-    const result = this.db.transaction(() => {
-      const candidate = candidateStmt.get(params) as { id: string } | undefined;
+    return await this.db.withTransaction(async (tx) => {
+      const candidateResult = await tx.query<{ id: string }>(runnableQuery, params);
+      const candidate = candidateResult.rows[0];
       if (!candidate) return null;
-      const update = this.db
-        .prepare(
-          `UPDATE missions
-           SET status='RUNNING',
-               claimed_by=@agentName,
-               claimed_at=@now,
-               lease_id=@leaseId,
-               lease_expires_at=@leaseExpiresAt,
-               last_heartbeat_at=@now,
-               attempts=attempts+1,
-               next_retry_at=NULL,
-               updated_at=@now
-           WHERE id=@id AND (
-             status='PENDING' OR
-             (status='RETRY' AND (next_retry_at IS NULL OR next_retry_at <= @now)) OR
-             (status='RUNNING' AND lease_expires_at IS NOT NULL AND lease_expires_at <= @now)
-           )`
-        )
-        .run({
-          id: candidate.id,
-          agentName,
-          now,
-          leaseId,
-          leaseExpiresAt
-        });
-      if (update.changes !== 1) {
+
+      const updateResult = await tx.exec(
+        `UPDATE missions
+         SET status='RUNNING',
+             claimed_by=?,
+             claimed_at=?,
+             lease_id=?,
+             lease_expires_at=?,
+             last_heartbeat_at=?,
+             attempts=attempts+1,
+             next_retry_at=NULL,
+             updated_at=?
+         WHERE id=? AND (
+           status='PENDING' OR
+           (status='RETRY' AND (next_retry_at IS NULL OR next_retry_at <= ?)) OR
+           (status='RUNNING' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?)
+         )`,
+        [agentName, now, leaseId, leaseExpiresAt, now, now, candidate.id, now, now]
+      );
+
+      if (updateResult.changes !== 1) {
         return null;
       }
-      const row = this.getMissionRowById(candidate.id);
-      return row ? this.mapRow(row) : null;
-    })();
 
-    return result;
+      const row = await this.getMissionRowById(candidate.id);
+      return row ? this.mapRow(row) : null;
+    });
   }
 
-  heartbeat(missionId: string, leaseId: string, nowIso: string): MissionRecord {
-    const mission = this.getMissionRowById(missionId);
+  async heartbeat(missionId: string, leaseId: string, nowIso: string): Promise<MissionRecord> {
+    const mission = await this.getMissionRowById(missionId);
     if (!mission) throw new Error("Mission not found");
     if (mission.status !== "RUNNING") {
       throw new Error("Mission is not running");
     }
     // allow heartbeats to extend lease even if client provided a stale leaseId, as long as mission is running
-    const leaseDurationMs = mission.leaseExpiresAt
-      ? new Date(mission.leaseExpiresAt).getTime() - new Date(mission.claimedAt ?? nowIso).getTime()
+    const leaseDurationMs = mission.lease_expires_at
+      ? new Date(mission.lease_expires_at).getTime() - new Date(mission.claimed_at ?? nowIso).getTime()
       : 30_000;
     const leaseExpiresAt = new Date(new Date(nowIso).getTime() + leaseDurationMs).toISOString();
-    this.db
-      .prepare(
-        `UPDATE missions
-         SET lease_expires_at=@leaseExpiresAt, last_heartbeat_at=@now, updated_at=@now
-         WHERE id=@id AND lease_id=@leaseId`
-      )
-      .run({ id: missionId, leaseId, now: nowIso, leaseExpiresAt });
-    const row = this.getMissionRowById(missionId);
+    await this.db.exec(
+      `UPDATE missions
+       SET lease_expires_at=?, last_heartbeat_at=?, updated_at=?
+       WHERE id=? AND lease_id=?`,
+      [leaseExpiresAt, nowIso, nowIso, missionId, leaseId]
+    );
+    const row = await this.getMissionRowById(missionId);
     if (!row) throw new Error("Mission not found");
     return this.mapRow(row);
   }
 
-  completeMission(missionId: string, summary: Record<string, unknown> | undefined, leaseId?: string): MissionRecord {
+  async completeMission(missionId: string, summary: Record<string, unknown> | undefined, leaseId?: string): Promise<MissionRecord> {
     const now = new Date().toISOString();
-    const mission = this.getMissionRowById(missionId);
+    const mission = await this.getMissionRowById(missionId);
     if (!mission) throw new Error("Mission not found");
     if (mission.status !== "RUNNING") {
       throw new Error("Mission is not running");
     }
-    if (mission.leaseId && leaseId && mission.leaseId !== leaseId) {
+    if (mission.lease_id && leaseId && mission.lease_id !== leaseId) {
       throw new Error("Lease mismatch");
     }
-    this.db
-      .prepare(
-        `UPDATE missions
-         SET status='DONE', result_json=@resultJson, completed_at=@now, updated_at=@now,
-             claimed_by=NULL, lease_id=NULL, lease_expires_at=NULL, last_heartbeat_at=NULL
-         WHERE id=@id`
-      )
-      .run({
-        id: missionId,
-        resultJson: summary ? JSON.stringify(summary) : null,
-        now
-      });
-    const row = this.getMissionRowById(missionId);
+    await this.db.exec(
+      `UPDATE missions
+       SET status='DONE', result_json=?, completed_at=?, updated_at=?,
+           claimed_by=NULL, lease_id=NULL, lease_expires_at=NULL, last_heartbeat_at=NULL
+       WHERE id=?`,
+      [summary ? JSON.stringify(summary) : null, now, now, missionId]
+    );
+    const row = await this.getMissionRowById(missionId);
     if (!row) throw new Error("Mission not found");
     return this.mapRow(row);
   }
 
-  failMission(options: FailOptions): MissionRecord {
-    const mission = this.getMissionRowById(options.missionId);
+  async failMission(options: FailOptions): Promise<MissionRecord> {
+    const mission = await this.getMissionRowById(options.missionId);
     if (!mission) throw new Error("Mission not found");
     if (mission.status !== "RUNNING") {
       throw new Error("Mission is not running");
     }
-    if (mission.leaseId && options.leaseId && mission.leaseId !== options.leaseId) {
+    if (mission.lease_id && options.leaseId && mission.lease_id !== options.leaseId) {
       throw new Error("Lease mismatch");
     }
     const attempts = mission.attempts + 1;
@@ -345,92 +329,79 @@ export class MissionRepository {
       ? new Date(new Date(now).getTime() + this.computeBackoffMs(options.backoffMs, attempts)).toISOString()
       : null;
     const status: MissionStatus = retryable ? "RETRY" : "FAILED";
-    this.db
-      .prepare(
-        `UPDATE missions
-         SET status=@status,
-             attempts=@attempts,
-             next_retry_at=@nextRetryAt,
-             last_error_json=@error,
-             failed_at=${retryable ? "failed_at" : "@now"},
-             claimed_by=NULL,
-             claimed_at=NULL,
-             lease_id=NULL,
-             lease_expires_at=NULL,
-             last_heartbeat_at=NULL,
-             updated_at=@now
-         WHERE id=@id`
-      )
-      .run({
-        id: options.missionId,
-        status,
-        attempts,
-        nextRetryAt,
-        error: JSON.stringify(options.error),
-        now
-      });
-    const row = this.getMissionRowById(options.missionId);
+    await this.db.exec(
+      `UPDATE missions
+       SET status=?,
+           attempts=?,
+           next_retry_at=?,
+           last_error_json=?,
+           failed_at=${retryable ? "failed_at" : "?"},
+           claimed_by=NULL,
+           claimed_at=NULL,
+           lease_id=NULL,
+           lease_expires_at=NULL,
+           last_heartbeat_at=NULL,
+           updated_at=?
+       WHERE id=?`,
+      retryable
+        ? [status, attempts, nextRetryAt, JSON.stringify(options.error), now, options.missionId]
+        : [status, attempts, nextRetryAt, JSON.stringify(options.error), now, now, options.missionId]
+    );
+    const row = await this.getMissionRowById(options.missionId);
     if (!row) throw new Error("Mission not found");
     return this.mapRow(row);
   }
 
-  approveMission(missionId: string, decision: GovernanceDecision, nowIso: string, actor?: Actor): MissionRecord {
-    const mission = this.getMissionRowById(missionId);
+  async approveMission(missionId: string, decision: GovernanceDecision, nowIso: string, actor?: Actor): Promise<MissionRecord> {
+    const mission = await this.getMissionRowById(missionId);
     if (!mission) throw new Error("Mission not found");
     if (mission.status !== "QUARANTINED") {
       throw new Error("Mission is not quarantined");
     }
-    this.db
-      .prepare(
-        `UPDATE missions
-         SET status='PENDING',
-             governance_json=@governanceJson,
-             next_retry_at=NULL,
-             claimed_by=NULL,
-             claimed_at=NULL,
-             lease_id=NULL,
-             lease_expires_at=NULL,
-             last_heartbeat_at=NULL,
-             updated_at=@now,
-             actor_json=@actorJson
-         WHERE id=@id`
-      )
-      .run({
-        id: missionId,
-        governanceJson: JSON.stringify(decision),
-        now: nowIso,
-        actorJson: actor ? JSON.stringify(actor) : null
-      });
-    const row = this.getMissionRowById(missionId);
+    await this.db.exec(
+      `UPDATE missions
+       SET status='PENDING',
+           governance_json=?,
+           next_retry_at=NULL,
+           claimed_by=NULL,
+           claimed_at=NULL,
+           lease_id=NULL,
+           lease_expires_at=NULL,
+           last_heartbeat_at=NULL,
+           updated_at=?,
+           actor_json=?
+       WHERE id=?`,
+      [JSON.stringify(decision), nowIso, actor ? JSON.stringify(actor) : null, missionId]
+    );
+    const row = await this.getMissionRowById(missionId);
     if (!row) throw new Error("Mission not found");
     return this.mapRow(row);
   }
 
-  cancelMission(missionId: string, nowIso: string, actor?: Actor): MissionRecord {
-    const mission = this.getMissionRowById(missionId);
+  async cancelMission(missionId: string, nowIso: string, actor?: Actor): Promise<MissionRecord> {
+    const mission = await this.getMissionRowById(missionId);
     if (!mission) throw new Error("Mission not found");
-    this.db
-      .prepare(
-        `UPDATE missions
-         SET status='CANCELED',
-             next_retry_at=NULL,
-             claimed_by=NULL,
-             claimed_at=NULL,
-             lease_id=NULL,
-             lease_expires_at=NULL,
-             last_heartbeat_at=NULL,
-             updated_at=@now,
-             actor_json=@actorJson
-         WHERE id=@id`
-      )
-      .run({ id: missionId, now: nowIso, actorJson: actor ? JSON.stringify(actor) : null });
-    const row = this.getMissionRowById(missionId);
+    await this.db.exec(
+      `UPDATE missions
+       SET status='CANCELED',
+           next_retry_at=NULL,
+           claimed_by=NULL,
+           claimed_at=NULL,
+           lease_id=NULL,
+           lease_expires_at=NULL,
+           last_heartbeat_at=NULL,
+           updated_at=?,
+           actor_json=?
+       WHERE id=?`,
+      [nowIso, actor ? JSON.stringify(actor) : null, missionId]
+    );
+    const row = await this.getMissionRowById(missionId);
     if (!row) throw new Error("Mission not found");
     return this.mapRow(row);
   }
 
-  retryNowMission(missionId: string, nowIso: string, actor?: Actor): MissionRecord {
-    const mission = this.getMissionRowById(missionId);
+  async retryNowMission(missionId: string, nowIso: string, actor?: Actor): Promise<MissionRecord> {
+    const mission = await this.getMissionRowById(missionId);
     if (!mission) throw new Error("Mission not found");
     if (mission.status !== "RETRY") {
       throw new Error("Mission is not retryable now");
@@ -446,33 +417,27 @@ export class MissionRepository {
       decidedBy: governance?.decidedBy ?? "HUMAN"
     };
 
-    this.db
-      .prepare(
-        `UPDATE missions
-         SET next_retry_at=@now,
-             governance_json=@governance,
-             updated_at=@now,
-             actor_json=@actorJson
-         WHERE id=@id AND status='RETRY'`
-      )
-      .run({
-        id: missionId,
-        now: nowIso,
-        governance: JSON.stringify(updatedGovernance),
-        actorJson: actor ? JSON.stringify(actor) : null
-      });
-    const row = this.getMissionRowById(missionId);
+    await this.db.exec(
+      `UPDATE missions
+       SET next_retry_at=?,
+           governance_json=?,
+           updated_at=?,
+           actor_json=?
+       WHERE id=? AND status='RETRY'`,
+      [nowIso, JSON.stringify(updatedGovernance), nowIso, actor ? JSON.stringify(actor) : null, missionId]
+    );
+    const row = await this.getMissionRowById(missionId);
     if (!row) throw new Error("Mission not found");
     return this.mapRow(row);
   }
 
-  metrics(): Record<MissionStatus, number> & {
+  async metrics(): Promise<Record<MissionStatus, number> & {
     total: number;
     quarantined_total: number;
     blocked_total: number;
     approved_total: number;
     rate_limited_total: number;
-  } {
+  }> {
     const counts: Record<MissionStatus, number> = {
       PENDING: 0,
       RUNNING: 0,
@@ -483,21 +448,32 @@ export class MissionRepository {
       BLOCKED: 0,
       CANCELED: 0
     };
-    const stmt = this.db.prepare(`SELECT status, COUNT(*) as count FROM missions GROUP BY status`);
-    for (const row of stmt.all() as Array<{ status: MissionStatus; count: number }>) {
+
+    const countResult = await this.db.query<{ status: MissionStatus; count: number }>(
+      `SELECT status, COUNT(*) as count FROM missions GROUP BY status`
+    );
+
+    for (const row of countResult.rows) {
       counts[row.status] = row.count;
     }
+
     const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
-    const extras = this.db
-      .prepare(
-        `SELECT
-           SUM(CASE WHEN status='QUARANTINED' THEN 1 ELSE 0 END) as quarantined_total,
-           SUM(CASE WHEN status='BLOCKED' THEN 1 ELSE 0 END) as blocked_total,
-           SUM(CASE WHEN governance_json LIKE '%RATE_LIMITED%' THEN 1 ELSE 0 END) as rate_limited_total,
-           SUM(CASE WHEN governance_json LIKE '%\"decidedBy\":\"HUMAN\"%' THEN 1 ELSE 0 END) as approved_total
-         FROM missions`
-      )
-      .get() as { quarantined_total?: number; blocked_total?: number; rate_limited_total?: number; approved_total?: number };
+
+    const extrasResult = await this.db.query<{
+      quarantined_total?: number;
+      blocked_total?: number;
+      rate_limited_total?: number;
+      approved_total?: number;
+    }>(`SELECT
+         SUM(CASE WHEN status='QUARANTINED' THEN 1 ELSE 0 END) as quarantined_total,
+         SUM(CASE WHEN status='BLOCKED' THEN 1 ELSE 0 END) as blocked_total,
+         SUM(CASE WHEN governance_json LIKE '%RATE_LIMITED%' THEN 1 ELSE 0 END) as rate_limited_total,
+         SUM(CASE WHEN governance_json LIKE '%"decidedBy":"HUMAN"%' THEN 1 ELSE 0 END) as approved_total
+       FROM missions`
+    );
+
+    const extras = extrasResult.rows[0];
+
     return {
       total,
       ...counts,
@@ -508,15 +484,20 @@ export class MissionRepository {
     };
   }
 
-  private getMissionRowById(id: string): MissionRow | null {
-    const row = this.db.prepare(`SELECT * FROM missions WHERE id = @id LIMIT 1`).get({ id }) as MissionRow | undefined;
-    return row ?? null;
+  private async getMissionRowById(id: string): Promise<MissionRow | null> {
+    const result = await this.db.query<MissionRow>(
+      `SELECT * FROM missions WHERE id = ? LIMIT 1`,
+      [id]
+    );
+    return result.rows[0] ?? null;
   }
 
-  private getMissionByIdempotencyKey(idempotencyKey: string): MissionRecord | null {
-    const row = this.db
-      .prepare(`SELECT * FROM missions WHERE idempotency_key = @idempotencyKey LIMIT 1`)
-      .get({ idempotencyKey }) as MissionRow | undefined;
+  private async getMissionByIdempotencyKey(idempotencyKey: string): Promise<MissionRecord | null> {
+    const result = await this.db.query<MissionRow>(
+      `SELECT * FROM missions WHERE idempotency_key = ? LIMIT 1`,
+      [idempotencyKey]
+    );
+    const row = result.rows[0];
     return row ? this.mapRow(row) : null;
   }
 
