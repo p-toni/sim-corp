@@ -411,6 +411,56 @@ Done:
     - Use cases: quality assurance, training datasets, explainability, safety
     - Updated environment variables section
   - **Impact**: Eval harness now supports optional qualitative evaluation beyond numeric metrics. LM-as-judge catches subtle quality issues, provides explainable reasoning, and detects dangerous patterns. Opt-in design with cost awareness. Foundation for training datasets and ML model development.
+- **T-038 Health Checks & Graceful Shutdown (2026-01-10):**
+  - **Health Check Library** (libs/health)
+    - Dual endpoint support: /health (liveness) and /ready (readiness) probes
+    - Database connectivity checker with latency tracking (SQLite/better-sqlite3)
+    - MQTT client connection status checker (mqtt package)
+    - HTTP upstream service health checker with timeout support
+    - System metrics collection (memory RSS/heap, uptime)
+    - Graceful shutdown handler for SIGTERM/SIGINT with 10-second timeout
+    - Connection draining before exit for zero-downtime deployments
+  - **Service Integration** (10 HTTP services)
+    - company-kernel: database dependency checks
+    - ingestion: database + MQTT dependency checks
+    - command: database dependency checks
+    - eval: database dependency checks
+    - analytics: basic health checks with system metrics
+    - sim-twin: basic health checks with system metrics
+    - sim-publisher: MQTT + HTTP upstream (sim-twin) checks
+    - driver-bridge: MQTT dependency checks
+    - event-inference: MQTT dependency checks
+    - dispatcher: MQTT + HTTP upstream (company-kernel) checks
+  - **Health Check Endpoints:**
+    - **/health (Liveness)**: Returns 200 OK if service process is alive, includes service name, timestamp, uptime
+    - **/ready (Readiness)**: Returns 200 OK if all critical dependencies healthy, 503 if database/MQTT down, includes detailed dependency status with latency
+  - **Graceful Shutdown:**
+    - Listens for SIGTERM and SIGINT signals
+    - Completes in-flight requests before shutdown
+    - Closes all connections (database, MQTT, HTTP) cleanly
+    - 10-second timeout before forced exit
+    - Disabled in tests to prevent signal handler conflicts (enableGracefulShutdown: false)
+  - **Docker & Kubernetes Integration:**
+    - Updated all 10 services in infra/production/docker-compose.yml to use /ready endpoint
+    - Healthcheck configuration: interval 30s, timeout 5s, retries 3, start_period 10s
+    - Kubernetes-ready with standard liveness/readiness probe support
+    - Enables rolling updates, proper startup sequencing, automatic restarts
+  - **Automation:**
+    - Created scripts/add-health-to-services.mjs for batch service updates
+    - Successfully automated health check integration across 8 services
+    - Manual integration for command service (main() function pattern)
+  - **Tests:**
+    - All service tests updated to disable graceful shutdown during testing
+    - Health check endpoint assertions updated to match new format
+    - company-kernel: 37 tests passing
+    - ingestion: 24 tests passing
+    - sim-twin: 6 tests passing
+  - **Documentation:**
+    - Created docs/ops/health-checks.md with comprehensive guide
+    - Endpoint specifications, dependency matrix, usage examples
+    - Kubernetes deployment patterns and troubleshooting
+    - Docker healthcheck configuration reference
+  - **Impact**: Production-ready health infrastructure enabling zero-downtime deployments, proper Kubernetes orchestration, and reliable service lifecycle management. All services now support standard cloud-native health probes. Foundation for autoscaling, load balancing, and multi-region deployments.
 
 Now:
 - M4 (Safe Autopilot L3 Beta) P0 + P1 complete
@@ -419,14 +469,14 @@ Now:
 - **M5 (Production Hardening) P0 in progress**
   - T-034 (Production Docker Images) COMPLETE
   - T-037 (Monitoring & Observability Foundation) COMPLETE
-  - **T-038 (Health Checks & Graceful Shutdown) NOW**
+  - T-038 (Health Checks & Graceful Shutdown) COMPLETE
 
 Next:
-- T-038 — Health Checks & Graceful Shutdown (P0, NOW)
-- T-038 — Health Checks & Graceful Shutdown (P0)
 - T-035 — Database Migration (SQLite → PostgreSQL) (P0)
 - T-039 — Backup & Disaster Recovery (P0)
 - T-036 — HSM Integration for Device Identity (P0)
+- T-040 — Secrets Management (P1)
+- T-041 — TLS/mTLS (P1)
 - T-029 — Bullet R1 USB driver implementation (awaiting hardware access)
 
 Open questions (UNCONFIRMED if needed):
