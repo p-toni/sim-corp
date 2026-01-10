@@ -784,6 +784,17 @@
         ]
       },
       "notes": "Complete observability stack: Prometheus metrics in all 11 services, 3 Grafana dashboards, alert rules, monitoring documentation. All service tests passing."
+    },
+    {
+      "id": "T-038",
+      "title": "Health Checks & Graceful Shutdown",
+      "milestone": "M5",
+      "status": "NOW",
+      "evidence": {
+        "commands": [],
+        "primaryArtifacts": []
+      },
+      "notes": "Add /ready endpoints with dependency checks, graceful shutdown on SIGTERM, connection draining. Enable zero-downtime deployments and Kubernetes orchestration."
     }
   ],
   "statusDefinitions": {

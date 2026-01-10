@@ -3,6 +3,7 @@ import { registerHealthRoute } from "./routes/health";
 import { registerAnalyzeRoute } from "./routes/analyze-session";
 import { registerPredictionRoute } from "./routes/prediction-session";
 import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
+import { setupHealthAndShutdown } from "@sim-corp/health";
 
 interface BuildOptions {
   logger?: FastifyServerOptions["logger"];

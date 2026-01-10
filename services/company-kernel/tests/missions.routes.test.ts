@@ -16,7 +16,7 @@ describe("mission routes", () => {
   beforeEach(async () => {
     dbPath = path.join(os.tmpdir(), `kernel-test-${Date.now()}.db`);
     const db = openKernelDatabase(dbPath);
-    server = await buildServer({ missionStore: new MissionStore(new MissionRepository(db), { baseBackoffMs: 1 }), dbPath });
+    server = await buildServer({ missionStore: new MissionStore(new MissionRepository(db), { baseBackoffMs: 1 }), dbPath, enableGracefulShutdown: false });
   });
 
   afterEach(async () => {

@@ -2,9 +2,11 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastif
 import { registerHealthRoutes } from "./routes/health";
 import { registerSimulateRoutes } from "./routes/simulate";
 import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
+import { setupHealthAndShutdown } from "@sim-corp/health";
 
 export interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
+  enableGracefulShutdown?: boolean;
 }
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -21,7 +23,15 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   // Add HTTP metrics middleware
   app.addHook('onRequest', httpMetrics.middleware('sim-twin'));
 
-  registerHealthRoutes(app);
+  // Setup health checks and graceful shutdown
+  setupHealthAndShutdown(app, {
+    serviceName: 'sim-twin',
+    includeSystemMetrics: true,
+  }, options.enableGracefulShutdown !== false ? {
+    timeout: 10000,
+    logger: app.log,
+  } : undefined);
+
   registerSimulateRoutes(app);
 
   // Prometheus metrics endpoint

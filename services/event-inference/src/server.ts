@@ -6,10 +6,12 @@ import { registerHealthRoute } from "./routes/health";
 import { registerStatusRoute } from "./routes/status";
 import { registerConfigRoute } from "./routes/config";
 import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
+import { setupHealthAndShutdown, createMqttChecker } from "@sim-corp/health";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
   mqttClient?: MqttClient | null;
+  enableGracefulShutdown?: boolean;
 }
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {

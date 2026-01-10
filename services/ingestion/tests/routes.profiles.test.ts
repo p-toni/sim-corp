@@ -9,7 +9,7 @@ describe("profile routes", () => {
     process.env.AUTH_MODE = "dev";
     process.env.DEV_ORG_ID = "org-1";
     process.env.DEV_USER_ID = "dev-user";
-    const server = await buildServer({ logger: false, mqttClient: null });
+    const server = await buildServer({ logger: false, mqttClient: null, enableGracefulShutdown: false });
     const createRes = await server.inject({
       method: "POST",
       url: "/profiles",

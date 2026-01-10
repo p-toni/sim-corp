@@ -3,7 +3,7 @@
 This file tracks per-task/per-session progress. Keep it short and focused on the current work.
 
 ## Current objective
-M5 Production Hardening - T-037 Monitoring & Observability Foundation (COMPLETE)
+M5 Production Hardening - T-038 Health Checks & Graceful Shutdown (NOW)
 
 ## Current state (what is true now)
 - M4 (Safe Autopilot L3 Beta) complete and merged

@@ -8,10 +8,12 @@ import { registerStatusRoutes } from "./routes/status";
 import { registerConfigRoutes } from "./routes/config";
 import { registerReplayRoutes } from "./routes/replay";
 import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
+import { setupHealthAndShutdown, createMqttChecker } from "@sim-corp/health";
 
 interface BuildServerOptions {
   mqttClient?: MqttSubscriber | null;
   dispatcher?: Dispatcher;
+  enableGracefulShutdown?: boolean;
 }
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -54,7 +56,20 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     app.log.warn("dispatcher starting without MQTT subscription");
   }
 
-  await registerHealthRoutes(app);
+  // Setup health checks and graceful shutdown
+  const dependencies: Record<string, () => Promise<{ status: 'healthy' | 'unhealthy'; message?: string; latency?: number }>> = {};
+  if (mqttClient) {
+    dependencies.mqtt = createMqttChecker(mqttClient);
+  }
+  setupHealthAndShutdown(app, {
+    serviceName: 'dispatcher',
+    dependencies,
+    includeSystemMetrics: true,
+  }, options.enableGracefulShutdown !== false ? {
+    timeout: 10000,
+    logger: app.log,
+  } : undefined);
+
   await registerStatusRoutes(app, dispatcher);
   await registerConfigRoutes(app, {
     topics,

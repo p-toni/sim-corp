@@ -7,12 +7,14 @@ import { registerStartRoute } from "./routes/start";
 import { registerStopRoute } from "./routes/stop";
 import { registerStatusRoute } from "./routes/status";
 import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
+import { setupHealthAndShutdown, createMqttChecker } from "@sim-corp/health";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
   driverFactory?: ReturnType<typeof loadDriver>;
   mqttPublisher?: RealMqttPublisher;
   bridge?: DriverBridge;
+  enableGracefulShutdown?: boolean;
 }
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -38,7 +40,20 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
       mqttPublisher
     });
 
-  registerHealthRoutes(app);
+  // Setup health checks and graceful shutdown
+  const dependencies: Record<string, () => Promise<{ status: 'healthy' | 'unhealthy'; message?: string; latency?: number }>> = {};
+  if (mqttClient) {
+    dependencies.mqtt = createMqttChecker(mqttClient);
+  }
+  setupHealthAndShutdown(app, {
+    serviceName: 'driver-bridge',
+    dependencies,
+    includeSystemMetrics: true,
+  }, options.enableGracefulShutdown !== false ? {
+    timeout: 10000,
+    logger: app.log,
+  } : undefined);
+
   registerStartRoute(app, { bridge, loadDriverFn: options.driverFactory ? () => options.driverFactory! : loadDriver });
   registerStopRoute(app, { bridge });
   registerStatusRoute(app, { bridge });

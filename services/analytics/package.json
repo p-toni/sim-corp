@@ -12,7 +12,8 @@
   "dependencies": {
     "@sim-corp/schemas": "workspace:*",
     "fastify": "^4.28.1",
-    "@sim-corp/metrics": "workspace:*"
+    "@sim-corp/metrics": "workspace:*",
+    "@sim-corp/health": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",

@@ -13,6 +13,7 @@
     "@sim-corp/schemas": "workspace:*",
     "@sim-corp/device-identity": "workspace:*",
     "@sim-corp/metrics": "workspace:*",
+    "@sim-corp/health": "workspace:*",
     "fastify": "^4.28.1",
     "mqtt": "^5.10.1",
     "better-sqlite3": "^11.2.1",

@@ -8,6 +8,7 @@ import { proposalsRoutes } from "./routes/proposals.js";
 import { executionRoutes } from "./routes/execution.js";
 import { analyticsRoutes } from "./routes/analytics.js";
 import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
+import { setupHealthAndShutdown, createDatabaseChecker } from "@sim-corp/health";
 
 const PORT = parseInt(process.env.COMMAND_PORT ?? "3004", 10);
 const HOST = process.env.COMMAND_HOST ?? "0.0.0.0";
@@ -38,9 +39,16 @@ async function main() {
     logger: true,
   });
 
-  // Health check
-  fastify.get("/health", async () => {
-    return { status: "ok", service: "command" };
+  // Setup health checks and graceful shutdown
+  setupHealthAndShutdown(fastify, {
+    serviceName: 'command',
+    dependencies: {
+      database: createDatabaseChecker(db),
+    },
+    includeSystemMetrics: true,
+  }, {
+    timeout: 10000,
+    logger: fastify.log,
   });
 
   // Register routes

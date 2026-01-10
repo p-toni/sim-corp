@@ -6,7 +6,7 @@ describe("traces routes", () => {
   let server: FastifyInstance;
 
   beforeEach(async () => {
-    server = await buildServer();
+    server = await buildServer({ enableGracefulShutdown: false });
   });
 
   afterEach(async () => {

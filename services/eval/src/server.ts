@@ -5,6 +5,7 @@ import { EvalService } from "./core/eval-service";
 import { registerGoldenCaseRoutes } from "./routes/golden-cases";
 import { registerEvaluationRoutes } from "./routes/evaluations";
 import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
+import { setupHealthAndShutdown, createDatabaseChecker } from "@sim-corp/health";
 
 export interface BuildServerOptions {
   logger?: boolean;
@@ -12,6 +13,7 @@ export interface BuildServerOptions {
   lmJudgeEnabled?: boolean;
   lmJudgeApiKey?: string;
   lmJudgeModel?: string;
+  enableGracefulShutdown?: boolean;
 }
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {

@@ -6,7 +6,7 @@ describe("sim-twin routes", () => {
   let server: FastifyInstance;
 
   beforeEach(async () => {
-    server = await buildServer({ logger: false });
+    server = await buildServer({ logger: false, enableGracefulShutdown: false });
   });
 
   afterEach(async () => {
@@ -16,7 +16,9 @@ describe("sim-twin routes", () => {
   it("reports health", async () => {
     const response = await server.inject({ method: "GET", url: "/health" });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ status: "ok" });
+    const json = response.json();
+    expect(json).toHaveProperty("status", "healthy");
+    expect(json).toHaveProperty("service", "sim-twin");
   });
 
   it("simulates a roast with defaults", async () => {

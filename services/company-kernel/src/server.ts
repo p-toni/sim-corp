@@ -17,10 +17,12 @@ import { GovernorEngine } from "./core/governor/engine";
 import { registerGovernorRoutes } from "./routes/governor";
 import { registerAuth } from "./auth";
 import { initializeMetrics, metricsHandler, createCounter, createGauge, Registry as PrometheusRegistry } from "@sim-corp/metrics";
+import { setupHealthAndShutdown, createDatabaseChecker } from "@sim-corp/health";
 
 interface BuildServerOptions {
   missionStore?: MissionStore;
   dbPath?: string;
+  enableGracefulShutdown?: boolean;
 }
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -82,7 +84,18 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   const rateLimiter = new RateLimiter(db);
   const governor = new GovernorEngine(governorConfig, rateLimiter);
 
-  await registerHealthRoutes(app);
+  // Setup health checks (graceful shutdown only in production)
+  setupHealthAndShutdown(app, {
+    serviceName: 'company-kernel',
+    dependencies: {
+      database: createDatabaseChecker(db),
+    },
+    includeSystemMetrics: true,
+  }, options.enableGracefulShutdown !== false ? {
+    timeout: 10000,
+    logger: app.log,
+  } : undefined);
+
   await registerAgentRoutes(app, { registry });
   await registerToolRoutes(app, { registry });
   await registerPolicyRoutes(app, { policy });

@@ -25,6 +25,7 @@ import { SignatureVerifier } from "./core/signature-verifier";
 import { EvalServiceClient } from "./core/eval-client";
 import { AutoEvaluator } from "./core/auto-evaluator";
 import { initializeMetrics, metricsHandler, createCounter, createGauge, Registry as PrometheusRegistry } from "@sim-corp/metrics";
+import { setupHealthAndShutdown, createDatabaseChecker, createMqttChecker } from "@sim-corp/health";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -35,6 +36,7 @@ interface BuildServerOptions {
   keystorePath?: string;
   evalServiceUrl?: string;
   autoEvalEnabled?: boolean;
+  enableGracefulShutdown?: boolean;
 }
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -157,7 +159,23 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     clearInterval(tickInterval);
   });
 
-  registerHealthRoutes(app);
+  // Setup health checks with database and optional MQTT checks
+  const dependencies: Record<string, () => Promise<{ status: 'healthy' | 'unhealthy'; message?: string; latency?: number }>> = {
+    database: createDatabaseChecker(db),
+  };
+  if (mqttClient) {
+    dependencies.mqtt = createMqttChecker(mqttClient);
+  }
+
+  setupHealthAndShutdown(app, {
+    serviceName: 'ingestion',
+    dependencies,
+    includeSystemMetrics: true,
+  }, options.enableGracefulShutdown !== false ? {
+    timeout: 10000,
+    logger: app.log,
+  } : undefined);
+
   registerAuth(app);
   registerTelemetryRoutes(app, { telemetryStore });
   registerEventRoutes(app, { eventStore });

@@ -419,9 +419,10 @@ Now:
 - **M5 (Production Hardening) P0 in progress**
   - T-034 (Production Docker Images) COMPLETE
   - T-037 (Monitoring & Observability Foundation) COMPLETE
+  - **T-038 (Health Checks & Graceful Shutdown) NOW**
 
 Next:
-- T-038 — Health Checks & Graceful Shutdown (P0, next)
+- T-038 — Health Checks & Graceful Shutdown (P0, NOW)
 - T-038 — Health Checks & Graceful Shutdown (P0)
 - T-035 — Database Migration (SQLite → PostgreSQL) (P0)
 - T-039 — Backup & Disaster Recovery (P0)
