@@ -277,3 +277,7 @@ pnpm harness:init  # Environment validation (Node 20.19.1, pnpm 9.11.0)
     - Complete testing strategy and deployment guide
   - Updated task registries (task-registry.json, task-registry.md)
   - T-029 driver implementation fully specced and ready for hardware
+- 2026-01-09 22:00: Committed and pushed M5 plan + T-034 to GitHub (commit 9f756ec)
+  - Fixed .env.example secret placeholders to pass GitHub push protection
+  - All M5 P0 foundation work now in main branch
+  - Ready to proceed with T-037 (Monitoring & Observability)
