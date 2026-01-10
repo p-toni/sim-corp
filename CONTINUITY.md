@@ -416,11 +416,12 @@ Now:
 - M4 (Safe Autopilot L3 Beta) P0 + P1 complete
 - T-028.1 (LM-as-judge) complete - M3 fully unblocked
 - T-029a (Bullet R1 protocol recon) complete - T-029 ready for hardware phase
-- **M5 (Production Hardening) P0 started** - T-034 complete
+- **M5 (Production Hardening) P0 in progress**
+  - T-034 (Production Docker Images) COMPLETE
+  - **T-037 (Monitoring & Observability Foundation) NOW**
 
 Next:
-- T-034 — Production Docker images (COMPLETE)
-- T-037 — Monitoring & Observability Foundation (P0, next)
+- T-037 — Monitoring & Observability Foundation (P0, NOW)
 - T-038 — Health Checks & Graceful Shutdown (P0)
 - T-035 — Database Migration (SQLite → PostgreSQL) (P0)
 - T-039 — Backup & Disaster Recovery (P0)

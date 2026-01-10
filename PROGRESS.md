@@ -3,7 +3,7 @@
 This file tracks per-task/per-session progress. Keep it short and focused on the current work.
 
 ## Current objective
-M5 Production Hardening - T-034 Production Docker Images (COMPLETE)
+M5 Production Hardening - T-037 Monitoring & Observability Foundation (NOW)
 
 ## Current state (what is true now)
 - M4 (Safe Autopilot L3 Beta) complete and merged
@@ -135,7 +135,7 @@ M5 Production Hardening - T-034 Production Docker Images (COMPLETE)
   - L3 autonomy: agent proposes, operator approves via desktop UX
 
 ## Next step (single step)
-T-037 (Monitoring & Observability Foundation) - Add Prometheus metrics to all services
+Design metrics architecture and add Prometheus client to all services
 
 ## Commands run (copy/paste)
 ```bash

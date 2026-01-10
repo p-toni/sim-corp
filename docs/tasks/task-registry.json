@@ -1,7 +1,7 @@
 {
   "$schema": "./task-registry-schema.json",
   "version": "1.0.0",
-  "lastUpdated": "2026-01-07T22:00:00Z",
+  "lastUpdated": "2026-01-09T22:30:00Z",
   "tasks": [
     {
       "id": "T-001",
@@ -756,6 +756,17 @@
         ]
       },
       "notes": "Multi-stage builds with security hardening (non-root user UID 1001), Alpine-based images (~150-200MB), health checks, resource limits. All 11 services production-ready."
+    },
+    {
+      "id": "T-037",
+      "title": "Monitoring & Observability Foundation",
+      "milestone": "M5",
+      "status": "NOW",
+      "evidence": {
+        "commands": [],
+        "primaryArtifacts": []
+      },
+      "notes": "Prometheus metrics for all services, structured JSON logging with correlation IDs, OpenTelemetry distributed tracing, Grafana dashboards, alert rules. Target: /metrics endpoints, real-time observability, production-ready monitoring stack."
     }
   ],
   "statusDefinitions": {
