@@ -38,12 +38,12 @@ export class MissionStore {
     this.backoffMs = options.baseBackoffMs ?? DEFAULT_BACKOFF_MS;
   }
 
-  createMission(mission: MissionCreateInput, actor?: Actor): MissionCreateResult {
+  async createMission(mission: MissionCreateInput, actor?: Actor): Promise<MissionCreateResult> {
     return this.repo.createMission(mission, actor);
   }
 
-  listMissions(filter: MissionFilters = {}): { items: MissionRecord[] } {
-    const missions = this.repo.listMissions({
+  async listMissions(filter: MissionFilters = {}): Promise<{ items: MissionRecord[] }> {
+    const missions = await this.repo.listMissions({
       statuses: Array.isArray(filter.status) ? filter.status : filter.status ? [filter.status] : undefined,
       goal: filter.goal,
       agent: filter.agent,
@@ -66,7 +66,7 @@ export class MissionStore {
     return { items: missions };
   }
 
-  claimNext(agentName: string, goals?: string[], now: Date = new Date()): MissionRecord | null {
+  async claimNext(agentName: string, goals?: string[], now: Date = new Date()): Promise<MissionRecord | null> {
     return this.repo.claimNext({
       agentName,
       goals,
@@ -75,8 +75,8 @@ export class MissionStore {
     });
   }
 
-  heartbeatMission(id: string, leaseId: string, agentName?: string): MissionRecord {
-    const mission = this.repo.getMission(id);
+  async heartbeatMission(id: string, leaseId: string, agentName?: string): Promise<MissionRecord> {
+    const mission = await this.repo.getMission(id);
     if (!mission) throw new Error("Mission not found");
     if (mission.claimedBy && agentName && mission.claimedBy !== agentName) {
       throw new Error("Mission claimed by another agent");
@@ -84,15 +84,15 @@ export class MissionStore {
     return this.repo.heartbeat(id, leaseId, new Date().toISOString());
   }
 
-  completeMission(id: string, resultMeta?: Record<string, unknown>, leaseId?: string): MissionRecord {
+  async completeMission(id: string, resultMeta?: Record<string, unknown>, leaseId?: string): Promise<MissionRecord> {
     return this.repo.completeMission(id, resultMeta, leaseId);
   }
 
-  failMission(
+  async failMission(
     id: string,
     error: { error: string; details?: Record<string, unknown> },
     options: { retryable?: boolean; leaseId?: string } = {}
-  ): MissionRecord {
+  ): Promise<MissionRecord> {
     return this.repo.failMission({
       missionId: id,
       retryable: Boolean(options.retryable),
@@ -103,23 +103,23 @@ export class MissionStore {
     });
   }
 
-  getMission(id: string): MissionRecord | null {
+  async getMission(id: string): Promise<MissionRecord | null> {
     return this.repo.getMission(id);
   }
 
-  approveMission(id: string, decision: GovernanceDecision, actor?: Actor): MissionRecord {
+  async approveMission(id: string, decision: GovernanceDecision, actor?: Actor): Promise<MissionRecord> {
     return this.repo.approveMission(id, decision, new Date().toISOString(), actor);
   }
 
-  cancelMission(id: string, actor?: Actor): MissionRecord {
+  async cancelMission(id: string, actor?: Actor): Promise<MissionRecord> {
     return this.repo.cancelMission(id, new Date().toISOString(), actor);
   }
 
-  retryNowMission(id: string, actor?: Actor): MissionRecord {
+  async retryNowMission(id: string, actor?: Actor): Promise<MissionRecord> {
     return this.repo.retryNowMission(id, new Date().toISOString(), actor);
   }
 
-  metrics(): ReturnType<MissionRepository["metrics"]> {
+  async metrics(): Promise<ReturnType<MissionRepository["metrics"]>> {
     return this.repo.metrics();
   }
 }

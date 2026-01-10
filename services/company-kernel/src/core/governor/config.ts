@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import type { Database } from "@sim-corp/database";
 import { z } from "zod";
 
 export const RateLimitRuleSchema = z.object({
@@ -71,12 +71,14 @@ export const DEFAULT_GOVERNOR_CONFIG: GovernorConfig = {
 };
 
 export class GovernorConfigStore {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: Database) {}
 
-  getConfig(): GovernorConfig {
-    const row = this.db.prepare(`SELECT value_json FROM kernel_settings WHERE key = @key LIMIT 1`).get({ key: "governor_config" }) as
-      | { value_json: string }
-      | undefined;
+  async getConfig(): Promise<GovernorConfig> {
+    const result = await this.db.query<{ value_json: string }>(
+      `SELECT value_json FROM kernel_settings WHERE key = ? LIMIT 1`,
+      ["governor_config"]
+    );
+    const row = result.rows[0];
     if (!row) {
       return DEFAULT_GOVERNOR_CONFIG;
     }
@@ -88,21 +90,16 @@ export class GovernorConfigStore {
     }
   }
 
-  setConfig(config: GovernorConfig): GovernorConfig {
+  async setConfig(config: GovernorConfig): Promise<GovernorConfig> {
     const parsed = GovernorConfigSchema.parse(config);
     const merged = withDefaults(parsed);
     const now = new Date().toISOString();
-    this.db
-      .prepare(
-        `INSERT INTO kernel_settings (key, value_json, updated_at)
-         VALUES (@key, @valueJson, @updatedAt)
-         ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at`
-      )
-      .run({
-        key: "governor_config",
-        valueJson: JSON.stringify(merged),
-        updatedAt: now
-      });
+    await this.db.exec(
+      `INSERT INTO kernel_settings (key, value_json, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at`,
+      ["governor_config", JSON.stringify(merged), now]
+    );
     return merged;
   }
 }

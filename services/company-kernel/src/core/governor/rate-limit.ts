@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import type { Database } from "@sim-corp/database";
 import type { RateLimitRule } from "./config";
 
 export interface RateLimitResult {
@@ -8,13 +8,15 @@ export interface RateLimitResult {
 }
 
 export class RateLimiter {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: Database) {}
 
-  take(scopeKey: string, goal: string, rule: RateLimitRule, nowIso: string = new Date().toISOString()): RateLimitResult {
+  async take(scopeKey: string, goal: string, rule: RateLimitRule, nowIso: string = new Date().toISOString()): Promise<RateLimitResult> {
     const bucketKey = `${scopeKey}|${goal}`;
-    const row = this.db
-      .prepare(`SELECT tokens, updated_at FROM rate_limit_buckets WHERE key = @key LIMIT 1`)
-      .get({ key: bucketKey }) as { tokens: number; updated_at: string } | undefined;
+    const result = await this.db.query<{ tokens: number; updated_at: string }>(
+      `SELECT tokens, updated_at FROM rate_limit_buckets WHERE key = ? LIMIT 1`,
+      [bucketKey]
+    );
+    const row = result.rows[0];
 
     const nowMs = Date.parse(nowIso);
     const lastUpdatedMs = row ? Date.parse(row.updated_at) : undefined;
@@ -26,13 +28,12 @@ export class RateLimiter {
     const remaining = allowed ? refilled - 1 : refilled;
     const updatedAt = nowIso;
 
-    this.db
-      .prepare(
-        `INSERT INTO rate_limit_buckets (key, tokens, updated_at)
-         VALUES (@key, @tokens, @updatedAt)
-         ON CONFLICT(key) DO UPDATE SET tokens=excluded.tokens, updated_at=excluded.updated_at`
-      )
-      .run({ key: bucketKey, tokens: remaining, updatedAt });
+    await this.db.exec(
+      `INSERT INTO rate_limit_buckets (key, tokens, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET tokens=excluded.tokens, updated_at=excluded.updated_at`,
+      [bucketKey, remaining, updatedAt]
+    );
 
     const refillRate = rule.refillPerSec <= 0 ? null : rule.refillPerSec;
     const secondsUntilToken =

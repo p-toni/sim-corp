@@ -19,9 +19,9 @@ export class GovernorEngine {
     private readonly rateLimiter: RateLimiter
   ) {}
 
-  evaluateMission(mission: Mission, now: Date = new Date()): GovernorResult {
+  async evaluateMission(mission: Mission, now: Date = new Date()): Promise<GovernorResult> {
     const nowIso = now.toISOString();
-    const config = this.configStore.getConfig() ?? DEFAULT_GOVERNOR_CONFIG;
+    const config = await this.configStore.getConfig() ?? DEFAULT_GOVERNOR_CONFIG;
     const goal = this.normalizeGoal(mission.goal);
 
     if (!config.policy.allowedGoals.includes(goal)) {
@@ -56,7 +56,7 @@ export class GovernorEngine {
     const rateRule = config.rateLimits[goal];
     if (rateRule) {
       const scopeKey = this.buildScopeKey(mission);
-      const rate = this.rateLimiter.take(scopeKey, goal, rateRule, nowIso);
+      const rate = await this.rateLimiter.take(scopeKey, goal, rateRule, nowIso);
       if (!rate.allowed) {
         const decision: GovernanceDecision = {
           action: "RETRY_LATER",
@@ -81,16 +81,16 @@ export class GovernorEngine {
   /**
    * Evaluate a command proposal against Governor autonomy config
    */
-  evaluateCommand(
+  async evaluateCommand(
     proposal: CommandProposal,
     context: {
       recentFailureRate?: number;
       commandsInSession?: number;
     } = {},
     now: Date = new Date()
-  ): GovernanceDecision {
+  ): Promise<GovernanceDecision> {
     const nowIso = now.toISOString();
-    const config = this.configStore.getConfig() ?? DEFAULT_GOVERNOR_CONFIG;
+    const config = await this.configStore.getConfig() ?? DEFAULT_GOVERNOR_CONFIG;
 
     const evalContext: CommandEvaluationContext = {
       proposal,

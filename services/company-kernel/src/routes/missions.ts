@@ -58,8 +58,8 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
         missionInput.context.orgId = actor.orgId;
       }
 
-      const evaluation = governor.evaluateMission(missionInput as Mission);
-      const { mission, created } = missions.createMission({
+      const evaluation = await governor.evaluateMission(missionInput as Mission);
+      const { mission, created } = await missions.createMission({
         ...missionInput,
         status: evaluation.status,
         governance: evaluation.decision,
@@ -78,7 +78,7 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
     const actorOrg = request.actor?.orgId;
     const effectiveOrgId = request.actor?.kind === "SYSTEM" ? orgId : actorOrg ?? orgId;
     const statuses = normalizeStatuses(request.query.status);
-    return missions.listMissions({
+    return await missions.listMissions({
       status: statuses,
       goal,
       agent,
@@ -92,7 +92,7 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
   });
 
   app.get("/missions/:id", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    const mission = missions.getMission(request.params.id);
+    const mission = await missions.getMission(request.params.id);
     if (!mission) {
       return reply.status(404).send({ error: "Mission not found" });
     }
@@ -112,7 +112,7 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
       return reply.status(400).send({ error: "agentName is required" });
     }
     const goals = Array.isArray(request.body?.goals) ? request.body.goals : undefined;
-    const claimed = missions.claimNext(agentName, goals);
+    const claimed = await missions.claimNext(agentName, goals);
     if (!claimed) {
       return reply.status(204).send();
     }
@@ -121,7 +121,7 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
 
   app.post("/missions/:id/complete", async (request: MissionUpdateRequest, reply: FastifyReply) => {
     try {
-      const updated = missions.completeMission(request.params.id, request.body?.summary, request.body?.leaseId);
+      const updated = await missions.completeMission(request.params.id, request.body?.summary, request.body?.leaseId);
       return updated;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Mission not found";
@@ -135,7 +135,7 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
       return reply.status(400).send({ error: "error is required" });
     }
     try {
-      const updated = missions.failMission(request.params.id, {
+      const updated = await missions.failMission(request.params.id, {
         error: request.body.error,
         details: request.body.details
       }, { retryable: request.body.retryable, leaseId: request.body.leaseId });
@@ -153,7 +153,7 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
       return reply.status(400).send({ error: "leaseId is required" });
     }
     try {
-      const updated = missions.heartbeatMission(request.params.id, leaseId, request.body?.agentName);
+      const updated = await missions.heartbeatMission(request.params.id, leaseId, request.body?.agentName);
       return updated;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Mission not found";
@@ -164,7 +164,7 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
 
   app.post("/missions/:id/approve", async (request: FastifyRequest<{ Params: { id: string }; Body: { note?: string } }>, reply: FastifyReply) => {
     try {
-      const mission = missions.getMission(request.params.id);
+      const mission = await missions.getMission(request.params.id);
       if (!mission) {
         return reply.status(404).send({ error: "Mission not found" });
       }
@@ -182,7 +182,7 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
         decidedAt: new Date().toISOString(),
         decidedBy: "HUMAN"
       };
-      const updated = missions.approveMission(request.params.id, decision, request.actor);
+      const updated = await missions.approveMission(request.params.id, decision, request.actor);
       return updated;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to approve mission";
@@ -193,12 +193,12 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
 
   app.post("/missions/:id/cancel", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
-      const mission = missions.getMission(request.params.id);
+      const mission = await missions.getMission(request.params.id);
       if (!mission) {
         return reply.status(404).send({ error: "Mission not found" });
       }
       if (!ensureUserActor(reply, request.actor, mission.context?.orgId)) return reply;
-      const updated = missions.cancelMission(request.params.id, request.actor);
+      const updated = await missions.cancelMission(request.params.id, request.actor);
       return updated;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to cancel mission";
@@ -209,7 +209,7 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
 
   app.post("/missions/:id/retryNow", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
-      const mission = missions.getMission(request.params.id);
+      const mission = await missions.getMission(request.params.id);
       if (!mission) {
         return reply.status(404).send({ error: "Mission not found" });
       }
@@ -217,7 +217,7 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
       if (mission.status !== "RETRY") {
         return reply.status(409).send({ error: "Mission is not in retry state" });
       }
-      const updated = missions.retryNowMission(request.params.id, request.actor);
+      const updated = await missions.retryNowMission(request.params.id, request.actor);
       return updated;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to retry mission";
@@ -226,7 +226,7 @@ export async function registerMissionRoutes(app: FastifyInstance, deps: MissionR
     }
   });
 
-  app.get("/missions/metrics", async () => missions.metrics());
+  app.get("/missions/metrics", async () => await missions.metrics());
 }
 
 function normalizeStatuses(status?: MissionStatus | MissionStatus[] | string | string[]): MissionStatus[] | undefined {
