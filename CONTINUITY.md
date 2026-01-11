@@ -34,7 +34,7 @@ Key decisions:
 
 State:
 Done:
-- T-001 to T-028.2 — All tasks DONE and verified
+- T-001 to T-028.2 Phase 2 — All tasks DONE and verified
 - M1 (Mission Inbox + Profiles + Predictive Assist + Tauri) — COMPLETE
 - M2 (Trust & Provenance) — COMPLETE
 - M3 (Design Partner Pilot: Eval Harness + Vendor Driver) — COMPLETE
@@ -468,6 +468,64 @@ Done:
     - ✅ Repository layer integration
     - ✅ Documentation updates
   - **Impact**: Eval harness now measures agent consistency and detects flaky behavior via pass@k metrics. Safety validation through negative test cases ensures agents correctly reject dangerous requests. Foundation for regression testing of production failures and expert baseline capture. Critical for autonomy promotion gating.
+- **T-028.2 Phase 2: Reference Solutions & Real Failure Sourcing (2026-01-11):**
+  - **Service Methods** (services/eval/src/core/eval-service.ts):
+    - createGoldenCaseFromSuccess(): Creates golden case from successful session
+      - Uses actual session metrics as targets
+      - Attaches reference solution with roasterName, notes, expertReviewed
+      - sourceType: REAL_SUCCESS, default tolerances (±30s FC/drop, ±2% dev)
+    - createGoldenCaseFromFailure(): Creates regression test from failure
+      - Uses failure metrics as targets (what went wrong)
+      - Tighter tolerances (±15s FC/drop, ±1% dev, 2 spikes, 0 crashes)
+      - sourceType: REAL_FAILURE, default expectation: SHOULD_SUCCEED (avoid regression)
+      - Runs multiple trials (default: 3, threshold: 90%)
+      - Automatically adds "regression" tag
+      - Supports SHOULD_REJECT for safety validation
+    - attachReferenceSolution(): Adds proven solution to existing golden case
+      - Updates sourceType from SYNTHETIC to REAL_SUCCESS
+      - Provides proof case is solvable
+      - Preserves original sourceType for REAL_FAILURE cases
+  - **API Endpoints** (services/eval/src/routes/golden-cases.ts):
+    - POST /golden-cases/from-success: Create from successful session
+    - POST /golden-cases/from-failure: Create from failed session
+    - POST /golden-cases/:id/reference-solution: Attach reference solution
+  - **Repository Updates** (services/eval/src/db/repo.ts):
+    - updateGoldenCase() now persists referenceSolution, sourceType, sourceSessionId
+    - Full Phase 2 field support
+  - **Pre-Seeded Regression Cases** (services/eval/migrations/003-real-failure-golden-cases.sql):
+    - 15 realistic failure cases covering common roasting mistakes:
+      - 2 underdevelopment (rushed drop, low power stall)
+      - 3 scorching (post-FC spike, charge scorch, Ethiopian tipped)
+      - 2 RoR instability (rollercoaster pattern, crash-flick)
+      - 2 timing issues (FC too early/late)
+      - 2 development ratio (excessive, zero)
+      - 2 equipment-related (undersized batch, cold start)
+      - 1 bean-specific (Brazil baked)
+      - 1 second crack (too dark)
+    - Each configured with appropriate tolerances, trial settings, failure modes
+  - **Tests** (services/eval/tests/session-sourcing.test.ts):
+    - 7 comprehensive tests (22 total passing):
+      - Create from success (with default and custom tolerances)
+      - Create from failure (SHOULD_SUCCEED and SHOULD_REJECT)
+      - Attach reference solution (new cases, preserve existing)
+  - **Documentation** (docs/ops/eval-harness.md):
+    - Added T-028.2 Phase 2 section (160+ lines)
+    - API usage examples for all 3 endpoints
+    - Use case workflows (expert baselines, regression tests, validation)
+    - Documentation of 15 pre-seeded cases
+    - Updated roadmap (P2 complete)
+  - **Workflows Enabled**:
+    - Expert baseline capture: POST /golden-cases/from-success
+    - Regression test suite: POST /golden-cases/from-failure
+    - Proof of solvability: POST /golden-cases/{id}/reference-solution
+  - **Deliverables**:
+    - ✅ 3 new API endpoints
+    - ✅ 3 service methods
+    - ✅ 15 pre-seeded regression cases
+    - ✅ 7 new tests (22 total passing)
+    - ✅ Repository updates
+    - ✅ Documentation updates
+  - **Impact**: Eval harness now enables capturing expert roasts as golden cases and turning production failures into regression tests. Reference solutions provide proof of solvability. 15 pre-seeded cases cover common failure modes for immediate regression detection. Foundation for continuous improvement via real-world data.
 - **T-038 Health Checks & Graceful Shutdown (2026-01-10):**
   - **Health Check Library** (libs/health)
     - Dual endpoint support: /health (liveness) and /ready (readiness) probes
