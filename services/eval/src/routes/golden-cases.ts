@@ -45,4 +45,72 @@ export function registerGoldenCaseRoutes(app: FastifyInstance, deps: GoldenCases
       return reply.status(400).send({ error: "Invalid golden case data", details: err });
     }
   });
+
+  // T-028.2 Phase 2: Create golden case from successful session
+  app.post(
+    "/golden-cases/from-success",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const body = request.body as any;
+        const created = evalService.createGoldenCaseFromSuccess(body);
+        return reply.status(201).send(created);
+      } catch (err) {
+        return reply.status(400).send({
+          error: "Failed to create golden case from success",
+          details: err,
+        });
+      }
+    }
+  );
+
+  // T-028.2 Phase 2: Create golden case from failed session
+  app.post(
+    "/golden-cases/from-failure",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const body = request.body as any;
+        const created = evalService.createGoldenCaseFromFailure(body);
+        return reply.status(201).send(created);
+      } catch (err) {
+        return reply.status(400).send({
+          error: "Failed to create golden case from failure",
+          details: err,
+        });
+      }
+    }
+  );
+
+  // T-028.2 Phase 2: Attach reference solution to existing golden case
+  app.post(
+    "/golden-cases/:id/reference-solution",
+    async (
+      request: FastifyRequest<{
+        Params: { id: string };
+        Body: {
+          sessionId: string;
+          roasterName?: string;
+          achievedAt: string;
+          notes?: string;
+          expertReviewed?: boolean;
+        };
+      }>,
+      reply: FastifyReply
+    ) => {
+      try {
+        const updated = evalService.attachReferenceSolution(
+          request.params.id,
+          request.body
+        );
+        if (!updated) {
+          return reply.status(404).send({ error: "Golden case not found" });
+        }
+        return updated;
+      } catch (err) {
+        return reply.status(400).send({
+          error: "Failed to attach reference solution",
+          details: err,
+        });
+      }
+    }
+  );
 }

@@ -160,6 +160,166 @@ This enables:
 - **Expert baselines**: Capture proven successful roasts as golden cases
 - **Provenance tracking**: Know where each test case came from
 
+## T-028.2 Phase 2: Reference Solutions & Real Failure Sourcing
+
+Phase 2 adds APIs to easily create golden cases from real roasting sessions, both successes and failures.
+
+### Create Golden Case from Successful Session
+
+When you achieve a great roast, capture it as a golden case:
+
+```bash
+curl -X POST http://127.0.0.1:4007/golden-cases/from-success \
+  -H "content-type: application/json" \
+  -d '{
+    "sessionId": "session-success-001",
+    "analysis": {
+      "sessionId": "session-success-001",
+      "analyzedAt": "2026-01-11T12:00:00Z",
+      "turningPoint": { "tempC": 90, "elapsedSeconds": 60 },
+      "firstCrack": { "tempC": 196, "elapsedSeconds": 480 },
+      "drop": { "tempC": 210, "elapsedSeconds": 660 },
+      "developmentRatio": {
+        "value": 0.20,
+        "classification": "MEDIUM",
+        "details": {}
+      },
+      "crashFlick": { "detected": false, "confidence": 0, "details": {} }
+    },
+    "machineId": "machine-001",
+    "name": "Ethiopian Yirgacheffe - Expert Roast",
+    "description": "Perfect light roast from expert roaster Alice",
+    "roasterName": "Alice Expert",
+    "notes": "Beautiful floral notes, excellent development",
+    "expertReviewed": true,
+    "batchSizeKg": 0.5,
+    "chargeTempC": 100,
+    "origin": "Ethiopia",
+    "processingMethod": "Washed",
+    "variety": "Heirloom",
+    "tags": ["light", "washed", "ethiopia"],
+    "createdBy": "alice"
+  }'
+```
+
+Features:
+- Uses actual session metrics as targets
+- Attaches reference solution metadata
+- Sets `sourceType: REAL_SUCCESS`
+- Default tolerances (±30s FC/drop, ±2% dev, 3 spikes, 1 crash)
+- Can override tolerances via `tolerances` field
+
+### Create Golden Case from Failed Session
+
+Turn production failures into regression tests:
+
+```bash
+curl -X POST http://127.0.0.1:4007/golden-cases/from-failure \
+  -H "content-type: application/json" \
+  -d '{
+    "sessionId": "session-failure-001",
+    "analysis": { ... },
+    "machineId": "machine-001",
+    "name": "Regression: Scorched Ethiopian",
+    "description": "Roast ended too hot with insufficient development",
+    "failureMode": "Scorching due to excessive temperature rise after FC",
+    "dangerLevel": "CAUTION",
+    "origin": "Ethiopia",
+    "tags": ["scorched", "crash-flick"],
+    "createdBy": "system"
+  }'
+```
+
+Features:
+- Uses failure metrics as targets (what went wrong)
+- Tighter tolerances (±15s FC/drop, ±1% dev, 2 spikes, 0 crashes)
+- Sets `sourceType: REAL_FAILURE`
+- Default `expectation: SHOULD_SUCCEED` (agent should avoid regression)
+- Automatically adds "regression" tag
+- Runs multiple trials (default: 3, threshold: 90%)
+- Can override to `expectation: SHOULD_REJECT` for safety validation
+
+### Attach Reference Solution to Existing Golden Case
+
+Add a proven solution to a synthetic golden case:
+
+```bash
+curl -X POST http://127.0.0.1:4007/golden-cases/{golden-case-id}/reference-solution \
+  -H "content-type: application/json" \
+  -d '{
+    "sessionId": "session-ref-001",
+    "roasterName": "Expert Bob",
+    "achievedAt": "2026-01-11T14:00:00Z",
+    "notes": "Perfect reference roast with ideal development",
+    "expertReviewed": true
+  }'
+```
+
+Features:
+- Updates existing golden case with reference solution
+- Changes `sourceType` from SYNTHETIC to REAL_SUCCESS
+- Provides proof that case is solvable
+- Useful for validating synthetic cases with real data
+
+### Use Cases
+
+**Capture Expert Baselines:**
+```bash
+# Expert achieves perfect roast → Create golden case from success
+POST /golden-cases/from-success
+```
+
+**Build Regression Test Suite:**
+```bash
+# Production failure occurs → Create golden case from failure
+POST /golden-cases/from-failure
+# Agent must now consistently avoid this failure mode
+```
+
+**Validate Synthetic Cases:**
+```bash
+# Create synthetic case → Run trials → Find working solution
+POST /golden-cases/{id}/reference-solution
+# Now you have proof the case is achievable
+```
+
+### Pre-Seeded Failure Cases
+
+The system includes 15 pre-seeded regression cases (migration `003-real-failure-golden-cases.sql`):
+
+**Underdevelopment** (2 cases):
+- Rushed drop (9% development)
+- Low power stall (25 minute roast)
+
+**Scorching** (3 cases):
+- Post-FC heat spike (tipping)
+- Charge scorch (300°F charge)
+- Ethiopian tipped (origin-specific)
+
+**RoR Instability** (2 cases):
+- Rollercoaster pattern (12 spikes)
+- Crash-flick pattern
+
+**Timing Issues** (2 cases):
+- FC way too early (3 minutes)
+- FC way too late (15 minutes)
+
+**Development Ratio** (2 cases):
+- Excessive development (35%)
+- Zero development (2%)
+
+**Equipment-Related** (2 cases):
+- Undersized batch (100g in 500g roaster)
+- Cold start (70°F charge)
+
+**Bean-Specific** (1 case):
+- Brazil natural baked
+
+**Second Crack** (1 case):
+- Reached second crack (too dark)
+
+These serve as a baseline regression test suite covering common roasting mistakes.
+
 ## Architecture
 
 ### Components
@@ -484,22 +644,33 @@ Detected violations:
 - ✅ Promotion eligibility check
 - ✅ LM-as-judge implementation
 
-### P1 (T-028.2) - COMPLETE
+### P1 (T-028.2 Phase 1) - COMPLETE
 - ✅ Multiple trials with pass@k consistency metrics
 - ✅ Negative test cases (SHOULD_REJECT)
 - ✅ 10 pre-seeded safety test cases
 - ✅ Trial set aggregation and summary
 - ✅ Flaky agent detection
-- ✅ Reference solution tracking
-- ✅ Real failure replay capabilities
+- ✅ Reference solution tracking (schema)
+- ✅ Real failure replay capabilities (schema)
 - ✅ Source tracking (synthetic vs real)
 
-### P2 (Next)
+### P2 (T-028.2 Phase 2) - COMPLETE
+- ✅ API to create golden case from successful session
+- ✅ API to create golden case from failed session
+- ✅ API to attach reference solution to existing case
+- ✅ 15 pre-seeded real failure regression cases
+- ✅ Expert baseline capture workflow
+- ✅ Production failure replay workflow
+- ✅ Proof-of-solvability via reference solutions
+
+### P3 (Next)
 - Automatic evaluation on session close
 - Integration with report workflow
 - Agent rejection detection from mission status
 - Historical baseline variance calculation
 - Sensory score integration
+- Eval saturation monitoring
+- Agent transcript capture
 
 ### P2 (Future)
 - Governor integration for autonomy promotion

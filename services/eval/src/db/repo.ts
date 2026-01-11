@@ -137,7 +137,10 @@ export class EvalRepository {
         name = @name,
         description = @description,
         archived = @archived,
-        tags_json = @tagsJson
+        tags_json = @tagsJson,
+        reference_solution_json = @referenceSolutionJson,
+        source_type = @sourceType,
+        source_session_id = @sourceSessionId
       WHERE id = @id
     `);
 
@@ -146,7 +149,10 @@ export class EvalRepository {
       name: merged.name,
       description: merged.description ?? null,
       archived: merged.archived ? 1 : 0,
-      tagsJson: JSON.stringify(merged.tags ?? [])
+      tagsJson: JSON.stringify(merged.tags ?? []),
+      referenceSolutionJson: merged.referenceSolution ? JSON.stringify(merged.referenceSolution) : null,
+      sourceType: merged.sourceType ?? "SYNTHETIC",
+      sourceSessionId: merged.sourceSessionId ?? null
     });
 
     return this.getGoldenCase(id);

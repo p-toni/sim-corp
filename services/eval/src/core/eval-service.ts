@@ -161,6 +161,193 @@ export class EvalService {
   }
 
   /**
+   * T-028.2 Phase 2: Create a golden case from a successful session
+   */
+  createGoldenCaseFromSuccess(input: {
+    sessionId: string;
+    analysis: RoastAnalysis;
+    machineId: string;
+    name: string;
+    description?: string;
+    roasterName?: string;
+    notes?: string;
+    expertReviewed?: boolean;
+    batchSizeKg?: number;
+    chargeTempC?: number;
+    origin?: string;
+    processingMethod?: string;
+    variety?: string;
+    cropYear?: string;
+    tolerances?: {
+      fcSecondsErrorTolerance?: number;
+      dropSecondsErrorTolerance?: number;
+      devPercentageErrorTolerance?: number;
+      maxRorSpikes?: number;
+      maxRorCrashes?: number;
+    };
+    tags?: string[];
+    createdBy?: string;
+  }): GoldenCase {
+    const goldenCase: Omit<GoldenCase, "id"> = {
+      name: input.name,
+      description: input.description,
+      origin: input.origin,
+      processingMethod: input.processingMethod,
+      variety: input.variety,
+      cropYear: input.cropYear,
+      machineId: input.machineId,
+      batchSizeKg: input.batchSizeKg,
+      chargeTempC: input.chargeTempC,
+
+      // Use actual session values as targets
+      targetFirstCrackSeconds: input.analysis.firstCrack.elapsedSeconds,
+      targetDropSeconds: input.analysis.drop.elapsedSeconds,
+      targetDevelopmentPercentage: input.analysis.developmentRatio.value * 100,
+      targetFCTempC: input.analysis.firstCrack.tempC,
+      targetDropTempC: input.analysis.drop.tempC,
+
+      // Tolerances (use defaults if not provided)
+      fcSecondsErrorTolerance: input.tolerances?.fcSecondsErrorTolerance ?? 30,
+      dropSecondsErrorTolerance: input.tolerances?.dropSecondsErrorTolerance ?? 30,
+      devPercentageErrorTolerance: input.tolerances?.devPercentageErrorTolerance ?? 2,
+      maxRorSpikes: input.tolerances?.maxRorSpikes ?? 3,
+      maxRorCrashes: input.tolerances?.maxRorCrashes ?? 1,
+
+      // Source tracking
+      sourceType: "REAL_SUCCESS",
+      sourceSessionId: input.sessionId,
+
+      // Reference solution
+      referenceSolution: {
+        sessionId: input.sessionId,
+        roasterName: input.roasterName,
+        achievedAt: input.analysis.analyzedAt,
+        notes: input.notes,
+        expertReviewed: input.expertReviewed ?? false,
+      },
+
+      // Metadata
+      baselineCommands: [],
+      trialsRequired: 1,
+      expectation: "SHOULD_SUCCEED",
+      dangerLevel: "SAFE",
+      tags: input.tags ?? [],
+      archived: false,
+      createdBy: input.createdBy,
+    };
+
+    return this.createGoldenCase(goldenCase);
+  }
+
+  /**
+   * T-028.2 Phase 2: Create a golden case from a failed session
+   */
+  createGoldenCaseFromFailure(input: {
+    sessionId: string;
+    analysis: RoastAnalysis;
+    machineId: string;
+    name: string;
+    description?: string;
+    failureMode: string;
+    expectation?: "SHOULD_SUCCEED" | "SHOULD_REJECT";
+    rejectReasonExpected?: string;
+    dangerLevel?: "SAFE" | "CAUTION" | "DANGER";
+    batchSizeKg?: number;
+    chargeTempC?: number;
+    origin?: string;
+    processingMethod?: string;
+    variety?: string;
+    cropYear?: string;
+    tolerances?: {
+      fcSecondsErrorTolerance?: number;
+      dropSecondsErrorTolerance?: number;
+      devPercentageErrorTolerance?: number;
+      maxRorSpikes?: number;
+      maxRorCrashes?: number;
+    };
+    trialsRequired?: number;
+    passAtKThreshold?: number;
+    tags?: string[];
+    createdBy?: string;
+  }): GoldenCase {
+    const goldenCase: Omit<GoldenCase, "id"> = {
+      name: input.name,
+      description: input.description,
+      origin: input.origin,
+      processingMethod: input.processingMethod,
+      variety: input.variety,
+      cropYear: input.cropYear,
+      machineId: input.machineId,
+      batchSizeKg: input.batchSizeKg,
+      chargeTempC: input.chargeTempC,
+
+      // Use failure values as targets (what went wrong)
+      targetFirstCrackSeconds: input.analysis.firstCrack.elapsedSeconds,
+      targetDropSeconds: input.analysis.drop.elapsedSeconds,
+      targetDevelopmentPercentage: input.analysis.developmentRatio.value * 100,
+      targetFCTempC: input.analysis.firstCrack.tempC,
+      targetDropTempC: input.analysis.drop.tempC,
+
+      // Tolerances (tighter for failure cases)
+      fcSecondsErrorTolerance: input.tolerances?.fcSecondsErrorTolerance ?? 15,
+      dropSecondsErrorTolerance: input.tolerances?.dropSecondsErrorTolerance ?? 15,
+      devPercentageErrorTolerance: input.tolerances?.devPercentageErrorTolerance ?? 1,
+      maxRorSpikes: input.tolerances?.maxRorSpikes ?? 2,
+      maxRorCrashes: input.tolerances?.maxRorCrashes ?? 0,
+
+      // Source tracking
+      sourceType: "REAL_FAILURE",
+      sourceSessionId: input.sessionId,
+      failureMode: input.failureMode,
+
+      // Expectation (default to SHOULD_SUCCEED to catch regression)
+      expectation: input.expectation ?? "SHOULD_SUCCEED",
+      rejectReasonExpected: input.rejectReasonExpected,
+      dangerLevel: input.dangerLevel ?? "CAUTION",
+
+      // Trial settings (run multiple times for failure cases)
+      trialsRequired: input.trialsRequired ?? 3,
+      passAtKThreshold: input.passAtKThreshold ?? 0.9, // 90% must pass
+
+      // Metadata
+      baselineCommands: [],
+      tags: [...(input.tags ?? []), "regression"],
+      archived: false,
+      createdBy: input.createdBy,
+    };
+
+    return this.createGoldenCase(goldenCase);
+  }
+
+  /**
+   * T-028.2 Phase 2: Attach reference solution to existing golden case
+   */
+  attachReferenceSolution(
+    goldenCaseId: string,
+    referenceSolution: {
+      sessionId: string;
+      roasterName?: string;
+      achievedAt: string;
+      notes?: string;
+      expertReviewed?: boolean;
+    }
+  ): GoldenCase | null {
+    const goldenCase = this.repo.getGoldenCase(goldenCaseId);
+    if (!goldenCase) {
+      return null;
+    }
+
+    // Update golden case with reference solution
+    const updated = this.repo.updateGoldenCase(goldenCaseId, {
+      referenceSolution,
+      sourceType: goldenCase.sourceType === "SYNTHETIC" ? "REAL_SUCCESS" : goldenCase.sourceType,
+      sourceSessionId: goldenCase.sourceSessionId ?? referenceSolution.sessionId,
+    });
+
+    return updated;
+  }
+
+  /**
    * T-028.2: Run multi-trial evaluation for consistency measurement
    * Runs N trials and aggregates results with pass@k and pass^k metrics
    */
