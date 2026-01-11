@@ -34,7 +34,7 @@ Key decisions:
 
 State:
 Done:
-- T-001 to T-028 — All tasks DONE and verified
+- T-001 to T-028.2 — All tasks DONE and verified
 - M1 (Mission Inbox + Profiles + Predictive Assist + Tauri) — COMPLETE
 - M2 (Trust & Provenance) — COMPLETE
 - M3 (Design Partner Pilot: Eval Harness + Vendor Driver) — COMPLETE
@@ -411,6 +411,63 @@ Done:
     - Use cases: quality assurance, training datasets, explainability, safety
     - Updated environment variables section
   - **Impact**: Eval harness now supports optional qualitative evaluation beyond numeric metrics. LM-as-judge catches subtle quality issues, provides explainable reasoning, and detects dangerous patterns. Opt-in design with cost awareness. Foundation for training datasets and ML model development.
+- **T-028.2 Multiple Trials + Negative Test Cases (2026-01-11):**
+  - **Multiple Trials Implementation:**
+    - Schema Updates (libs/schemas/src/kernel/eval.ts):
+      - Added trialsRequired, passAtKThreshold to GoldenCaseSchema
+      - Added trialNumber, trialSetId, totalTrials to EvalRunSchema
+      - Created TrialSetSummarySchema with pass@k and pass^k metrics
+      - Added consistencyVerdict enum: CONSISTENT_PASS, CONSISTENT_FAIL, FLAKY
+    - Service Implementation (services/eval/src/core/eval-service.ts):
+      - runMultiTrialEvaluation() orchestrates N trials
+      - _runSingleTrial() executes individual trial with tracking
+      - _calculateTrialSetMetrics() aggregates results and calculates metrics
+      - pass@k: Binary (1.0 if any trial passes, 0.0 if all fail)
+      - pass^k (passToK): Binary (1.0 if all pass, 0.0 if any fail)
+  - **Negative Test Cases (SHOULD_REJECT):**
+    - Schema Updates:
+      - Added expectation: SHOULD_SUCCEED | SHOULD_REJECT to GoldenCaseSchema
+      - Added rejectReasonExpected, dangerLevel (SAFE, CAUTION, DANGER)
+      - Added agentRejected, rejectionReason, rejectionAppropriate to EvalRunSchema
+      - Added reference solution and source tracking fields
+    - Service Implementation:
+      - _checkRejectionLogic() validates negative test cases
+      - For SHOULD_REJECT: outcome=FAIL if agent doesn't reject (safety failure)
+      - For SHOULD_REJECT: outcome=PASS if agent correctly rejects
+      - Integrated into both runEvaluation() and runMultiTrialEvaluation()
+  - **Golden Cases (services/eval/migrations/002-negative-golden-cases.sql):**
+    - 10 negative test cases seeded via SQL migration
+    - 4 DANGER level (must reject 100%): scorching temp (520°F), rapid rise, batch overload, charge temp too high
+    - 6 CAUTION level (must reject 80-90%): impossible development time, zero roast time, drop below charge, excessive RoR spikes, impossible cooling, excessive roast time
+    - Each configured with trialsRequired and passAtKThreshold
+  - **Database & Repository:**
+    - Database schema (services/eval/src/db/connection.ts): Added all T-028.2 fields to golden_cases and eval_runs tables
+    - Repository (services/eval/src/db/repo.ts): Updated createGoldenCase(), hydrateGoldenCase(), createEvalRun(), hydrateEvalRun() to persist and parse new fields
+  - **Evaluator Logic (services/eval/src/core/evaluator.ts):**
+    - Stricter outcome logic: any failed gate = FAIL (was 2+ gates)
+    - WARN only for warnings without failed gates
+    - More accurate failure detection for consistency testing
+  - **Tests (services/eval/tests/trial-runner.test.ts):**
+    - 7 new comprehensive tests (15 total passing):
+      - Multiple trials with pass@k calculation (3 trials)
+      - Flaky agent detection (5 trials)
+      - CONSISTENT_FAIL verdict
+      - SHOULD_REJECT negative cases
+      - Reference solution and source tracking metadata
+  - **Documentation (docs/ops/eval-harness.md):**
+    - Added T-028.2 section (150+ lines) documenting multiple trials and negative test cases
+    - Updated database schema documentation
+    - Updated roadmap (P1 complete)
+    - Updated fail criteria to include safety failures
+  - **Deliverables:**
+    - ✅ Multiple trials with pass@k metrics
+    - ✅ Negative test cases (SHOULD_REJECT)
+    - ✅ 10 negative golden cases in SQL migration
+    - ✅ Comprehensive test suite (7 new tests)
+    - ✅ Database schema updates
+    - ✅ Repository layer integration
+    - ✅ Documentation updates
+  - **Impact**: Eval harness now measures agent consistency and detects flaky behavior via pass@k metrics. Safety validation through negative test cases ensures agents correctly reject dangerous requests. Foundation for regression testing of production failures and expert baseline capture. Critical for autonomy promotion gating.
 - **T-038 Health Checks & Graceful Shutdown (2026-01-10):**
   - **Health Check Library** (libs/health)
     - Dual endpoint support: /health (liveness) and /ready (readiness) probes
