@@ -60,11 +60,13 @@ export class Evaluator {
 
     // Determine overall outcome
     let outcome: EvalOutcome;
-    if (failedGates.length === 0) {
+    if (failedGates.length === 0 && warnings.length === 0) {
       outcome = "PASS";
-    } else if (failedGates.length === 1 || warnings.length > 0) {
+    } else if (failedGates.length === 0 && warnings.length > 0) {
+      // Only warnings, no hard failures
       outcome = "WARN";
     } else {
+      // Any failed gates = FAIL
       outcome = "FAIL";
     }
 

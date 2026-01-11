@@ -63,6 +63,29 @@ export const GoldenCaseSchema = z.object({
     reasoning: z.string().optional()
   })).default([]),
 
+  // T-028.2: Multiple trials support
+  trialsRequired: z.number().int().min(1).default(1), // How many trials to run for consistency testing
+  passAtKThreshold: z.number().min(0).max(1).optional(), // e.g., 0.7 = 7/10 trials must pass
+
+  // T-028.2: Negative test cases (agent should reject)
+  expectation: z.enum(["SHOULD_SUCCEED", "SHOULD_REJECT"]).default("SHOULD_SUCCEED"),
+  rejectReasonExpected: z.string().optional(), // Why agent should reject this case
+  dangerLevel: z.enum(["SAFE", "CAUTION", "DANGER"]).default("SAFE"), // Safety classification
+
+  // Reference solution (proof of solvability)
+  referenceSolution: z.object({
+    sessionId: z.string(),
+    roasterName: z.string().optional(),
+    achievedAt: IsoDateTimeSchema,
+    notes: z.string().optional(),
+    expertReviewed: z.boolean().default(false)
+  }).optional(),
+
+  // Source tracking (real vs synthetic)
+  sourceType: z.enum(["SYNTHETIC", "REAL_SUCCESS", "REAL_FAILURE"]).default("SYNTHETIC"),
+  sourceSessionId: z.string().optional(),
+  failureMode: z.string().optional(), // What went wrong in original session?
+
   // Metadata
   createdAt: IsoDateTimeSchema.optional(),
   createdBy: z.string().optional(),
@@ -145,10 +168,20 @@ export const EvalRunSchema = z.object({
   runAt: IsoDateTimeSchema,
   evaluatorId: IdentifierSchema.optional(),
 
+  // T-028.2: Trial tracking for consistency measurement
+  trialNumber: z.number().int().min(1).optional(), // Which trial is this? (1-indexed)
+  trialSetId: z.string().optional(), // Groups trials together
+  totalTrials: z.number().int().min(1).optional(), // How many trials in this set?
+
   // Outcome and gates
   outcome: EvalOutcomeSchema,
   passedGates: z.array(z.string()).default([]),
   failedGates: z.array(z.string()).default([]),
+
+  // T-028.2: Rejection tracking (for negative test cases)
+  agentRejected: z.boolean().default(false), // Did agent refuse the mission?
+  rejectionReason: z.string().optional(), // Agent's stated reason
+  rejectionAppropriate: z.boolean().optional(), // Was rejection correct?
 
   // Detailed metrics
   detailedMetrics: DetailedEvalMetricsSchema.optional(),
@@ -186,3 +219,42 @@ export const EvalRunSchema = z.object({
 });
 
 export type EvalRun = z.infer<typeof EvalRunSchema>;
+
+/**
+ * T-028.2: Trial set summary for pass@k and pass^k metrics
+ * Aggregates results from multiple trials of the same golden case
+ */
+export const TrialSetSummarySchema = z.object({
+  trialSetId: IdentifierSchema,
+  goldenCaseId: IdentifierSchema,
+  sessionId: IdentifierSchema.optional(),
+  evaluatedAt: IsoDateTimeSchema,
+
+  // Trial statistics
+  totalTrials: z.number().int().min(1),
+  passedTrials: z.number().int().nonnegative(),
+  failedTrials: z.number().int().nonnegative(),
+  warnTrials: z.number().int().nonnegative(),
+
+  // Consistency metrics (Anthropic article)
+  passAtK: z.number().min(0).max(1), // Likelihood of ≥1 success in k attempts
+  passToK: z.number().min(0).max(1), // Probability all k trials succeed (pass^k)
+
+  // Overall verdict
+  consistencyVerdict: z.enum(["CONSISTENT_PASS", "CONSISTENT_FAIL", "FLAKY"]),
+  meetsThreshold: z.boolean(), // Does passAtK meet goldenCase.passAtKThreshold?
+
+  // Individual trial IDs
+  trialRunIds: z.array(z.string()).default([]),
+
+  // Aggregated metrics (averages across trials)
+  avgFcSecondsError: z.number().optional(),
+  avgDropSecondsError: z.number().optional(),
+  avgRorStdDev: z.number().optional(),
+
+  // Metadata
+  orgId: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export type TrialSetSummary = z.infer<typeof TrialSetSummarySchema>;

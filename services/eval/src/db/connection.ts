@@ -36,6 +36,25 @@ function initSchema(db: Database.Database): void {
       max_ror_crashes INTEGER,
       sensory_min_score REAL,
       sensory_notes_json TEXT,
+      baseline_commands_json TEXT DEFAULT '[]',
+
+      -- T-028.2: Multiple trials support
+      trials_required INTEGER DEFAULT 1,
+      pass_at_k_threshold REAL,
+
+      -- T-028.2: Negative test cases
+      expectation TEXT DEFAULT 'SHOULD_SUCCEED',
+      reject_reason_expected TEXT,
+      danger_level TEXT DEFAULT 'SAFE',
+
+      -- Reference solution
+      reference_solution_json TEXT,
+
+      -- Source tracking
+      source_type TEXT DEFAULT 'SYNTHETIC',
+      source_session_id TEXT,
+      failure_mode TEXT,
+
       created_at TEXT NOT NULL,
       created_by TEXT,
       tags_json TEXT DEFAULT '[]',
@@ -53,12 +72,25 @@ function initSchema(db: Database.Database): void {
       golden_case_id TEXT,
       run_at TEXT NOT NULL,
       evaluator_id TEXT,
+
+      -- T-028.2: Trial tracking
+      trial_number INTEGER,
+      trial_set_id TEXT,
+      total_trials INTEGER,
+
       outcome TEXT NOT NULL,
       passed_gates_json TEXT DEFAULT '[]',
       failed_gates_json TEXT DEFAULT '[]',
+
+      -- T-028.2: Rejection tracking
+      agent_rejected INTEGER DEFAULT 0,
+      rejection_reason TEXT,
+      rejection_appropriate INTEGER,
+
       detailed_metrics_json TEXT,
       metrics_json TEXT DEFAULT '[]',
       lm_judge_json TEXT,
+      commands_json TEXT DEFAULT '[]',
       human_reviewed INTEGER DEFAULT 0,
       human_outcome TEXT,
       human_notes TEXT,
@@ -74,5 +106,6 @@ function initSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_eval_runs_golden_case ON eval_runs(golden_case_id);
     CREATE INDEX IF NOT EXISTS idx_eval_runs_outcome ON eval_runs(outcome);
     CREATE INDEX IF NOT EXISTS idx_eval_runs_org ON eval_runs(org_id);
+    CREATE INDEX IF NOT EXISTS idx_eval_runs_trial_set ON eval_runs(trial_set_id);
   `);
 }
