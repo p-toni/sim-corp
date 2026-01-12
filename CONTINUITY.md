@@ -1006,6 +1006,7 @@ Now:
 
 Next:
 - T-044 — Resource Limits & Autoscaling (P1)
+- T-050 — Autonomy Governance Agent & Circuit Breakers (P1) [Planned]
 - T-029 — Bullet R1 USB driver implementation (awaiting hardware access)
 
 Open questions (UNCONFIRMED if needed):
