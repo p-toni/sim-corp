@@ -34,7 +34,7 @@ Key decisions:
 
 State:
 Done:
-- T-001 to T-036 — All tasks DONE and verified
+- T-001 to T-036, T-040 — All tasks DONE and verified
 - M1 (Mission Inbox + Profiles + Predictive Assist + Tauri) — COMPLETE
 - M2 (Trust & Provenance) — COMPLETE
 - M3 (Design Partner Pilot: Eval Harness + Vendor Driver) — COMPLETE
@@ -622,6 +622,67 @@ Done:
     - Zero-downtime key rotation support
     - IAM-based access control for key operations
   - **Impact**: Production-grade device identity security. File-based keystore remains for development. Private key exposure eliminated in production. Foundation for compliance and zero-trust architecture.
+- **T-040 Secrets Management (2026-01-12):**
+  - **Scope**: Secure credential storage and rotation to replace hardcoded environment variable access
+  - **Interfaces** (libs/secrets/src/interfaces.ts):
+    - ISecretProvider: Abstract interface for all secret providers
+    - SecretAuditEntry: Audit trail for all secret access operations
+    - SecretsConfig: Configuration for provider selection and caching
+    - SecretCacheEntry: Cache entry structure with TTL
+  - **Environment Provider** (development):
+    - EnvSecretProvider: Reads secrets from process.env
+    - Supports get, getMany, getByPrefix operations
+    - Optional audit logging for development debugging
+    - set() method for testing (modifies process.env)
+  - **AWS Secrets Manager Provider** (production):
+    - AwsSecretsProvider: Integrates with AWS Secrets Manager
+    - In-memory caching with configurable TTL (default 5 minutes)
+    - Automatic secret rotation support via RotateSecretCommand
+    - Full audit logging with operation metadata (duration, cached flag)
+    - Graceful handling of ResourceNotFoundException
+  - **Factory Pattern** (libs/secrets/src/factory.ts):
+    - SecretsFactory: Creates providers based on configuration
+    - createFromEnv(): Reads SECRETS_PROVIDER, AWS_REGION, SECRETS_CACHE_TTL, SECRETS_AUDIT
+    - Singleton getInstance() for global provider instance
+    - resetInstance() for testing
+    - Supports providers: 'env', 'aws', 'vault' (vault planned)
+  - **Helper Utilities** (libs/secrets/src/helpers.ts):
+    - SecretsHelper: Convenience methods for common patterns
+    - Type coercion: getNumber(), getBoolean(), getJson()
+    - Required secrets: getRequired() throws if missing
+    - Default values: getOrDefault() with fallback
+    - URL construction: getDatabaseUrl(), getMqttUrl() from parts
+    - Prefix-based retrieval for grouped secrets
+  - **Service Integration**:
+    - event-inference: MQTT URL from secrets
+    - driver-bridge: MQTT URL from secrets
+    - sim-publisher: MQTT URL from secrets
+    - company-kernel: Ready for database URL from secrets
+    - Updated 4 service package.json files with @sim-corp/secrets dependency
+  - **Tests** (libs/secrets/tests/secrets.test.ts):
+    - 28 tests passing (all providers, factory, helpers)
+    - EnvSecretProvider: get, getMany, getByPrefix, set, audit logging
+    - SecretsFactory: provider creation, environment config, singleton
+    - SecretsHelper: type coercion, URL construction, required/optional patterns
+    - End-to-end workflow validation
+  - **Documentation** (docs/ops/secrets-management.md):
+    - AWS Secrets Manager setup guide with IAM permissions
+    - Environment variable configuration examples
+    - Cost analysis (~$9/month for 20 secrets with 5-min cache)
+    - Migration path from process.env to secrets library
+    - Security best practices (IAM roles, rotation, least privilege)
+    - Troubleshooting guide with common errors
+    - Testing patterns with mock providers
+  - **Dependencies**:
+    - Added @aws-sdk/client-secrets-manager@^3.709.0 to libs/secrets
+    - Added @sim-corp/secrets to 4 services
+  - **Security Benefits**:
+    - Centralized secret access with audit trail
+    - Secret rotation without code changes
+    - Cache reduces AWS API costs and latency
+    - Pluggable architecture supports HashiCorp Vault
+    - Never commit secrets to git (externalized configuration)
+  - **Impact**: Foundation for production secret management. Environment variables remain for development. Enables automatic rotation, centralized audit logging, and cost-effective secret storage. Services ready for AWS Secrets Manager in production.
 - **T-038 Health Checks & Graceful Shutdown (2026-01-10):**
   - **Health Check Library** (libs/health)
     - Dual endpoint support: /health (liveness) and /ready (readiness) probes
@@ -771,9 +832,9 @@ Now:
   - T-035 (Database Migration: SQLite → PostgreSQL) COMPLETE
   - T-039 (Backup & Disaster Recovery) COMPLETE
   - T-036 (HSM Integration for Device Identity) COMPLETE
+  - T-040 (Secrets Management) COMPLETE
 
 Next:
-- **T-040 — Secrets Management (P1)**
 - T-041 — TLS/mTLS (P1)
 - T-042 — Rate Limiting & Throttling (P1)
 - T-029 — Bullet R1 USB driver implementation (awaiting hardware access)

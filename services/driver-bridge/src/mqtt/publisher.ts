@@ -5,12 +5,10 @@ export interface MqttPublisher {
   disconnect(): Promise<void>;
 }
 
-const DEFAULT_MQTT_URL = "mqtt://127.0.0.1:1883";
-
 export class RealMqttPublisher implements MqttPublisher {
   private readonly client: RawMqttClient;
 
-  constructor(brokerUrl: string = process.env.MQTT_URL ?? DEFAULT_MQTT_URL, clientId?: string) {
+  constructor(brokerUrl: string, clientId?: string) {
     this.client = mqtt.connect(brokerUrl, { clientId });
   }
 

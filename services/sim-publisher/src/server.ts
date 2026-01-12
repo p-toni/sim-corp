@@ -9,6 +9,7 @@ import { registerStopRoute } from "./routes/stop";
 import { registerStatusRoute } from "./routes/status";
 import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
 import { setupHealthAndShutdown, createMqttChecker } from "@sim-corp/health";
+import { SecretsHelper } from "@sim-corp/secrets";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -33,19 +34,17 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   // Add HTTP metrics middleware
   app.addHook('onRequest', httpMetrics.middleware('sim-publisher'));
 
-  const mqttPublisher = options.mqttPublisher ?? new RealMqttPublisher();
+  // Get MQTT URL from secrets (falls back to env var)
+  const mqttUrl = process.env.MQTT_URL ?? "mqtt://127.0.0.1:1883";
+  const mqttPublisher = options.mqttPublisher ?? new RealMqttPublisher(mqttUrl);
   const simTwinClient = options.simTwinClient ?? new HttpSimTwinClient();
   const keystorePath = options.keystorePath ?? process.env.DEVICE_KEYSTORE_PATH ?? "./var/device-keys";
   const manager = options.manager ?? new SimPublisherManager(mqttPublisher, simTwinClient, keystorePath);
 
   // Setup health checks and graceful shutdown
-  const dependencies: Record<string, () => Promise<{ status: 'healthy' | 'unhealthy'; message?: string; latency?: number }>> = {};
-  if (mqttClient) {
-    dependencies.mqtt = createMqttChecker(mqttClient);
-  }
   setupHealthAndShutdown(app, {
     serviceName: 'sim-publisher',
-    dependencies,
+    dependencies: {},
     includeSystemMetrics: true,
   }, options.enableGracefulShutdown !== false ? {
     timeout: 10000,

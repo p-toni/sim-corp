@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@sim-corp/schemas": "workspace:*",
+    "@sim-corp/secrets": "workspace:*",
     "@sim-corp/metrics": "workspace:*",
     "@sim-corp/health": "workspace:*",
     "@sim-corp/database": "workspace:*",

@@ -14,6 +14,7 @@
     "@sim-corp/driver-fake": "workspace:*",
     "@sim-corp/driver-tcp-line": "workspace:*",
     "@sim-corp/schemas": "workspace:*",
+    "@sim-corp/secrets": "workspace:*",
     "fastify": "^4.28.1",
     "mqtt": "^5.10.1",
     "zod": "^3.23.8",

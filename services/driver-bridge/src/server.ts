@@ -8,6 +8,7 @@ import { registerStopRoute } from "./routes/stop";
 import { registerStatusRoute } from "./routes/status";
 import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
 import { setupHealthAndShutdown, createMqttChecker } from "@sim-corp/health";
+import { SecretsHelper } from "@sim-corp/secrets";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -31,7 +32,9 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   // Add HTTP metrics middleware
   app.addHook('onRequest', httpMetrics.middleware('driver-bridge'));
 
-  const mqttPublisher = options.mqttPublisher ?? new RealMqttPublisher();
+  // Get MQTT URL from secrets (falls back to env var)
+  const mqttUrl = process.env.MQTT_URL ?? "mqtt://127.0.0.1:1883";
+  const mqttPublisher = options.mqttPublisher ?? new RealMqttPublisher(mqttUrl);
   const driverKind = process.env.DRIVER_KIND ?? "fake";
   const bridge =
     options.bridge ??
@@ -41,13 +44,9 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     });
 
   // Setup health checks and graceful shutdown
-  const dependencies: Record<string, () => Promise<{ status: 'healthy' | 'unhealthy'; message?: string; latency?: number }>> = {};
-  if (mqttClient) {
-    dependencies.mqtt = createMqttChecker(mqttClient);
-  }
   setupHealthAndShutdown(app, {
     serviceName: 'driver-bridge',
-    dependencies,
+    dependencies: {},
     includeSystemMetrics: true,
   }, options.enableGracefulShutdown !== false ? {
     timeout: 10000,

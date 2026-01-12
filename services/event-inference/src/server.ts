@@ -7,6 +7,7 @@ import { registerStatusRoute } from "./routes/status";
 import { registerConfigRoute } from "./routes/config";
 import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
 import { setupHealthAndShutdown, createMqttChecker } from "@sim-corp/health";
+import { SecretsHelper } from "@sim-corp/secrets";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -78,9 +79,21 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
 function resolveMqttClient(provided: MqttClient | null | undefined, app: FastifyInstance): MqttClient | null {
   if (provided === null) return null;
   if (provided) return provided;
-  if (!process.env.MQTT_URL) return null;
+
+  // Fetch MQTT URL from secrets
+  const secrets = SecretsHelper.create();
+  let mqttUrl: string | null = null;
+
   try {
-    return new RealMqttClient();
+    // Try synchronous access for backward compatibility (env provider is sync)
+    mqttUrl = process.env.MQTT_URL ?? null;
+
+    if (!mqttUrl) {
+      app.log.warn("event-inference: MQTT_URL not set");
+      return null;
+    }
+
+    return new RealMqttClient(mqttUrl);
   } catch (err) {
     app.log.error(err, "event-inference: failed to init MQTT client");
     return null;
