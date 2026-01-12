@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { TelemetryEnvelopeSchema } from "@sim-corp/schemas";
 import type { TelemetryEnvelope } from "@sim-corp/schemas";
-import { DeviceKeyStore, signTelemetry } from "@sim-corp/device-identity";
+import { DeviceIdentityFactory, type ISigner, type IKeyStore } from "@sim-corp/device-identity";
 import type {
   MqttPublisher,
   PublishRequest,
@@ -22,7 +22,7 @@ async function buildEnvelope(
   origin: PublishRequest,
   topic: TelemetryEnvelope["topic"],
   payload: unknown,
-  keystore?: DeviceKeyStore
+  signer?: ISigner
 ): Promise<TelemetryEnvelope> {
   const envelope: TelemetryEnvelope = {
     ts: typeof (payload as { ts?: unknown }).ts === "string" ? (payload as { ts: string }).ts : new Date().toISOString(),
@@ -35,12 +35,11 @@ async function buildEnvelope(
     payload
   };
 
-  // Sign telemetry if keystore is provided
-  if (keystore) {
+  // Sign telemetry if signer is provided
+  if (signer) {
     const kid = `device:${origin.machineId}@${origin.siteId}`;
     try {
-      const keypair = await keystore.getOrCreate(kid);
-      const signed = await signTelemetry(payload as Record<string, unknown>, keypair.privateKey, kid);
+      const signed = await signer.sign(payload as Record<string, unknown>, kid);
       envelope.sig = signed.sig;
       envelope.kid = kid;
     } catch (err) {
@@ -54,15 +53,31 @@ async function buildEnvelope(
 
 export class SimPublisherManager {
   private readonly sessions = new Map<string, PublishSession>();
-  private readonly keystore?: DeviceKeyStore;
+  private readonly keystore?: IKeyStore;
+  private readonly signer?: ISigner;
 
   constructor(
     private readonly mqtt: MqttPublisher,
     private readonly simTwin: SimTwinClient,
     keystorePath?: string
   ) {
-    if (keystorePath) {
-      this.keystore = new DeviceKeyStore(keystorePath);
+    // Use factory to create keystore and signer
+    // Supports both file-based (dev) and HSM (production) modes
+    if (keystorePath || process.env.DEVICE_IDENTITY_MODE) {
+      try {
+        const identity = keystorePath
+          ? DeviceIdentityFactory.create({
+              mode: "file",
+              keystorePath,
+              auditLogging: false
+            })
+          : DeviceIdentityFactory.createFromEnv();
+
+        this.keystore = identity.keystore;
+        this.signer = identity.signer;
+      } catch (err) {
+        console.error("Failed to initialize device identity:", err);
+      }
     }
   }
 
@@ -124,7 +139,7 @@ export class SimPublisherManager {
         const delayMs = Math.max(MIN_INTERVAL_MS, Math.round(point.elapsedSeconds * 1000));
         const timer = setTimeout(async () => {
           if (!this.sessions.has(sessionId)) return;
-          const envelope = await buildEnvelope(request, "telemetry", point, this.keystore);
+          const envelope = await buildEnvelope(request, "telemetry", point, this.signer);
           await this.mqtt.publish(topic, JSON.stringify(envelope));
           stats.telemetrySent += 1;
           stats.lastSentTs = envelope.ts;
@@ -156,7 +171,7 @@ export class SimPublisherManager {
         const delayMs = Math.max(MIN_INTERVAL_MS, Math.round(elapsed * 1000));
         const timer = setTimeout(async () => {
           if (!this.sessions.has(sessionId)) return;
-          const envelope = await buildEnvelope(request, "event", event, this.keystore);
+          const envelope = await buildEnvelope(request, "event", event, this.signer);
           await this.mqtt.publish(topic, JSON.stringify(envelope));
           stats.eventsSent += 1;
           stats.lastSentTs = envelope.ts;

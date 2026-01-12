@@ -3,9 +3,10 @@ import { generateKeyPair, exportJWK, exportPKCS8, exportSPKI } from "jose";
 export interface DeviceKeypair {
   kid: string;
   publicKey: string; // PEM format (SPKI)
-  privateKey: string; // PEM format (PKCS8)
+  privateKey: string; // PEM format (PKCS8) - empty for HSM keys
   publicKeyJwk: Record<string, unknown>;
-  privateKeyJwk: Record<string, unknown>;
+  privateKeyJwk: Record<string, unknown>; // empty for HSM keys
+  hsmKeyId?: string; // KMS/HSM key ID (for HSM-backed keys)
 }
 
 /**

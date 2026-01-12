@@ -1,12 +1,14 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { generateDeviceKeypair, type DeviceKeypair } from "./keypair";
+import type { IKeyStore } from "./interfaces";
 
 /**
- * Simple file-based keystore for device keypairs.
- * In production, this would be replaced with HSM or secure key storage.
+ * File-based keystore for device keypairs.
+ * Stores keys on disk in PEM and JWK formats.
+ * For development and testing only - use HsmKeyStore for production.
  */
-export class DeviceKeyStore {
+export class FileKeyStore implements IKeyStore {
   constructor(private readonly keystorePath: string) {}
 
   /**
@@ -64,6 +66,31 @@ export class DeviceKeyStore {
   }
 
   /**
+   * Loads the public key for a device.
+   */
+  async loadPublicKey(kid: string): Promise<Pick<DeviceKeypair, "kid" | "publicKey" | "publicKeyJwk"> | null> {
+    const keyDir = path.join(this.keystorePath, kid);
+
+    try {
+      const [publicKey, publicKeyJwk] = await Promise.all([
+        fs.readFile(path.join(keyDir, "public.pem"), "utf-8"),
+        fs.readFile(path.join(keyDir, "public.jwk"), "utf-8").then(JSON.parse)
+      ]);
+
+      return {
+        kid,
+        publicKey,
+        publicKeyJwk
+      };
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  /**
    * Gets or creates a device keypair.
    */
   async getOrCreate(kid: string): Promise<DeviceKeypair> {
@@ -88,4 +115,38 @@ export class DeviceKeyStore {
       throw err;
     }
   }
+
+  /**
+   * Rotates a device key (generates new key, archives old).
+   */
+  async rotate(kid: string): Promise<DeviceKeypair> {
+    const existing = await this.load(kid);
+    if (existing) {
+      // Archive old key
+      const keyDir = path.join(this.keystorePath, kid);
+      const archiveDir = path.join(keyDir, `archived-${Date.now()}`);
+      await fs.mkdir(archiveDir, { recursive: true });
+
+      try {
+        await Promise.all([
+          fs.rename(path.join(keyDir, "private.pem"), path.join(archiveDir, "private.pem")),
+          fs.rename(path.join(keyDir, "private.jwk"), path.join(archiveDir, "private.jwk"))
+        ]);
+      } catch (err) {
+        // If files don't exist, that's okay
+        if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+          throw err;
+        }
+      }
+    }
+
+    // Generate and store new key
+    return this.generateAndStore(kid);
+  }
 }
+
+/**
+ * Backward compatibility alias for FileKeyStore.
+ * @deprecated Use FileKeyStore instead
+ */
+export const DeviceKeyStore = FileKeyStore;
