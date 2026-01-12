@@ -34,7 +34,7 @@ Key decisions:
 
 State:
 Done:
-- T-001 to T-036, T-040 — All tasks DONE and verified
+- T-001 to T-036, T-040, T-041 — All tasks DONE and verified
 - M1 (Mission Inbox + Profiles + Predictive Assist + Tauri) — COMPLETE
 - M2 (Trust & Provenance) — COMPLETE
 - M3 (Design Partner Pilot: Eval Harness + Vendor Driver) — COMPLETE
@@ -683,6 +683,67 @@ Done:
     - Pluggable architecture supports HashiCorp Vault
     - Never commit secrets to git (externalized configuration)
   - **Impact**: Foundation for production secret management. Environment variables remain for development. Enables automatic rotation, centralized audit logging, and cost-effective secret storage. Services ready for AWS Secrets Manager in production.
+- **T-041 TLS & mTLS (2026-01-12):**
+  - **Scope**: Encrypt all service-to-service communication with TLS and mTLS for zero-trust networking
+  - **Interfaces** (libs/tls/src/interfaces.ts):
+    - Certificate: PEM-encoded certificate with metadata (type, expiry, fingerprint)
+    - CertificateRequest: Request structure for certificate generation
+    - ICertificateProvider: Abstract interface for certificate providers
+    - ICertificateManager: High-level API for TLS configuration management
+    - TlsConfig: Configuration for TLS/mTLS (provider, paths, mTLS, auto-renewal)
+  - **Self-Signed Provider** (development):
+    - SelfSignedProvider: Generates self-signed certificates using 'selfsigned' library
+    - CA certificate generation (10-year validity)
+    - Server and client certificate generation with Subject Alternative Names
+    - RSA 2048-bit keys with proper X.509 extensions
+    - SHA-256 fingerprint calculation
+  - **File Provider** (production):
+    - FileProvider: Loads certificates from filesystem
+    - Compatible with Let's Encrypt (certbot) certificates
+    - Support for CA certificate chains
+    - Certificate watching and auto-reload
+  - **Certificate Manager** (libs/tls/src/certificate-manager.ts):
+    - High-level API for server and client TLS configuration
+    - Certificate validation with expiry checking
+    - Automatic renewal based on threshold (default 30 days)
+    - Certificate rotation with event callbacks
+    - Renewal checker background task
+  - **Fastify Integration** (libs/tls/src/fastify-helper.ts):
+    - FastifyTlsHelper: Helpers for Fastify HTTPS server configuration
+    - getHttpsOptions(): Get Fastify HTTPS options from certificate manager
+    - addRotationHook(): Register certificate rotation callbacks
+    - getHttpClientOptions(): Get mTLS client options for outbound requests
+  - **Factory Pattern** (libs/tls/src/factory.ts):
+    - TlsFactory: Creates certificate managers based on configuration
+    - createFromEnv(): Reads TLS_ENABLED, TLS_PROVIDER, TLS_MTLS_ENABLED
+    - Singleton getInstance() for global manager instance
+    - Supports providers: 'self-signed', 'file', 'acm' (planned), 'lets-encrypt' (planned)
+  - **Tests** (libs/tls/tests/tls.test.ts):
+    - 21 tests passing (all providers, manager, factory)
+    - SelfSignedProvider: certificate generation, CA creation, retrieval, listing
+    - CertificateManager: initialization, mTLS configuration, validation, rotation
+    - TlsFactory: environment configuration, singleton pattern, provider selection
+    - End-to-end TLS and mTLS workflows
+  - **Documentation** (docs/ops/tls-mtls-setup.md):
+    - Comprehensive TLS/mTLS setup guide (600+ lines)
+    - Architecture diagrams for production deployments
+    - Three deployment strategies: load balancer, service mesh, application-level
+    - Let's Encrypt integration with certbot
+    - AWS Certificate Manager (ACM) setup
+    - mTLS configuration for mutual authentication
+    - Certificate rotation and validation patterns
+    - Security best practices (cipher suites, HSTS, monitoring)
+    - Troubleshooting guide for common TLS errors
+  - **Dependencies**:
+    - Added selfsigned@^2.4.1 to libs/tls
+  - **Security Benefits**:
+    - End-to-end encryption for all communication
+    - Mutual authentication with mTLS (client certificates)
+    - Automatic certificate rotation before expiry
+    - Zero-downtime certificate updates
+    - Support for Let's Encrypt (free, auto-renewing certificates)
+    - Foundation for zero-trust security model
+  - **Impact**: Production-grade TLS/mTLS foundation. Self-signed certificates for development. File provider supports Let's Encrypt integration. Certificate lifecycle management with automatic rotation. Ready for production deployment with load balancer TLS termination or service mesh mTLS.
 - **T-038 Health Checks & Graceful Shutdown (2026-01-10):**
   - **Health Check Library** (libs/health)
     - Dual endpoint support: /health (liveness) and /ready (readiness) probes
@@ -833,9 +894,9 @@ Now:
   - T-039 (Backup & Disaster Recovery) COMPLETE
   - T-036 (HSM Integration for Device Identity) COMPLETE
   - T-040 (Secrets Management) COMPLETE
+  - T-041 (TLS & mTLS) COMPLETE
 
 Next:
-- T-041 — TLS/mTLS (P1)
 - T-042 — Rate Limiting & Throttling (P1)
 - T-029 — Bullet R1 USB driver implementation (awaiting hardware access)
 
