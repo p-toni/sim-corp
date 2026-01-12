@@ -26,6 +26,7 @@ import { EvalServiceClient } from "./core/eval-client";
 import { AutoEvaluator } from "./core/auto-evaluator";
 import { initializeMetrics, metricsHandler, createCounter, createGauge, Registry as PrometheusRegistry } from "@sim-corp/metrics";
 import { setupHealthAndShutdown, createDatabaseChecker, createMqttChecker } from "@sim-corp/health";
+import { RateLimitFactory, FastifyRateLimitPlugin } from "@sim-corp/rate-limit";
 
 interface BuildServerOptions {
   logger?: FastifyServerOptions["logger"];
@@ -177,6 +178,19 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   } : undefined);
 
   registerAuth(app);
+
+  // Setup rate limiting (skip health and metrics endpoints)
+  const { rateLimiter, strategy } = RateLimitFactory.getInstance();
+  const rateLimitPlugin = new FastifyRateLimitPlugin(rateLimiter, strategy);
+
+  app.addHook('preHandler', async (request, reply) => {
+    // Skip rate limiting for health checks and metrics
+    if (request.url === '/health' || request.url === '/metrics' || request.url === '/_rate-limit/metrics') {
+      return;
+    }
+    await rateLimitPlugin.createHook()(request, reply);
+  });
+
   registerTelemetryRoutes(app, { telemetryStore });
   registerEventRoutes(app, { eventStore });
   registerStreamRoutes(app, { telemetryStore, eventStore });
@@ -191,6 +205,11 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     const metrics = await metricsHandler(metricsRegistry);
     reply.header('Content-Type', 'text/plain; version=0.0.4');
     return metrics;
+  });
+
+  // Rate limit metrics endpoint
+  app.get('/_rate-limit/metrics', async () => {
+    return rateLimiter.getMetrics();
   });
 
   return app;

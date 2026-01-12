@@ -744,6 +744,63 @@ Done:
     - Support for Let's Encrypt (free, auto-renewing certificates)
     - Foundation for zero-trust security model
   - **Impact**: Production-grade TLS/mTLS foundation. Self-signed certificates for development. File provider supports Let's Encrypt integration. Certificate lifecycle management with automatic rotation. Ready for production deployment with load balancer TLS termination or service mesh mTLS.
+- **T-042 Rate Limiting & Throttling (2026-01-12):**
+  - **Scope**: Protect services from abuse with configurable rate limiting and burst handling
+  - **Rate Limiting Library** (libs/rate-limit)
+    - Interfaces: RateLimitConfig, RateLimitInfo, RateLimitResult, IRateLimitStorage, TokenBucketConfig
+    - Sliding window algorithm for fixed-rate limiting (RateLimiter class)
+    - Token bucket algorithm for burst handling (TokenBucket class)
+    - Memory storage for development (MemoryStorage with automatic cleanup)
+    - Redis storage for production (RedisStorage with atomic operations)
+    - Built-in metrics tracking (totalRequests, allowedRequests, blockedRequests, activeKeys)
+  - **Rate Limit Strategies**
+    - IpRateLimitStrategy: Rate limit by IP address (X-Forwarded-For, X-Real-IP support)
+    - UserRateLimitStrategy: Rate limit by authenticated user ID
+    - OrgRateLimitStrategy: Rate limit by organization/tenant ID (multi-tenancy)
+    - ApiKeyRateLimitStrategy: Rate limit by API key (header-based)
+    - EndpointRateLimitStrategy: Different limits per endpoint with wildcard matching
+    - CompositeRateLimitStrategy: Apply multiple strategies with most restrictive wins
+  - **Fastify Integration**
+    - FastifyRateLimitPlugin: Pre-built middleware for easy setup
+    - Standard rate limit headers: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset
+    - HTTP 429 Too Many Requests responses with Retry-After header
+    - Health/metrics endpoint exemption support
+  - **Factory Pattern**
+    - RateLimitFactory: Environment-based configuration
+    - createFromEnv(): Reads RATE_LIMIT_STORAGE, RATE_LIMIT_STRATEGY, RATE_LIMIT_MAX_REQUESTS, etc.
+    - Singleton getInstance() for global instance
+    - Supports 'memory' (dev) and 'redis' (production) storage
+  - **Service Integration**
+    - sim-twin: IP-based rate limiting with metrics endpoint
+    - analytics: IP-based rate limiting with metrics endpoint
+    - ingestion: IP-based rate limiting with metrics endpoint (authenticated routes protected)
+    - All services exempt health checks and metrics from rate limiting
+  - **Tests** (libs/rate-limit/tests/rate-limit.test.ts)
+    - 32 comprehensive tests passing
+    - MemoryStorage: increment, reset, TTL, cleanup (8 tests)
+    - RateLimiter: allow/block, metrics, handlers (7 tests)
+    - TokenBucket: consume, refill, capacity (4 tests)
+    - Strategies: IP/user/org/endpoint extraction (4 tests)
+    - Factory: environment config, singleton (6 tests)
+    - End-to-end workflows (3 tests)
+  - **Documentation** (docs/ops/rate-limiting-setup.md)
+    - Comprehensive 1000+ line guide
+    - Quick start examples for Fastify integration
+    - Storage backend setup (memory, Redis, Docker)
+    - All strategy patterns with use cases
+    - Configuration reference (environment variables, programmatic)
+    - Monitoring and metrics integration
+    - Best practices (limits, exemptions, testing)
+    - Troubleshooting guide
+  - **Dependencies**
+    - Added ioredis@^5.4.2 to libs/rate-limit
+    - Added @sim-corp/rate-limit to 3 services (sim-twin, analytics, ingestion)
+  - **Configuration**
+    - Default: 100 requests per 60 seconds (1 minute window)
+    - Strategy: IP-based by default (changeable via RATE_LIMIT_STRATEGY)
+    - Storage: Memory for development, Redis for production
+    - HTTP 429 status code with custom error messages
+  - **Impact**: Services now protected from abuse with configurable rate limiting. Memory storage for development, Redis storage for production multi-node deployments. Multiple strategies support different rate limiting needs (IP, user, org, API key, endpoint). Built-in metrics enable monitoring and alerting. Foundation for tiered API access and fair resource allocation.
 - **T-038 Health Checks & Graceful Shutdown (2026-01-10):**
   - **Health Check Library** (libs/health)
     - Dual endpoint support: /health (liveness) and /ready (readiness) probes
@@ -886,7 +943,7 @@ Now:
 - M4 (Safe Autopilot L3 Beta) P0 + P1 complete
 - T-028.1 (LM-as-judge) complete - M3 fully unblocked
 - T-029a (Bullet R1 protocol recon) complete - T-029 ready for hardware phase
-- **M5 (Production Hardening) P0 COMPLETE**
+- **M5 (Production Hardening) P0 + P1 (partial) COMPLETE**
   - T-034 (Production Docker Images) COMPLETE
   - T-037 (Monitoring & Observability Foundation) COMPLETE
   - T-038 (Health Checks & Graceful Shutdown) COMPLETE
@@ -895,9 +952,10 @@ Now:
   - T-036 (HSM Integration for Device Identity) COMPLETE
   - T-040 (Secrets Management) COMPLETE
   - T-041 (TLS & mTLS) COMPLETE
+  - T-042 (Rate Limiting & Throttling) COMPLETE
 
 Next:
-- T-042 — Rate Limiting & Throttling (P1)
+- T-043 — Connection Pooling (P1)
 - T-029 — Bullet R1 USB driver implementation (awaiting hardware access)
 
 Open questions (UNCONFIRMED if needed):
@@ -987,3 +1045,18 @@ Working set (files/ids/commands):
 - services/command/src/core/command-service.ts (T-030.14 getAllProposals method)
 - services/command/src/routes/proposals.ts (T-030.14 GET /proposals endpoint)
 - services/command/tests/command-service.test.ts (T-030.14 4 history tests, 21 total passing)
+- libs/rate-limit/* (T-042 rate limiting library)
+  - src/interfaces.ts (rate limiting interfaces)
+  - src/memory-storage.ts (in-memory storage backend)
+  - src/redis-storage.ts (Redis storage backend)
+  - src/rate-limiter.ts (sliding window algorithm)
+  - src/token-bucket.ts (token bucket algorithm)
+  - src/strategies.ts (6 rate limit strategies)
+  - src/fastify-middleware.ts (Fastify integration)
+  - src/factory.ts (environment-based factory)
+  - tests/rate-limit.test.ts (32 tests passing)
+  - package.json (ioredis dependency)
+- services/sim-twin/src/server.ts (T-042 rate limiting integration)
+- services/analytics/src/server.ts (T-042 rate limiting integration)
+- services/ingestion/src/server.ts (T-042 rate limiting integration)
+- docs/ops/rate-limiting-setup.md (T-042 comprehensive guide, 1000+ lines)
