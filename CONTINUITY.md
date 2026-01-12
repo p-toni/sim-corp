@@ -988,6 +988,59 @@ Done:
     - Added ioredis@^5.4.2 to libs/cache
   - **Impact**: Production-ready connection pooling with statistics API. Memory cache for development, Redis cache for production multi-node deployments. Cache-aside pattern enables safe automatic caching. LRU eviction and TTL expiration prevent memory exhaustion. Built-in metrics enable monitoring (hit rate, operations). Foundation for tiered caching strategies and performance optimization.
 
+- **T-044 Resource Limits & Autoscaling (2026-01-12):**
+  - **Scope**: Implement Kubernetes resource limits, autoscaling, and cost monitoring for production deployment
+  - **Kubernetes Deployments** (infra/k8s/deployments/)
+    - Created deployment manifests for all 6 services (ingestion, sim-twin, analytics, company-kernel, command, eval)
+    - Resource requests and limits defined per service tier
+    - API services: 100m/500m CPU, 128Mi/256Mi memory
+    - Company kernel: 200m/1000m CPU, 256Mi/512Mi memory (higher throughput)
+    - Health checks: liveness probe (/health, 30s delay) and readiness probe (/ready, 10s delay)
+    - Cost allocation labels: app, tier, component, cost-center, environment
+    - Service manifests (ClusterIP) for internal communication
+  - **HorizontalPodAutoscaler Configs** (infra/k8s/autoscaling/)
+    - HPA manifests for all 6 services
+    - Replica range: 2-10 pods (min 2 for HA, max 10 for cost control)
+    - Scaling thresholds: 70% CPU, 80% memory utilization
+    - Scale-up behavior: 60s stabilization window, max 50% increase or 2 pods/minute
+    - Scale-down behavior: 300s stabilization window, max 1 pod decrease/minute
+    - Conservative scaling policies prevent thrashing
+  - **Resource Metrics** (libs/metrics/src/resource-metrics.ts)
+    - ResourceMetrics class for tracking CPU, memory, and replica counts
+    - Metrics: cpu_usage_percent, memory_usage_bytes, memory_limit_bytes
+    - Autoscaling metrics: replicas_current, replicas_desired
+    - Process metrics collection from Node.js (process.memoryUsage(), process.cpuUsage())
+    - Cgroup integration for memory limits (Linux containers)
+    - Exported via libs/metrics/src/index.ts
+  - **Grafana Dashboard** (infra/k8s/monitoring/resource-utilization-dashboard.json)
+    - 8 panels: CPU usage, memory usage, replica counts, HPA status
+    - Gauges for CPU/memory utilization vs targets (threshold alerts at 70/80%)
+    - Resource summary table with pod-level details
+    - Alert annotations from Prometheus firing alerts
+    - Auto-refresh: 30s interval, 1-hour time window
+  - **Documentation** (infra/k8s/README.md)
+    - Comprehensive guide (400+ lines)
+    - Resource allocation strategy and rationale (requests < limits for burst)
+    - Autoscaling policies and behavior explanation
+    - Deployment instructions (kubectl apply)
+    - Monitoring queries (kubectl top, Prometheus PromQL)
+    - Troubleshooting: OOMKilled, CPU throttling, HPA not scaling
+    - Cost optimization strategies
+    - Health check implementation examples
+    - Best practices for production
+  - **Resource Strategy**
+    - Request < Limit: Allows burst capacity for traffic spikes
+    - Conservative requests: Efficient pod scheduling
+    - Appropriate limits: Prevents resource hogging and OOM kills
+    - Cost control: Max replica limits, cost allocation labels
+  - **Tests**: Manifests validated for syntax and best practices
+  - **Configuration**
+    - All services: 2 replica baseline, 10 replica max
+    - HPA metrics: CPU 70%, Memory 80%
+    - Stabilization windows: 1min scale-up, 5min scale-down
+    - Environment variables: DATABASE_POOL_MIN/MAX, QUEUE_CONCURRENCY
+  - **Impact**: Production-ready Kubernetes manifests with resource limits prevent resource exhaustion and OOM kills. HPA enables automatic scaling for traffic spikes while controlling costs. Resource metrics enable monitoring and right-sizing. Cost allocation labels enable spending tracking. Grafana dashboard provides visibility into resource utilization and autoscaling behavior. Conservative scaling policies prevent thrashing. Foundation for cluster autoscaling, VPA (Vertical Pod Autoscaler), and custom metrics autoscaling.
+
 Now:
 - M4 (Safe Autopilot L3 Beta) P0 + P1 complete
 - T-028.1 (LM-as-judge) complete - M3 fully unblocked
@@ -1003,9 +1056,9 @@ Now:
   - T-041 (TLS & mTLS) COMPLETE
   - T-042 (Rate Limiting & Throttling) COMPLETE
   - T-043 (Connection Pooling & Caching) COMPLETE
+  - T-044 (Resource Limits & Autoscaling) COMPLETE
 
 Next:
-- T-044 — Resource Limits & Autoscaling (P1)
 - T-050 — Autonomy Governance Agent & Circuit Breakers (P1) [Planned]
 - T-029 — Bullet R1 USB driver implementation (awaiting hardware access)
 
@@ -1123,3 +1176,22 @@ Working set (files/ids/commands):
   - tests/cache.test.ts (23 tests passing)
   - package.json (ioredis dependency)
 - docs/ops/connection-pooling-caching.md (T-043 comprehensive guide, 400+ lines)
+- infra/k8s/deployments/* (T-044 Kubernetes deployment manifests)
+  - ingestion.yaml (2 replicas, 100m/500m CPU, 128Mi/256Mi memory)
+  - sim-twin.yaml (2 replicas, 100m/500m CPU, 128Mi/256Mi memory)
+  - analytics.yaml (2 replicas, 100m/500m CPU, 128Mi/256Mi memory)
+  - company-kernel.yaml (2 replicas, 200m/1000m CPU, 256Mi/512Mi memory)
+  - command.yaml (2 replicas, 100m/500m CPU, 128Mi/256Mi memory)
+  - eval.yaml (2 replicas, 100m/500m CPU, 128Mi/256Mi memory)
+- infra/k8s/autoscaling/* (T-044 HPA configurations)
+  - ingestion-hpa.yaml (2-10 replicas, 70% CPU, 80% memory)
+  - sim-twin-hpa.yaml (2-10 replicas, 70% CPU, 80% memory)
+  - analytics-hpa.yaml (2-10 replicas, 70% CPU, 80% memory)
+  - company-kernel-hpa.yaml (2-10 replicas, 70% CPU, 80% memory)
+  - command-hpa.yaml (2-10 replicas, 70% CPU, 80% memory)
+  - eval-hpa.yaml (2-10 replicas, 70% CPU, 80% memory)
+- libs/metrics/src/resource-metrics.ts (T-044 resource utilization metrics)
+- libs/metrics/src/index.ts (T-044 resource metrics exports)
+- infra/k8s/monitoring/resource-utilization-dashboard.json (T-044 Grafana dashboard)
+- infra/k8s/README.md (T-044 comprehensive documentation, 400+ lines)
+- docs/tasks/T-044-PLAN.md (T-044 implementation plan)

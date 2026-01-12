@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics
+  labels:
+    app: analytics
+    tier: backend
+    component: analytics
+    cost-center: sim-corp
+    environment: production
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: analytics
+  template:
+    metadata:
+      labels:
+        app: analytics
+        tier: backend
+        component: analytics
+        cost-center: sim-corp
+        environment: production
+    spec:
+      containers:
+      - name: analytics
+        image: simcorp/analytics:latest
+        ports:
+        - containerPort: 4003
+          name: http
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        env:
+        - name: NODE_ENV
+          value: production
+        - name: PORT
+          value: "4003"
+        - name: DATABASE_POOL_MIN
+          value: "2"
+        - name: DATABASE_POOL_MAX
+          value: "10"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 4003
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 4003
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics
+  labels:
+    app: analytics
+    cost-center: sim-corp
+spec:
+  type: ClusterIP
+  ports:
+  - port: 4003
+    targetPort: 4003
+    protocol: TCP
+    name: http
+  selector:
+    app: analytics

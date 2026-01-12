@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: company-kernel
+  labels:
+    app: company-kernel
+    tier: backend
+    component: mission-queue
+    cost-center: sim-corp
+    environment: production
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: company-kernel
+  template:
+    metadata:
+      labels:
+        app: company-kernel
+        tier: backend
+        component: mission-queue
+        cost-center: sim-corp
+        environment: production
+    spec:
+      containers:
+      - name: company-kernel
+        image: simcorp/company-kernel:latest
+        ports:
+        - containerPort: 4004
+          name: http
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 512Mi
+        env:
+        - name: NODE_ENV
+          value: production
+        - name: PORT
+          value: "4004"
+        - name: DATABASE_POOL_MIN
+          value: "2"
+        - name: DATABASE_POOL_MAX
+          value: "20"
+        - name: QUEUE_CONCURRENCY
+          value: "10"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 4004
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 4004
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: company-kernel
+  labels:
+    app: company-kernel
+    cost-center: sim-corp
+spec:
+  type: ClusterIP
+  ports:
+  - port: 4004
+    targetPort: 4004
+    protocol: TCP
+    name: http
+  selector:
+    app: company-kernel

@@ -199,3 +199,7 @@ export function createSummary(opts: {
     registers: [opts.registry || register],
   });
 }
+
+// Export resource metrics
+export { ResourceMetrics, initializeResourceMetrics } from './resource-metrics.js';
+export type { ResourceMetricsConfig } from './resource-metrics.js';
