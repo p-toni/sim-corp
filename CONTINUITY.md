@@ -938,12 +938,61 @@ Done:
     - RTO (Recovery Time Objective): <1 hour ✓
     - RPO (Recovery Point Objective): <15 minutes ✓ (hourly backups)
   - **Impact**: Production PostgreSQL data fully protected with automated backups, offsite storage, and tested restore procedures. Meets M5 success criteria for disaster recovery. Complete DR playbook enables rapid recovery from any data loss scenario. Monitoring ensures backup health and compliance.
+- **T-043 Connection Pooling & Caching (2026-01-12):**
+  - **Scope**: Optimize database connections and add distributed caching for production performance
+  - **Connection Pooling Enhancements** (libs/database)
+    - Added getPoolStats() API to PostgresAdapter and SQLiteAdapter
+    - PoolStats interface: size, active, idle, waiting connections
+    - Built-in pool monitoring for active/idle connection tracking
+    - Pool configuration via DATABASE_POOL_MIN/MAX (default: 2/10)
+  - **Caching Library** (libs/cache)
+    - Interfaces: ICache, CacheConfig, CacheStats, CacheAsideOptions
+    - MemoryCache: In-memory cache with LRU eviction and TTL expiration
+    - RedisCache: Distributed Redis cache via ioredis
+    - Automatic cleanup of expired entries (memory cache)
+    - Built-in metrics: operations, hits, misses, hitRate, size, evictions
+  - **Cache Strategies**
+    - TTL-based expiration (configurable per key)
+    - LRU eviction when capacity reached (memory cache)
+    - Pattern-based invalidation (e.g., "user:*")
+    - Prefix support for namespacing
+  - **Cache-Aside Pattern Helpers**
+    - cacheAside(): Automatic fetch-and-cache on miss
+    - cachedFunction(): Wrap functions with caching
+    - batchGet/batchSet(): Efficient bulk operations
+    - warmCache(): Pre-populate cache on startup
+    - invalidateByTag(): Tag-based cache clearing
+  - **Factory Pattern**
+    - createCacheFromEnv(): Environment-based configuration
+    - getCacheInstance(): Singleton cache instance
+    - Supports backends: 'memory' (dev), 'redis' (production)
+  - **Tests** (libs/cache/tests/cache.test.ts)
+    - 23 comprehensive tests passing
+    - MemoryCache: set/get, TTL, eviction, pattern matching (12 tests)
+    - Factory: environment config, singleton (3 tests)
+    - Cache-aside pattern (2 tests)
+    - Batch operations (4 tests)
+    - Cache metrics (2 tests)
+  - **Documentation** (docs/ops/connection-pooling-caching.md)
+    - Comprehensive guide (400+ lines)
+    - Connection pool configuration and tuning
+    - Cache backend setup (memory, Redis)
+    - Cache-aside pattern examples
+    - Best practices (TTLs, invalidation, monitoring)
+    - Troubleshooting guide
+  - **Configuration**
+    - Default: Memory cache with 1000 max entries, 300s TTL
+    - Connection pool: 2-10 connections per service instance
+    - Environment-driven: CACHE_BACKEND, CACHE_TTL, DATABASE_POOL_MIN/MAX
+  - **Dependencies**
+    - Added ioredis@^5.4.2 to libs/cache
+  - **Impact**: Production-ready connection pooling with statistics API. Memory cache for development, Redis cache for production multi-node deployments. Cache-aside pattern enables safe automatic caching. LRU eviction and TTL expiration prevent memory exhaustion. Built-in metrics enable monitoring (hit rate, operations). Foundation for tiered caching strategies and performance optimization.
 
 Now:
 - M4 (Safe Autopilot L3 Beta) P0 + P1 complete
 - T-028.1 (LM-as-judge) complete - M3 fully unblocked
 - T-029a (Bullet R1 protocol recon) complete - T-029 ready for hardware phase
-- **M5 (Production Hardening) P0 + P1 (partial) COMPLETE**
+- **M5 (Production Hardening) P0 + P1 COMPLETE**
   - T-034 (Production Docker Images) COMPLETE
   - T-037 (Monitoring & Observability Foundation) COMPLETE
   - T-038 (Health Checks & Graceful Shutdown) COMPLETE
@@ -953,9 +1002,10 @@ Now:
   - T-040 (Secrets Management) COMPLETE
   - T-041 (TLS & mTLS) COMPLETE
   - T-042 (Rate Limiting & Throttling) COMPLETE
+  - T-043 (Connection Pooling & Caching) COMPLETE
 
 Next:
-- T-043 — Connection Pooling (P1)
+- T-044 — Resource Limits & Autoscaling (P1)
 - T-029 — Bullet R1 USB driver implementation (awaiting hardware access)
 
 Open questions (UNCONFIRMED if needed):
@@ -1060,3 +1110,15 @@ Working set (files/ids/commands):
 - services/analytics/src/server.ts (T-042 rate limiting integration)
 - services/ingestion/src/server.ts (T-042 rate limiting integration)
 - docs/ops/rate-limiting-setup.md (T-042 comprehensive guide, 1000+ lines)
+- libs/database/src/types.ts (T-043 PoolStats interface)
+- libs/database/src/postgres-adapter.ts (T-043 getPoolStats() implementation)
+- libs/database/src/sqlite-adapter.ts (T-043 getPoolStats() stub)
+- libs/cache/* (T-043 caching library)
+  - src/interfaces.ts (cache interfaces)
+  - src/memory-cache.ts (in-memory cache with LRU)
+  - src/redis-cache.ts (Redis cache via ioredis)
+  - src/factory.ts (environment-based factory)
+  - src/cache-aside.ts (cache-aside pattern helpers)
+  - tests/cache.test.ts (23 tests passing)
+  - package.json (ioredis dependency)
+- docs/ops/connection-pooling-caching.md (T-043 comprehensive guide, 400+ lines)

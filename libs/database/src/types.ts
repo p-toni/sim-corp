@@ -77,6 +77,20 @@ export interface Transaction {
 }
 
 /**
+ * Connection pool statistics
+ */
+export interface PoolStats {
+  /** Total size of the pool (max connections) */
+  size: number;
+  /** Number of connections currently in use */
+  active: number;
+  /** Number of idle connections available */
+  idle: number;
+  /** Number of requests waiting for a connection */
+  waiting: number;
+}
+
+/**
  * Core database interface implemented by all adapters
  */
 export interface Database {
@@ -120,6 +134,12 @@ export interface Database {
    * Check if database is healthy/connected
    */
   healthCheck(): Promise<{ healthy: boolean; latency?: number; error?: string }>;
+
+  /**
+   * Get connection pool statistics (PostgreSQL only)
+   * Returns null for SQLite
+   */
+  getPoolStats(): PoolStats | null;
 
   /**
    * Close the database connection

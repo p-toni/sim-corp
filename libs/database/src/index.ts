@@ -56,6 +56,7 @@ export type {
   DatabaseLogger,
   DatabaseType,
   ExecResult,
+  PoolStats,
   PreparedStatement,
   QueryResult,
   Transaction,

@@ -196,6 +196,15 @@ export class PostgresAdapter implements Database {
     }
   }
 
+  getPoolStats(): { size: number; active: number; idle: number; waiting: number } | null {
+    return {
+      size: this.pool.totalCount,
+      active: this.pool.totalCount - this.pool.idleCount,
+      idle: this.pool.idleCount,
+      waiting: this.pool.waitingCount,
+    };
+  }
+
   async close(): Promise<void> {
     try {
       await this.pool.end();

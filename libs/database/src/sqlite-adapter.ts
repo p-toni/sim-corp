@@ -183,6 +183,11 @@ export class SQLiteAdapter implements Database {
     }
   }
 
+  getPoolStats(): null {
+    // SQLite doesn't use connection pooling
+    return null;
+  }
+
   async close(): Promise<void> {
     try {
       this.db.close();
