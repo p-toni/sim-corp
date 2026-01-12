@@ -320,6 +320,206 @@ The system includes 15 pre-seeded regression cases (migration `003-real-failure-
 
 These serve as a baseline regression test suite covering common roasting mistakes.
 
+## T-028.2 Phase 3: Observability (Agent Transcripts & Saturation Monitoring)
+
+Phase 3 adds **observability features** to detect issues early and debug evaluation failures.
+
+### Agent Transcript Capture
+
+Store structured logs of agent reasoning and decisions during evaluations for debugging and analysis.
+
+#### What Gets Captured
+
+When running evaluations, optionally include an `agentTranscript` array with structured log entries:
+
+```json
+{
+  "sessionId": "session-123",
+  "goldenCaseId": "golden-456",
+  "analysis": { ... },
+  "agentTranscript": [
+    {
+      "timestamp": "2026-01-12T10:30:00Z",
+      "type": "thinking",
+      "content": "Analyzing bean characteristics to plan roast curve",
+      "metadata": { "step": "planning" }
+    },
+    {
+      "timestamp": "2026-01-12T10:30:15Z",
+      "type": "decision",
+      "content": "Chosen gas profile: progressive increase to FC, then gradual reduction",
+      "metadata": { "profile": "light_roast_standard" }
+    },
+    {
+      "timestamp": "2026-01-12T10:31:00Z",
+      "type": "tool_call",
+      "content": "Calling roast_planner.generate_curve()",
+      "metadata": { "tool": "roast_planner" }
+    },
+    {
+      "timestamp": "2026-01-12T10:31:05Z",
+      "type": "observation",
+      "content": "Current BT: 185°C, approaching FC target of 196°C",
+      "metadata": { "bt": 185, "target": 196 }
+    },
+    {
+      "timestamp": "2026-01-12T10:32:00Z",
+      "type": "error",
+      "content": "Temperature sensor lag detected, adjusting plan",
+      "metadata": { "sensor": "bean_temp", "lag_ms": 2000 }
+    }
+  ]
+}
+```
+
+#### Transcript Entry Types
+
+- **thinking**: Agent reasoning and planning
+- **tool_call**: Tool/function invocations
+- **tool_result**: Tool responses
+- **decision**: Decision points in execution
+- **error**: Errors encountered
+- **observation**: Environment observations
+- **action**: Actions taken
+
+#### Benefits
+
+- **Debug failures**: Understand why an evaluation failed
+- **Improve agents**: Identify reasoning flaws or missing observations
+- **Training data**: Capture expert agent behavior for training
+- **Audit trail**: Track agent decision-making for safety review
+
+### Eval Saturation Monitoring
+
+Detect when golden cases become "too easy" (high pass rates) and need to be retired or made harder.
+
+#### What Is Saturation?
+
+A golden case is **saturated** when agents consistently pass it (>80% pass rate), indicating it's no longer challenging and may not be catching regressions effectively.
+
+#### Saturation Metrics
+
+Get saturation metrics for a specific golden case:
+
+```bash
+curl http://127.0.0.1:4007/saturation/golden-cases/:id
+```
+
+Response:
+
+```json
+{
+  "goldenCaseId": "golden-abc123",
+  "goldenCaseName": "Ethiopian Yirgacheffe Light",
+  "machineId": "LORING-S35",
+  "totalEvaluations": 45,
+  "recentEvaluations": 12,
+  "overallPassRate": 0.72,
+  "recentPassRate": 0.92,
+  "passRateTrend": "IMPROVING",
+  "isSaturated": true,
+  "saturationLevel": "SATURATED",
+  "consistencyScore": 0.85,
+  "recommendation": "RETIRE",
+  "firstEvaluatedAt": "2026-01-01T10:00:00Z",
+  "lastEvaluatedAt": "2026-01-12T08:00:00Z",
+  "daysSinceLastEval": 0,
+  "sourceType": "SYNTHETIC",
+  "tags": ["light", "washed"]
+}
+```
+
+#### Saturation Levels
+
+- **LOW** (<40%): Golden case is very difficult, agents rarely pass
+- **MEDIUM** (40-60%): Good difficulty balance, agents sometimes pass
+- **HIGH** (60-80%): Getting easier, agents often pass
+- **SATURATED** (>80%): Too easy, agents almost always pass
+
+#### Pass Rate Trends
+
+Compares recent (30 days) vs overall pass rate:
+
+- **IMPROVING**: Recent pass rate >10% higher than overall (case getting easier)
+- **STABLE**: Recent pass rate within ±10% of overall
+- **DECLINING**: Recent pass rate >10% lower than overall (case getting harder)
+
+#### Recommendations
+
+- **KEEP**: Good difficulty level, no action needed
+- **MAKE_HARDER**: Tighten tolerances to restore challenge
+- **RETIRE**: Replace with new case, this one is saturated
+- **NEEDS_ATTENTION**: Inconsistent results, review case definition
+
+#### Saturation Summary
+
+Get saturation summary across all golden cases:
+
+```bash
+curl http://127.0.0.1:4007/saturation/summary
+```
+
+Response:
+
+```json
+{
+  "totalCases": 25,
+  "saturatedCases": 3,
+  "saturationRate": 0.12,
+  "lowDifficulty": 5,
+  "mediumDifficulty": 12,
+  "highDifficulty": 5,
+  "saturated": 3,
+  "casesToRetire": 3,
+  "casesToHarden": 5,
+  "casesNeedingAttention": 2,
+  "needsAction": false,
+  "severity": "OK",
+  "calculatedAt": "2026-01-12T09:00:00Z"
+}
+```
+
+#### Alert Severity
+
+- **OK**: <10% of cases saturated - healthy test suite
+- **WARNING**: 10-20% of cases saturated - review suite soon
+- **ALERT**: >20% of cases saturated - immediate action needed
+
+#### Use Cases
+
+**Detect regression test drift:**
+```bash
+# Check if regression cases are still catching failures
+GET /saturation/golden-cases?sourceType=REAL_FAILURE
+# If many are saturated, agent has learned to avoid those failure modes
+```
+
+**Maintain test suite quality:**
+```bash
+# Get summary weekly
+GET /saturation/summary
+# If severity: ALERT, review and retire/harden saturated cases
+```
+
+**Track agent improvement over time:**
+```bash
+# Rising pass rates indicate agent is getting better
+# Declining pass rates may indicate agent regression
+```
+
+#### List All Saturation Metrics
+
+Get saturation metrics for all non-archived golden cases:
+
+```bash
+curl http://127.0.0.1:4007/saturation/golden-cases
+```
+
+Returns array of saturation metrics for all cases, useful for:
+- Bulk analysis
+- Exporting to dashboards (Grafana, etc.)
+- Identifying cases needing attention
+
 ## Architecture
 
 ### Components
@@ -603,6 +803,7 @@ curl "http://127.0.0.1:4007/golden-cases?machineId=LORING-S35&archived=false"
 - **rejection_appropriate** (T-028.2): Was rejection correct?
 - **detailed_metrics_json**: Calculated metrics
 - **commands_json** (T-028.2): Command sequence executed
+- **agent_transcript_json** (T-028.2 Phase 3): Agent reasoning and decision logs
 - **lm_judge_json**: Optional LM-as-judge scores
 - **human_reviewed**: Human review flag
 - **human_outcome, human_notes**: Human override
@@ -663,14 +864,21 @@ Detected violations:
 - ✅ Production failure replay workflow
 - ✅ Proof-of-solvability via reference solutions
 
-### P3 (Next)
+### P3 (T-028.2 Phase 3) - COMPLETE
+- ✅ Agent transcript capture for debugging
+- ✅ Eval saturation monitoring (pass rate tracking)
+- ✅ Saturation metrics per golden case
+- ✅ Saturation summary across all cases
+- ✅ Saturation alerts and recommendations
+- ✅ Pass rate trend analysis (IMPROVING/STABLE/DECLINING)
+- ✅ Difficulty classification (LOW/MEDIUM/HIGH/SATURATED)
+
+### P4 (Next)
 - Automatic evaluation on session close
 - Integration with report workflow
 - Agent rejection detection from mission status
 - Historical baseline variance calculation
 - Sensory score integration
-- Eval saturation monitoring
-- Agent transcript capture
 
 ### P2 (Future)
 - Governor integration for autonomy promotion

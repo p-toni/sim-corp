@@ -60,4 +60,29 @@ export function registerEvaluationRoutes(app: FastifyInstance, deps: Evaluations
       return evalService.canPromote(request.params.sessionId);
     }
   );
+
+  // T-028.2 Phase 3: Get saturation metrics for a specific golden case
+  app.get(
+    "/saturation/golden-cases/:id",
+    (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const metrics = evalService.calculateSaturationMetrics(request.params.id);
+      if (!metrics) {
+        return reply.status(404).send({ error: "Golden case not found" });
+      }
+      return metrics;
+    }
+  );
+
+  // T-028.2 Phase 3: Get saturation summary across all golden cases
+  app.get("/saturation/summary", () => {
+    return evalService.calculateSaturationSummary();
+  });
+
+  // T-028.2 Phase 3: Get list of all golden case saturation metrics
+  app.get("/saturation/golden-cases", () => {
+    const allGoldenCases = evalService.listGoldenCases({ archived: false });
+    return allGoldenCases
+      .map(gc => evalService.calculateSaturationMetrics(gc.id))
+      .filter(m => m !== null);
+  });
 }

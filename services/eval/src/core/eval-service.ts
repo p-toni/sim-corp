@@ -566,4 +566,162 @@ export class EvalService {
     if (numbers.length === 0) return undefined;
     return numbers.reduce((sum, n) => sum + n, 0) / numbers.length;
   }
+
+  /**
+   * T-028.2 Phase 3: Calculate saturation metrics for a golden case
+   */
+  calculateSaturationMetrics(goldenCaseId: string): import("@sim-corp/schemas").GoldenCaseSaturationMetrics | null {
+    const goldenCase = this.repo.getGoldenCase(goldenCaseId);
+    if (!goldenCase) {
+      return null;
+    }
+
+    // Get all evaluations for this golden case
+    const allEvals = this.repo.listEvalRuns({ goldenCaseId });
+    if (allEvals.length === 0) {
+      // No evaluations yet - return default metrics
+      return {
+        goldenCaseId: goldenCase.id,
+        goldenCaseName: goldenCase.name,
+        machineId: goldenCase.machineId,
+        totalEvaluations: 0,
+        recentEvaluations: 0,
+        overallPassRate: 0,
+        recentPassRate: 0,
+        passRateTrend: "STABLE",
+        isSaturated: false,
+        saturationLevel: "LOW",
+        sourceType: goldenCase.sourceType ?? "SYNTHETIC",
+        tags: goldenCase.tags ?? []
+      };
+    }
+
+    // Calculate pass rates
+    const passedCount = allEvals.filter(e => e.outcome === "PASS").length;
+    const overallPassRate = passedCount / allEvals.length;
+
+    // Recent evaluations (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const recentEvals = allEvals.filter(e => new Date(e.runAt) >= thirtyDaysAgo);
+    const recentPassedCount = recentEvals.filter(e => e.outcome === "PASS").length;
+    const recentPassRate = recentEvals.length > 0 ? recentPassedCount / recentEvals.length : overallPassRate;
+
+    // Determine pass rate trend
+    let passRateTrend: "IMPROVING" | "STABLE" | "DECLINING";
+    const diff = recentPassRate - overallPassRate;
+    if (diff > 0.1) {
+      passRateTrend = "IMPROVING";
+    } else if (diff < -0.1) {
+      passRateTrend = "DECLINING";
+    } else {
+      passRateTrend = "STABLE";
+    }
+
+    // Determine saturation level and recommendation
+    const isSaturated = recentPassRate > 0.8;
+    let saturationLevel: "LOW" | "MEDIUM" | "HIGH" | "SATURATED";
+    let recommendation: "KEEP" | "MAKE_HARDER" | "RETIRE" | "NEEDS_ATTENTION";
+
+    if (recentPassRate < 0.4) {
+      saturationLevel = "LOW";
+      recommendation = recentEvals.length < 5 ? "NEEDS_ATTENTION" : "KEEP";
+    } else if (recentPassRate <= 0.6) {
+      saturationLevel = "MEDIUM";
+      recommendation = "KEEP";
+    } else if (recentPassRate <= 0.8) {
+      saturationLevel = "HIGH";
+      recommendation = "MAKE_HARDER";
+    } else {
+      saturationLevel = "SATURATED";
+      recommendation = "RETIRE";
+    }
+
+    // Calculate consistency score (how consistent are the results)
+    const outcomes = recentEvals.map(e => e.outcome);
+    const uniqueOutcomes = new Set(outcomes);
+    const consistencyScore = 1 - (uniqueOutcomes.size - 1) / 2; // 0-1 scale
+
+    // Time-based metrics
+    const sortedEvals = [...allEvals].sort((a, b) =>
+      new Date(a.runAt).getTime() - new Date(b.runAt).getTime()
+    );
+    const firstEvaluatedAt = sortedEvals[0]?.runAt;
+    const lastEvaluatedAt = sortedEvals[sortedEvals.length - 1]?.runAt;
+    const daysSinceLastEval = lastEvaluatedAt
+      ? Math.floor((Date.now() - new Date(lastEvaluatedAt).getTime()) / (1000 * 60 * 60 * 24))
+      : undefined;
+
+    return {
+      goldenCaseId: goldenCase.id,
+      goldenCaseName: goldenCase.name,
+      machineId: goldenCase.machineId,
+      totalEvaluations: allEvals.length,
+      recentEvaluations: recentEvals.length,
+      overallPassRate,
+      recentPassRate,
+      passRateTrend,
+      isSaturated,
+      saturationLevel,
+      consistencyScore,
+      firstEvaluatedAt,
+      lastEvaluatedAt,
+      daysSinceLastEval,
+      recommendation,
+      sourceType: goldenCase.sourceType ?? "SYNTHETIC",
+      tags: goldenCase.tags ?? []
+    };
+  }
+
+  /**
+   * T-028.2 Phase 3: Calculate saturation summary across all golden cases
+   */
+  calculateSaturationSummary(): import("@sim-corp/schemas").SaturationSummary {
+    const allGoldenCases = this.repo.listGoldenCases({ archived: false });
+    const metrics = allGoldenCases
+      .map(gc => this.calculateSaturationMetrics(gc.id))
+      .filter(m => m !== null) as import("@sim-corp/schemas").GoldenCaseSaturationMetrics[];
+
+    const totalCases = metrics.length;
+    const saturatedCases = metrics.filter(m => m.isSaturated).length;
+    const saturationRate = totalCases > 0 ? saturatedCases / totalCases : 0;
+
+    // Breakdown by saturation level
+    const lowDifficulty = metrics.filter(m => m.saturationLevel === "LOW").length;
+    const mediumDifficulty = metrics.filter(m => m.saturationLevel === "MEDIUM").length;
+    const highDifficulty = metrics.filter(m => m.saturationLevel === "HIGH").length;
+    const saturated = metrics.filter(m => m.saturationLevel === "SATURATED").length;
+
+    // Recommendations
+    const casesToRetire = metrics.filter(m => m.recommendation === "RETIRE").length;
+    const casesToHarden = metrics.filter(m => m.recommendation === "MAKE_HARDER").length;
+    const casesNeedingAttention = metrics.filter(m => m.recommendation === "NEEDS_ATTENTION").length;
+
+    // Alert status
+    const needsAction = saturationRate > 0.2; // More than 20% saturated
+    let severity: "OK" | "WARNING" | "ALERT";
+    if (saturationRate < 0.1) {
+      severity = "OK";
+    } else if (saturationRate < 0.2) {
+      severity = "WARNING";
+    } else {
+      severity = "ALERT";
+    }
+
+    return {
+      totalCases,
+      saturatedCases,
+      saturationRate,
+      lowDifficulty,
+      mediumDifficulty,
+      highDifficulty,
+      saturated,
+      casesToRetire,
+      casesToHarden,
+      casesNeedingAttention,
+      needsAction,
+      severity,
+      calculatedAt: new Date().toISOString()
+    };
+  }
 }

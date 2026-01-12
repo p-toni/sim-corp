@@ -91,6 +91,10 @@ function initSchema(db: Database.Database): void {
       metrics_json TEXT DEFAULT '[]',
       lm_judge_json TEXT,
       commands_json TEXT DEFAULT '[]',
+
+      -- T-028.2 Phase 3: Agent transcript
+      agent_transcript_json TEXT,
+
       human_reviewed INTEGER DEFAULT 0,
       human_outcome TEXT,
       human_notes TEXT,

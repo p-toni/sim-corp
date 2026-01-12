@@ -34,7 +34,7 @@ Key decisions:
 
 State:
 Done:
-- T-001 to T-028.2 Phase 2 — All tasks DONE and verified
+- T-001 to T-028.2 Phase 3 — All tasks DONE and verified
 - M1 (Mission Inbox + Profiles + Predictive Assist + Tauri) — COMPLETE
 - M2 (Trust & Provenance) — COMPLETE
 - M3 (Design Partner Pilot: Eval Harness + Vendor Driver) — COMPLETE
@@ -518,14 +518,58 @@ Done:
     - Expert baseline capture: POST /golden-cases/from-success
     - Regression test suite: POST /golden-cases/from-failure
     - Proof of solvability: POST /golden-cases/{id}/reference-solution
-  - **Deliverables**:
-    - ✅ 3 new API endpoints
-    - ✅ 3 service methods
-    - ✅ 15 pre-seeded regression cases
-    - ✅ 7 new tests (22 total passing)
-    - ✅ Repository updates
-    - ✅ Documentation updates
-  - **Impact**: Eval harness now enables capturing expert roasts as golden cases and turning production failures into regression tests. Reference solutions provide proof of solvability. 15 pre-seeded cases cover common failure modes for immediate regression detection. Foundation for continuous improvement via real-world data.
+- **T-028.2 Phase 3: Observability (Agent Transcripts & Saturation Monitoring) (2026-01-12):**
+  - **Schemas** (libs/schemas/src/kernel/eval.ts):
+    - agentTranscript: Array of structured log entries (thinking, tool_call, decision, error, observation, action)
+    - GoldenCaseSaturationMetrics: Pass rates, trends, saturation levels, recommendations
+    - SaturationSummary: Cross-case saturation metrics and alert severity
+  - **Database Schema** (services/eval/src/db/connection.ts):
+    - Added agent_transcript_json column to eval_runs table
+  - **Repository Updates** (services/eval/src/db/repo.ts):
+    - createEvalRun() persists agentTranscript
+    - hydrateEvalRun() parses agentTranscript from JSON
+  - **Service Methods** (services/eval/src/core/eval-service.ts):
+    - calculateSaturationMetrics(): Calculates pass rates, trends, and recommendations for a golden case
+      - Overall and recent (30 days) pass rates
+      - Pass rate trend: IMPROVING/STABLE/DECLINING (±10% threshold)
+      - Saturation levels: LOW (<40%), MEDIUM (40-60%), HIGH (60-80%), SATURATED (>80%)
+      - Recommendations: KEEP, MAKE_HARDER, RETIRE, NEEDS_ATTENTION
+      - Consistency score calculation
+    - calculateSaturationSummary(): Aggregates saturation across all cases
+      - Breakdown by difficulty level
+      - Saturation rate and counts
+      - Alert severity: OK (<10%), WARNING (10-20%), ALERT (>20%)
+      - needsAction flag when saturation rate > 20%
+  - **API Endpoints** (services/eval/src/routes/evaluations.ts):
+    - GET /saturation/golden-cases/:id: Get saturation metrics for specific case
+    - GET /saturation/summary: Get saturation summary across all cases
+    - GET /saturation/golden-cases: List all case saturation metrics
+  - **Tests** (services/eval/tests/saturation-monitoring.test.ts):
+    - 8 comprehensive tests (30 total passing):
+      - Default metrics for unevaluated cases
+      - Pass rate calculation (60% mixed results)
+      - Saturation detection (>80%)
+      - Pass rate trend calculation
+      - Non-existent case handling
+      - Cross-case saturation summary
+      - Alert severity levels
+      - Agent transcript storage and retrieval
+  - **Documentation** (docs/ops/eval-harness.md):
+    - Added T-028.2 Phase 3 section (200+ lines)
+    - Agent transcript capture examples and entry types
+    - Saturation monitoring API usage
+    - Saturation levels, trends, and recommendations
+    - Alert severity thresholds
+    - Use cases: regression drift detection, test suite maintenance, agent improvement tracking
+    - Updated database schema documentation
+    - Updated roadmap (P3 complete)
+  - **Features Enabled**:
+    - Debug eval failures via agent transcripts
+    - Detect golden cases that are too easy
+    - Track agent improvement over time
+    - Maintain test suite quality
+    - Alert when saturation exceeds thresholds
+  - **Impact**: Eval harness now provides observability into agent behavior and test suite health. Agent transcripts enable debugging failures and capturing expert behavior. Saturation monitoring prevents test suite degradation and tracks agent improvement over time.
 - **T-038 Health Checks & Graceful Shutdown (2026-01-10):**
   - **Health Check Library** (libs/health)
     - Dual endpoint support: /health (liveness) and /ready (readiness) probes

@@ -212,6 +212,22 @@ export const EvalRunSchema = z.object({
     outcome: z.string().optional() // "SUCCESS", "FAILED", "ABORTED"
   })).default([]),
 
+  // T-028.2 Phase 3: Agent transcript for debugging and analysis
+  agentTranscript: z.array(z.object({
+    timestamp: IsoDateTimeSchema,
+    type: z.enum([
+      "thinking",      // Agent reasoning/planning
+      "tool_call",     // Tool invocation
+      "tool_result",   // Tool response
+      "decision",      // Decision point
+      "error",         // Error encountered
+      "observation",   // Environment observation
+      "action"         // Action taken
+    ]),
+    content: z.string(),
+    metadata: z.record(z.unknown()).optional() // Additional context
+  })).optional(),
+
   // Metadata
   orgId: z.string().optional(),
   notes: z.string().optional(),
@@ -258,3 +274,78 @@ export const TrialSetSummarySchema = z.object({
 });
 
 export type TrialSetSummary = z.infer<typeof TrialSetSummarySchema>;
+
+/**
+ * T-028.2 Phase 3: Golden case saturation metrics
+ * Tracks pass rates over time to detect saturated (too easy) cases
+ */
+export const GoldenCaseSaturationMetricsSchema = z.object({
+  goldenCaseId: IdentifierSchema,
+  goldenCaseName: z.string(),
+  machineId: z.string(),
+
+  // Evaluation statistics
+  totalEvaluations: z.number().int().nonnegative(),
+  recentEvaluations: z.number().int().nonnegative(), // Last 30 days
+
+  // Pass rate metrics
+  overallPassRate: z.number().min(0).max(1), // All time
+  recentPassRate: z.number().min(0).max(1),  // Last 30 days
+  passRateTrend: z.enum(["IMPROVING", "STABLE", "DECLINING"]),
+
+  // Saturation detection
+  isSaturated: z.boolean(), // passRate > 0.8
+  saturationLevel: z.enum(["LOW", "MEDIUM", "HIGH", "SATURATED"]),
+  // LOW: <40%, MEDIUM: 40-60%, HIGH: 60-80%, SATURATED: >80%
+
+  // Difficulty metrics
+  averageFailMargin: z.number().optional(), // How far from passing when failing
+  consistencyScore: z.number().min(0).max(1).optional(), // How consistent results are
+
+  // Time-based metrics
+  firstEvaluatedAt: IsoDateTimeSchema.optional(),
+  lastEvaluatedAt: IsoDateTimeSchema.optional(),
+  daysSinceLastEval: z.number().int().nonnegative().optional(),
+
+  // Recommendations
+  recommendation: z.enum([
+    "KEEP",           // Good difficulty, keep as-is
+    "MAKE_HARDER",    // Too easy, tighten tolerances
+    "RETIRE",         // Saturated, replace with harder variant
+    "NEEDS_ATTENTION" // Inconsistent or problematic
+  ]).optional(),
+
+  // Source tracking
+  sourceType: z.enum(["SYNTHETIC", "REAL_SUCCESS", "REAL_FAILURE"]),
+  tags: z.array(z.string()).default([])
+});
+
+export type GoldenCaseSaturationMetrics = z.infer<typeof GoldenCaseSaturationMetricsSchema>;
+
+/**
+ * T-028.2 Phase 3: Saturation summary across all golden cases
+ */
+export const SaturationSummarySchema = z.object({
+  totalCases: z.number().int().nonnegative(),
+  saturatedCases: z.number().int().nonnegative(),
+  saturationRate: z.number().min(0).max(1), // % saturated
+
+  // Breakdown by saturation level
+  lowDifficulty: z.number().int().nonnegative(),    // <40%
+  mediumDifficulty: z.number().int().nonnegative(), // 40-60%
+  highDifficulty: z.number().int().nonnegative(),   // 60-80%
+  saturated: z.number().int().nonnegative(),        // >80%
+
+  // Recommendations
+  casesToRetire: z.number().int().nonnegative(),
+  casesToHarden: z.number().int().nonnegative(),
+  casesNeedingAttention: z.number().int().nonnegative(),
+
+  // Alert status
+  needsAction: z.boolean(), // saturationRate > 0.2 (20%)
+  severity: z.enum(["OK", "WARNING", "ALERT"]),
+
+  calculatedAt: IsoDateTimeSchema
+});
+
+export type SaturationSummary = z.infer<typeof SaturationSummarySchema>;

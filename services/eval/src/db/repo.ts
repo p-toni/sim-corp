@@ -168,6 +168,7 @@ export class EvalRepository {
         agent_rejected, rejection_reason, rejection_appropriate,
         detailed_metrics_json, metrics_json, lm_judge_json,
         commands_json,
+        agent_transcript_json,
         human_reviewed, human_outcome, human_notes, reviewed_by, reviewed_at,
         org_id, notes, artifacts_json
       ) VALUES (
@@ -177,6 +178,7 @@ export class EvalRepository {
         @agentRejected, @rejectionReason, @rejectionAppropriate,
         @detailedMetricsJson, @metricsJson, @lmJudgeJson,
         @commandsJson,
+        @agentTranscriptJson,
         @humanReviewed, @humanOutcome, @humanNotes, @reviewedBy, @reviewedAt,
         @orgId, @notes, @artifactsJson
       )
@@ -202,6 +204,7 @@ export class EvalRepository {
       metricsJson: JSON.stringify(evalRun.metrics ?? []),
       lmJudgeJson: evalRun.lmJudge ? JSON.stringify(evalRun.lmJudge) : null,
       commandsJson: JSON.stringify(evalRun.commands ?? []),
+      agentTranscriptJson: evalRun.agentTranscript ? JSON.stringify(evalRun.agentTranscript) : null,
       humanReviewed: evalRun.humanReviewed ? 1 : 0,
       humanOutcome: evalRun.humanOutcome ?? null,
       humanNotes: evalRun.humanNotes ?? null,
@@ -319,6 +322,7 @@ export class EvalRepository {
       metrics: JSON.parse(row.metrics_json ?? "[]"),
       lmJudge: row.lm_judge_json ? JSON.parse(row.lm_judge_json) : undefined,
       commands: JSON.parse(row.commands_json ?? "[]"),
+      agentTranscript: row.agent_transcript_json ? JSON.parse(row.agent_transcript_json) : undefined,
       humanReviewed: row.human_reviewed === 1,
       humanOutcome: row.human_outcome ?? undefined,
       humanNotes: row.human_notes ?? undefined,
