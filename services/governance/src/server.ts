@@ -12,6 +12,7 @@ import Fastify from 'fastify';
 import { registerHealthChecks } from '@sim-corp/health';
 import { initializeMetrics, metricsHandler } from '@sim-corp/metrics';
 import { metricsRoutes } from './routes/metrics.js';
+import { createMetricsExporter } from './metrics/exporter.js';
 
 const PORT = parseInt(process.env.PORT || '4007', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -22,11 +23,14 @@ const fastify = Fastify({
   },
 });
 
-// Initialize metrics
+// Initialize HTTP metrics
 const httpMetrics = initializeMetrics({
   serviceName: 'governance',
   prefix: 'simcorp',
 });
+
+// Initialize governance-specific metrics
+const governanceMetrics = createMetricsExporter();
 
 // Add metrics middleware
 fastify.addHook('onRequest', httpMetrics.middleware('governance'));
@@ -60,6 +64,9 @@ fastify.register(governanceRoutes, { prefix: '/api' });
 import { createCircuitBreaker } from './circuit-breaker/breaker.js';
 const circuitBreaker = createCircuitBreaker();
 circuitBreaker.start();
+
+// Start periodic governance metrics updates
+governanceMetrics.startPeriodicUpdates(30000); // Update every 30 seconds
 
 /**
  * Start server

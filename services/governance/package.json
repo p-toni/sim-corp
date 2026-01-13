@@ -16,6 +16,7 @@
     "@sim-corp/health": "workspace:*",
     "better-sqlite3": "^11.7.0",
     "fastify": "^5.2.0",
+    "prom-client": "^15.1.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
