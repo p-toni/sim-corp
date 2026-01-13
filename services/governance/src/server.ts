@@ -45,6 +45,10 @@ fastify.get('/metrics', async () => {
 // Governance routes
 fastify.register(metricsRoutes, { prefix: '/api' });
 
+// Readiness routes
+import { readinessRoutes } from './routes/readiness.js';
+fastify.register(readinessRoutes, { prefix: '/api' });
+
 /**
  * Start server
  */
