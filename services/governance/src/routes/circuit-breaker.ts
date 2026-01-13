@@ -3,7 +3,6 @@
  */
 
 import type { FastifyInstance } from 'fastify';
-import { CircuitBreakerEventSchema, CircuitBreakerRuleSchema } from '@sim-corp/schemas/kernel/governance';
 import { CircuitBreakerEventsRepo, CircuitBreakerRulesRepo } from '../db/repo.js';
 
 export async function circuitBreakerRoutes(fastify: FastifyInstance) {
@@ -13,16 +12,7 @@ export async function circuitBreakerRoutes(fastify: FastifyInstance) {
   /**
    * GET /circuit-breaker/events - Get recent circuit breaker events
    */
-  fastify.get('/circuit-breaker/events', {
-    schema: {
-      response: {
-        200: {
-          type: 'array',
-          items: CircuitBreakerEventSchema,
-        },
-      },
-    },
-  }, async (request, reply) => {
+  fastify.get('/circuit-breaker/events', async (request, reply) => {
     const events = eventsRepo.getRecent(20);
     return events;
   });
@@ -30,16 +20,7 @@ export async function circuitBreakerRoutes(fastify: FastifyInstance) {
   /**
    * GET /circuit-breaker/events/unresolved - Get unresolved events
    */
-  fastify.get('/circuit-breaker/events/unresolved', {
-    schema: {
-      response: {
-        200: {
-          type: 'array',
-          items: CircuitBreakerEventSchema,
-        },
-      },
-    },
-  }, async (request, reply) => {
+  fastify.get('/circuit-breaker/events/unresolved', async (request, reply) => {
     const events = eventsRepo.getUnresolved();
     return events;
   });
@@ -66,16 +47,7 @@ export async function circuitBreakerRoutes(fastify: FastifyInstance) {
   /**
    * GET /circuit-breaker/rules - Get all circuit breaker rules
    */
-  fastify.get('/circuit-breaker/rules', {
-    schema: {
-      response: {
-        200: {
-          type: 'array',
-          items: CircuitBreakerRuleSchema,
-        },
-      },
-    },
-  }, async (request, reply) => {
+  fastify.get('/circuit-breaker/rules', async (request, reply) => {
     const rules = rulesRepo.getAll();
     return rules;
   });
@@ -83,16 +55,7 @@ export async function circuitBreakerRoutes(fastify: FastifyInstance) {
   /**
    * GET /circuit-breaker/rules/enabled - Get enabled rules
    */
-  fastify.get('/circuit-breaker/rules/enabled', {
-    schema: {
-      response: {
-        200: {
-          type: 'array',
-          items: CircuitBreakerRuleSchema,
-        },
-      },
-    },
-  }, async (request, reply) => {
+  fastify.get('/circuit-breaker/rules/enabled', async (request, reply) => {
     const rules = rulesRepo.getEnabled();
     return rules;
   });

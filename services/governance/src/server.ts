@@ -9,7 +9,7 @@
  */
 
 import Fastify from 'fastify';
-import { createHealthRoutes } from '@sim-corp/health';
+import { registerHealthChecks } from '@sim-corp/health';
 import { initializeMetrics, metricsHandler } from '@sim-corp/metrics';
 import { metricsRoutes } from './routes/metrics.js';
 
@@ -32,9 +32,8 @@ const httpMetrics = initializeMetrics({
 fastify.addHook('onRequest', httpMetrics.middleware('governance'));
 
 // Health routes
-fastify.register(createHealthRoutes, {
+registerHealthChecks(fastify, {
   serviceName: 'governance',
-  version: '0.0.1',
 });
 
 // Prometheus metrics endpoint

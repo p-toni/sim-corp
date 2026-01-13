@@ -3,7 +3,6 @@
  */
 
 import type { FastifyInstance } from 'fastify';
-import { GovernanceReportSchema, ScopeExpansionProposalSchema } from '@sim-corp/schemas/kernel/governance';
 import { AutonomyGovernanceAgent } from '../agent/governance-agent.js';
 import { GovernanceReportsRepo, GovernanceStateRepo, ScopeExpansionProposalsRepo } from '../db/repo.js';
 
@@ -15,13 +14,7 @@ export async function governanceRoutes(fastify: FastifyInstance) {
   /**
    * POST /governance/run-cycle - Run weekly governance cycle
    */
-  fastify.post('/governance/run-cycle', {
-    schema: {
-      response: {
-        200: GovernanceReportSchema,
-      },
-    },
-  }, async (request, reply) => {
+  fastify.post('/governance/run-cycle', async (request, reply) => {
     const agent = new AutonomyGovernanceAgent();
     const report = await agent.runWeeklyCycle();
     agent.close();
@@ -32,22 +25,7 @@ export async function governanceRoutes(fastify: FastifyInstance) {
   /**
    * GET /governance/reports - Get governance reports
    */
-  fastify.get('/governance/reports', {
-    schema: {
-      querystring: {
-        type: 'object',
-        properties: {
-          limit: { type: 'number', default: 10 },
-        },
-      },
-      response: {
-        200: {
-          type: 'array',
-          items: GovernanceReportSchema,
-        },
-      },
-    },
-  }, async (request, reply) => {
+  fastify.get('/governance/reports', async (request, reply) => {
     const { limit = 10 } = request.query as { limit?: number };
     const reports = reportsRepo.getAll(limit);
     return reports;
@@ -56,13 +34,7 @@ export async function governanceRoutes(fastify: FastifyInstance) {
   /**
    * GET /governance/reports/latest - Get latest report
    */
-  fastify.get('/governance/reports/latest', {
-    schema: {
-      response: {
-        200: GovernanceReportSchema.nullable(),
-      },
-    },
-  }, async (request, reply) => {
+  fastify.get('/governance/reports/latest', async (request, reply) => {
     const report = reportsRepo.getLatest();
     return report;
   });
@@ -70,20 +42,7 @@ export async function governanceRoutes(fastify: FastifyInstance) {
   /**
    * GET /governance/reports/:id - Get report by ID
    */
-  fastify.get<{ Params: { id: string } }>('/governance/reports/:id', {
-    schema: {
-      params: {
-        type: 'object',
-        properties: {
-          id: { type: 'string' },
-        },
-        required: ['id'],
-      },
-      response: {
-        200: GovernanceReportSchema.nullable(),
-      },
-    },
-  }, async (request, reply) => {
+  fastify.get<{ Params: { id: string } }>('/governance/reports/:id', async (request, reply) => {
     const { id } = request.params;
     const report = reportsRepo.getById(id);
     return report;
@@ -127,16 +86,7 @@ export async function governanceRoutes(fastify: FastifyInstance) {
   /**
    * GET /governance/proposals - Get scope expansion proposals
    */
-  fastify.get('/governance/proposals', {
-    schema: {
-      response: {
-        200: {
-          type: 'array',
-          items: ScopeExpansionProposalSchema,
-        },
-      },
-    },
-  }, async (request, reply) => {
+  fastify.get('/governance/proposals', async (request, reply) => {
     const proposals = proposalsRepo.getPending();
     return proposals;
   });

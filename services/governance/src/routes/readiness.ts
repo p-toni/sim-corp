@@ -16,13 +16,7 @@ export async function readinessRoutes(fastify: FastifyInstance) {
   /**
    * GET /readiness/current - Get current readiness assessment
    */
-  fastify.get('/readiness/current', {
-    schema: {
-      response: {
-        200: ReadinessReportSchema,
-      },
-    },
-  }, async (request, reply) => {
+  fastify.get('/readiness/current', async (request, reply) => {
     // Get current governance state
     const state = stateRepo.getState();
     if (!state) {
@@ -57,13 +51,7 @@ export async function readinessRoutes(fastify: FastifyInstance) {
   /**
    * GET /readiness/latest - Get latest saved assessment
    */
-  fastify.get('/readiness/latest', {
-    schema: {
-      response: {
-        200: ReadinessReportSchema.nullable(),
-      },
-    },
-  }, async (request, reply) => {
+  fastify.get('/readiness/latest', async (request, reply) => {
     const latest = assessmentsRepo.getLatest();
     return latest;
   });
