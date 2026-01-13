@@ -49,6 +49,19 @@ fastify.register(metricsRoutes, { prefix: '/api' });
 import { readinessRoutes } from './routes/readiness.js';
 fastify.register(readinessRoutes, { prefix: '/api' });
 
+// Circuit breaker routes
+import { circuitBreakerRoutes } from './routes/circuit-breaker.js';
+fastify.register(circuitBreakerRoutes, { prefix: '/api' });
+
+// Governance agent routes
+import { governanceRoutes } from './routes/governance.js';
+fastify.register(governanceRoutes, { prefix: '/api' });
+
+// Start circuit breaker monitoring
+import { createCircuitBreaker } from './circuit-breaker/breaker.js';
+const circuitBreaker = createCircuitBreaker();
+circuitBreaker.start();
+
 /**
  * Start server
  */

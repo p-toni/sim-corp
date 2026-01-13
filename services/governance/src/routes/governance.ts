@@ -1,0 +1,195 @@
+/**
+ * Governance agent routes
+ */
+
+import type { FastifyInstance } from 'fastify';
+import { GovernanceReportSchema, ScopeExpansionProposalSchema } from '@sim-corp/schemas/kernel/governance';
+import { AutonomyGovernanceAgent } from '../agent/governance-agent.js';
+import { GovernanceReportsRepo, GovernanceStateRepo, ScopeExpansionProposalsRepo } from '../db/repo.js';
+
+export async function governanceRoutes(fastify: FastifyInstance) {
+  const reportsRepo = new GovernanceReportsRepo();
+  const stateRepo = new GovernanceStateRepo();
+  const proposalsRepo = new ScopeExpansionProposalsRepo();
+
+  /**
+   * POST /governance/run-cycle - Run weekly governance cycle
+   */
+  fastify.post('/governance/run-cycle', {
+    schema: {
+      response: {
+        200: GovernanceReportSchema,
+      },
+    },
+  }, async (request, reply) => {
+    const agent = new AutonomyGovernanceAgent();
+    const report = await agent.runWeeklyCycle();
+    agent.close();
+
+    return report;
+  });
+
+  /**
+   * GET /governance/reports - Get governance reports
+   */
+  fastify.get('/governance/reports', {
+    schema: {
+      querystring: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', default: 10 },
+        },
+      },
+      response: {
+        200: {
+          type: 'array',
+          items: GovernanceReportSchema,
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { limit = 10 } = request.query as { limit?: number };
+    const reports = reportsRepo.getAll(limit);
+    return reports;
+  });
+
+  /**
+   * GET /governance/reports/latest - Get latest report
+   */
+  fastify.get('/governance/reports/latest', {
+    schema: {
+      response: {
+        200: GovernanceReportSchema.nullable(),
+      },
+    },
+  }, async (request, reply) => {
+    const report = reportsRepo.getLatest();
+    return report;
+  });
+
+  /**
+   * GET /governance/reports/:id - Get report by ID
+   */
+  fastify.get<{ Params: { id: string } }>('/governance/reports/:id', {
+    schema: {
+      params: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+        },
+        required: ['id'],
+      },
+      response: {
+        200: GovernanceReportSchema.nullable(),
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params;
+    const report = reportsRepo.getById(id);
+    return report;
+  });
+
+  /**
+   * GET /governance/state - Get current governance state
+   */
+  fastify.get('/governance/state', {
+    schema: {
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            currentPhase: { type: 'string' },
+            phaseStartDate: { type: 'string' },
+            commandWhitelist: { type: 'array', items: { type: 'string' } },
+            daysSincePhaseStart: { type: 'number' },
+          },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const state = stateRepo.getState();
+    if (!state) {
+      return reply.code(404).send({ error: 'Governance state not found' });
+    }
+
+    const daysSincePhaseStart = Math.floor(
+      (Date.now() - state.phaseStartDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    return {
+      currentPhase: state.currentPhase,
+      phaseStartDate: state.phaseStartDate.toISOString(),
+      commandWhitelist: state.commandWhitelist,
+      daysSincePhaseStart,
+    };
+  });
+
+  /**
+   * GET /governance/proposals - Get scope expansion proposals
+   */
+  fastify.get('/governance/proposals', {
+    schema: {
+      response: {
+        200: {
+          type: 'array',
+          items: ScopeExpansionProposalSchema,
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const proposals = proposalsRepo.getPending();
+    return proposals;
+  });
+
+  /**
+   * POST /governance/proposals/:id/approve - Approve proposal
+   */
+  fastify.post<{ Params: { id: string }; Body: { approvedBy: string } }>('/governance/proposals/:id/approve', {
+    schema: {
+      params: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+        },
+        required: ['id'],
+      },
+      body: {
+        type: 'object',
+        properties: {
+          approvedBy: { type: 'string' },
+        },
+        required: ['approvedBy'],
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params;
+    const { approvedBy } = request.body;
+
+    proposalsRepo.approve(id, approvedBy);
+
+    // TODO: Update governance state with new whitelist
+
+    return { success: true, id, approvedBy };
+  });
+
+  /**
+   * POST /governance/proposals/:id/reject - Reject proposal
+   */
+  fastify.post<{ Params: { id: string } }>('/governance/proposals/:id/reject', {
+    schema: {
+      params: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+        },
+        required: ['id'],
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params;
+
+    proposalsRepo.reject(id);
+
+    return { success: true, id };
+  });
+}
