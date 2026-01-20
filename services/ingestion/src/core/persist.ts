@@ -16,16 +16,16 @@ interface PersistDeps {
 export class PersistencePipeline {
   constructor(private readonly deps: PersistDeps) {}
 
-  persistEnvelope(envelope: TelemetryEnvelope): TelemetryEnvelope {
+  async persistEnvelope(envelope: TelemetryEnvelope): Promise<TelemetryEnvelope> {
     const withSession = this.deps.sessionizer.assignSession(envelope);
     const sessionSummary = this.buildSummary(withSession);
-    this.deps.repo.upsertSession(sessionSummary);
+    await this.deps.repo.upsertSession(sessionSummary);
 
     if (withSession.topic === "telemetry") {
-      this.deps.repo.appendTelemetry(withSession.sessionId!, withSession.payload as TelemetryPoint);
+      await this.deps.repo.appendTelemetry(withSession.sessionId!, withSession.payload as TelemetryPoint);
 
       // Update trust metrics for telemetry
-      const currentSession = this.deps.repo.getSession(withSession.sessionId!);
+      const currentSession = await this.deps.repo.getSession(withSession.sessionId!);
       const telemetryPoints = (currentSession?.telemetryPoints ?? 0) + 1;
       const verified = withSession._verification?.verified === true;
       const unsigned = !withSession.sig && !withSession.kid;
@@ -53,10 +53,10 @@ export class PersistencePipeline {
         trustUpdate.maxBtC = Math.max(sessionSummary.maxBtC ?? 0, (withSession.payload as TelemetryPoint).btC!);
       }
 
-      this.deps.repo.upsertSession(trustUpdate);
+      await this.deps.repo.upsertSession(trustUpdate);
     } else if (withSession.topic === "event") {
       const event = withSession.payload as RoastEvent;
-      this.deps.repo.appendEvent(withSession.sessionId!, event);
+      await this.deps.repo.appendEvent(withSession.sessionId!, event);
       const update = { ...sessionSummary };
       if (event.type === "FC" && typeof event.payload?.elapsedSeconds === "number") {
         update.fcSeconds = event.payload.elapsedSeconds;
@@ -69,9 +69,9 @@ export class PersistencePipeline {
           update.durationSeconds = event.payload.elapsedSeconds;
         }
       }
-      this.deps.repo.upsertSession(update);
+      await this.deps.repo.upsertSession(update);
       if (update.status === "CLOSED") {
-        this.notifyClosedSession(update);
+        await this.notifyClosedSession(update);
       }
       this.deps.sessionizer.handleEvent(withSession);
     }
@@ -79,10 +79,10 @@ export class PersistencePipeline {
     return withSession;
   }
 
-  tick(nowIso: string): void {
+  async tick(nowIso: string): Promise<void> {
     const closed = this.deps.sessionizer.tick(nowIso);
-    closed.forEach((state) => {
-      this.deps.repo.upsertSession({
+    for (const state of closed) {
+      await this.deps.repo.upsertSession({
         sessionId: state.sessionId,
         orgId: state.orgId,
         siteId: state.siteId,
@@ -92,17 +92,17 @@ export class PersistencePipeline {
         status: "CLOSED",
         durationSeconds: (Date.parse(state.lastSeenAt) - Date.parse(state.startedAt)) / 1000
       });
-      this.notifyClosedSession({
+      await this.notifyClosedSession({
         sessionId: state.sessionId,
         orgId: state.orgId,
         siteId: state.siteId,
         machineId: state.machineId,
-        startedAt: state.startedAt,
+        startedAt: state.lastSeenAt,
         endedAt: state.lastSeenAt,
         status: "CLOSED",
         durationSeconds: (Date.parse(state.lastSeenAt) - Date.parse(state.startedAt)) / 1000
       });
-    });
+    }
   }
 
   private buildSummary(envelope: TelemetryEnvelope) {
@@ -117,10 +117,12 @@ export class PersistencePipeline {
     };
   }
 
-  private notifyClosedSession(session: RoastSessionSummary): void {
+  private async notifyClosedSession(session: RoastSessionSummary): Promise<void> {
     if (!this.deps.onSessionClosed) return;
-    Promise.resolve(this.deps.onSessionClosed(session)).catch(() => {
+    try {
+      await Promise.resolve(this.deps.onSessionClosed(session));
+    } catch {
       // swallow errors; hook errors should not disrupt ingestion
-    });
+    }
   }
 }

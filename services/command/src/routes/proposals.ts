@@ -26,7 +26,7 @@ export async function proposalsRoutes(
       offset: query.offset ? parseInt(query.offset, 10) : undefined,
     };
 
-    const proposals = commandService.getAllProposals(options);
+    const proposals = await commandService.getAllProposals(options);
     return proposals;
   });
 
@@ -50,7 +50,7 @@ export async function proposalsRoutes(
         approvalTimeoutSeconds: body.approvalTimeoutSeconds ?? 300,
       };
 
-      const proposal = commandService.proposeCommand(proposeRequest);
+      const proposal = await commandService.proposeCommand(proposeRequest);
       return proposal;
     } catch (error) {
       reply.status(400).send({
@@ -62,14 +62,14 @@ export async function proposalsRoutes(
 
   // GET /proposals/pending - Get all pending approvals
   fastify.get("/proposals/pending", async (request, reply) => {
-    const proposals = commandService.getPendingApprovals();
+    const proposals = await commandService.getPendingApprovals();
     return proposals;
   });
 
   // GET /proposals/:proposalId - Get a specific proposal
   fastify.get("/proposals/:proposalId", async (request, reply) => {
     const { proposalId } = request.params as { proposalId: string };
-    const proposal = commandService.getProposal(proposalId);
+    const proposal = await commandService.getProposal(proposalId);
 
     if (!proposal) {
       reply.status(404).send({ error: "Proposal not found" });
@@ -82,14 +82,14 @@ export async function proposalsRoutes(
   // GET /proposals/machine/:machineId - Get proposals for a machine
   fastify.get("/proposals/machine/:machineId", async (request, reply) => {
     const { machineId } = request.params as { machineId: string };
-    const proposals = commandService.getProposalsByMachine(machineId);
+    const proposals = await commandService.getProposalsByMachine(machineId);
     return proposals;
   });
 
   // GET /proposals/session/:sessionId - Get proposals for a session
   fastify.get("/proposals/session/:sessionId", async (request, reply) => {
     const { sessionId } = request.params as { sessionId: string };
-    const proposals = commandService.getProposalsBySession(sessionId);
+    const proposals = await commandService.getProposalsBySession(sessionId);
     return proposals;
   });
 
@@ -105,7 +105,7 @@ export async function proposalsRoutes(
         display: "Unknown User",
       };
 
-      const proposal = commandService.approveProposal(proposalId, approvedBy);
+      const proposal = await commandService.approveProposal(proposalId, approvedBy);
       return proposal;
     } catch (error) {
       reply.status(400).send({
@@ -128,7 +128,7 @@ export async function proposalsRoutes(
       };
       const reason = body.reason ?? "No reason provided";
 
-      const proposal = commandService.rejectProposal(
+      const proposal = await commandService.rejectProposal(
         proposalId,
         rejectedBy,
         reason

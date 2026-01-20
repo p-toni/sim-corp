@@ -1,9 +1,9 @@
-import Fastify, type { FastifyInstance } from "fastify";
-import { openDatabase } from "./db/connection";
-import { EvalRepository } from "./db/repo";
-import { EvalService } from "./core/eval-service";
-import { registerGoldenCaseRoutes } from "./routes/golden-cases";
-import { registerEvaluationRoutes } from "./routes/evaluations";
+import Fastify, { type FastifyInstance } from "fastify";
+import { getDatabase } from "./db/database.js";
+import { EvalRepository } from "./db/repo.js";
+import { EvalService } from "./core/eval-service.js";
+import { registerGoldenCaseRoutes } from "./routes/golden-cases.js";
+import { registerEvaluationRoutes } from "./routes/evaluations.js";
 import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
 import { setupHealthAndShutdown, createDatabaseChecker } from "@sim-corp/health";
 
@@ -31,7 +31,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   app.addHook('onRequest', httpMetrics.middleware('eval'));
 
   // Initialize database and repository
-  const db = openDatabase(options.dbPath);
+  const db = await getDatabase(options.dbPath);
   const repo = new EvalRepository(db);
 
   // Configure LM judge (read from environment if not provided)
@@ -52,7 +52,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
 
   // Cleanup on shutdown
   app.addHook("onClose", async () => {
-    db.close();
+    await db.close();
   });
 
   // Prometheus metrics endpoint

@@ -18,54 +18,54 @@ export function registerSessionQcRoutes(app: FastifyInstance, deps: SessionsQcDe
 
   app.get(
     "/sessions/:id/meta",
-    (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const session = repo.getSession(request.params.id);
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const session = await repo.getSession(request.params.id);
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
       if (!ensureOrgAccess(reply, request.actor, session.orgId)) return;
-      return repo.getSessionMeta(request.params.id) ?? SessionMetaSchema.parse({});
+      return (await repo.getSessionMeta(request.params.id)) ?? SessionMetaSchema.parse({});
     }
   );
 
   app.put(
     "/sessions/:id/meta",
-    (request: FastifyRequest<{ Params: { id: string }; Body: unknown }>, reply: FastifyReply) => {
-      const session = repo.getSession(request.params.id);
+    async (request: FastifyRequest<{ Params: { id: string }; Body: unknown }>, reply: FastifyReply) => {
+      const session = await repo.getSession(request.params.id);
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
       if (!ensureOrgAccess(reply, request.actor, session.orgId)) return;
       const meta = SessionMetaSchema.parse(request.body ?? {});
-      const stored = repo.upsertSessionMeta(request.params.id, meta, request.actor);
+      const stored = await repo.upsertSessionMeta(request.params.id, meta, request.actor);
       return stored;
     }
   );
 
   app.get(
     "/sessions/:id/notes",
-    (
+    async (
       request: FastifyRequest<{
         Params: { id: string };
         Querystring: { limit?: number | string; offset?: number | string };
       }>,
       reply: FastifyReply
     ) => {
-      const session = repo.getSession(request.params.id);
+      const session = await repo.getSession(request.params.id);
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
       if (!ensureOrgAccess(reply, request.actor, session.orgId)) return;
       const limit = toNumber(request.query.limit, 50);
       const offset = toNumber(request.query.offset, 0);
-      return repo.listSessionNotes(request.params.id, limit, offset);
+      return await repo.listSessionNotes(request.params.id, limit, offset);
     }
   );
 
   app.post(
     "/sessions/:id/notes",
-    (request: FastifyRequest<{ Params: { id: string }; Body: unknown }>, reply: FastifyReply) => {
-      const session = repo.getSession(request.params.id);
+    async (request: FastifyRequest<{ Params: { id: string }; Body: unknown }>, reply: FastifyReply) => {
+      const session = await repo.getSession(request.params.id);
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
@@ -75,7 +75,7 @@ export function registerSessionQcRoutes(app: FastifyInstance, deps: SessionsQcDe
         author: true
       });
       const parsed = baseSchema.parse(payload);
-      const note: SessionNote = repo.addSessionNote(request.params.id, parsed, request.actor);
+      const note: SessionNote = await repo.addSessionNote(request.params.id, parsed, request.actor);
       reply.status(201);
       return note;
     }
@@ -83,20 +83,20 @@ export function registerSessionQcRoutes(app: FastifyInstance, deps: SessionsQcDe
 
   app.get(
     "/sessions/:id/events/overrides",
-    (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const session = repo.getSession(request.params.id);
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const session = await repo.getSession(request.params.id);
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
       if (!ensureOrgAccess(reply, request.actor, session.orgId)) return;
-      return repo.getEventOverrides(request.params.id);
+      return await repo.getEventOverrides(request.params.id);
     }
   );
 
   app.put(
     "/sessions/:id/events/overrides",
-    (request: FastifyRequest<{ Params: { id: string }; Body: unknown }>, reply: FastifyReply) => {
-      const session = repo.getSession(request.params.id);
+    async (request: FastifyRequest<{ Params: { id: string }; Body: unknown }>, reply: FastifyReply) => {
+      const session = await repo.getSession(request.params.id);
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
@@ -107,7 +107,7 @@ export function registerSessionQcRoutes(app: FastifyInstance, deps: SessionsQcDe
         ...o,
         updatedAt: o.updatedAt ?? new Date().toISOString()
       }));
-      const maxElapsed = resolveMaxElapsedSeconds(repo, session.sessionId, session.dropSeconds);
+      const maxElapsed = await resolveMaxElapsedSeconds(repo, session.sessionId, session.dropSeconds);
       if (maxElapsed !== null) {
         for (const override of parsedOverrides) {
           if (override.elapsedSeconds < 0 || override.elapsedSeconds > maxElapsed) {
@@ -117,7 +117,7 @@ export function registerSessionQcRoutes(app: FastifyInstance, deps: SessionsQcDe
           }
         }
       }
-      const stored = repo.upsertEventOverrides(
+      const stored = await repo.upsertEventOverrides(
         request.params.id,
         parsedOverrides as EventOverride[],
         request.actor
@@ -134,11 +134,11 @@ function toNumber(value: string | number | undefined, defaultValue: number): num
   return numeric;
 }
 
-function resolveMaxElapsedSeconds(
+async function resolveMaxElapsedSeconds(
   repo: IngestionRepository,
   sessionId: string,
   dropSeconds?: number
-): number | null {
+): Promise<number | null> {
   if (typeof dropSeconds === "number") return dropSeconds;
-  return repo.getLastTelemetryElapsed(sessionId);
+  return await repo.getLastTelemetryElapsed(sessionId);
 }

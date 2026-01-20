@@ -15,7 +15,7 @@ export async function analyticsRoutes(
     const endTime = query.endTime || new Date().toISOString();
 
     try {
-      const metrics = analytics.getMetrics(startTime, endTime);
+      const metrics = await analytics.getMetrics(startTime, endTime);
       return metrics;
     } catch (error) {
       reply.status(400).send({
@@ -52,7 +52,7 @@ export async function analyticsRoutes(
     }
 
     try {
-      const timeseries = analytics.getTimeseriesMetrics(
+      const timeseries = await analytics.getTimeseriesMetrics(
         metric,
         startTime,
         endTime,
@@ -73,7 +73,7 @@ export async function analyticsRoutes(
     const limit = parseInt(query.limit || "100", 10);
 
     try {
-      const alerts = analytics.getAlerts(limit);
+      const alerts = await analytics.getAlerts(limit);
       return alerts;
     } catch (error) {
       reply.status(400).send({
@@ -86,7 +86,7 @@ export async function analyticsRoutes(
   // GET /analytics/summary - Get dashboard summary
   fastify.get("/analytics/summary", async (request, reply) => {
     try {
-      const summary = analytics.getSummary();
+      const summary = await analytics.getSummary();
       return summary;
     } catch (error) {
       reply.status(400).send({

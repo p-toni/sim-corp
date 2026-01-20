@@ -41,7 +41,7 @@ export async function executionRoutes(
   fastify.get("/status/:proposalId", async (request, reply) => {
     const { proposalId } = request.params as { proposalId: string };
 
-    const status = executor.getExecutionStatus(proposalId);
+    const status = await executor.getExecutionStatus(proposalId);
     if (!status) {
       reply.status(404).send({ error: "Proposal not found" });
       return;

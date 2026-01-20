@@ -13,18 +13,18 @@ interface SessionQuery extends SessionFilters {
 export function registerSessionRoutes(app: FastifyInstance, deps: SessionsDeps): void {
   const { repo } = deps;
 
-  app.get("/sessions", (request: FastifyRequest<{ Querystring: SessionQuery }>) => {
+  app.get("/sessions", async (request: FastifyRequest<{ Querystring: SessionQuery }>) => {
     const { limit, offset, ...filters } = request.query;
     const parsedFilters: SessionFilters = {
       ...filters,
       limit: toNumber(limit, 50),
       offset: toNumber(offset, 0)
     };
-    return repo.listSessions(parsedFilters);
+    return await repo.listSessions(parsedFilters);
   });
 
-  app.get("/sessions/:id", (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    const session = repo.getSession(request.params.id);
+  app.get("/sessions/:id", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const session = await repo.getSession(request.params.id);
     if (!session) {
       return reply.status(404).send({ error: "Session not found" });
     }
@@ -33,9 +33,9 @@ export function registerSessionRoutes(app: FastifyInstance, deps: SessionsDeps):
 
   app.get(
     "/sessions/:id/telemetry",
-    (request: FastifyRequest<{ Params: { id: string }; Querystring: { limit?: string | number; fromElapsedSeconds?: string | number; toElapsedSeconds?: string | number } }>) => {
+    async (request: FastifyRequest<{ Params: { id: string }; Querystring: { limit?: string | number; fromElapsedSeconds?: string | number; toElapsedSeconds?: string | number } }>) => {
       const { limit, fromElapsedSeconds, toElapsedSeconds } = request.query;
-      const telemetry = repo.getTelemetry(
+      const telemetry = await repo.getTelemetry(
         request.params.id,
         toNumber(limit, 2000),
         toNumber(fromElapsedSeconds),
@@ -45,8 +45,8 @@ export function registerSessionRoutes(app: FastifyInstance, deps: SessionsDeps):
     }
   );
 
-  app.get("/sessions/:id/events", (request: FastifyRequest<{ Params: { id: string } }>) => {
-    return repo.getEvents(request.params.id);
+  app.get("/sessions/:id/events", async (request: FastifyRequest<{ Params: { id: string } }>) => {
+    return await repo.getEvents(request.params.id);
   });
 }
 

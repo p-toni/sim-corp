@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { Database } from "@sim-corp/database";
 import type { GoldenCase, EvalRun } from "@sim-corp/schemas";
 
 export interface GoldenCaseFilters {
@@ -19,11 +19,11 @@ export interface EvalRunFilters {
 }
 
 export class EvalRepository {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: Database) {}
 
   // Golden Cases
-  createGoldenCase(goldenCase: GoldenCase): GoldenCase {
-    const stmt = this.db.prepare(`
+  async createGoldenCase(goldenCase: GoldenCase): Promise<GoldenCase> {
+    await this.db.exec(`
       INSERT INTO golden_cases (
         id, name, description, origin, processing_method, variety, crop_year,
         machine_id, batch_size_kg, charge_temp_c,
@@ -39,83 +39,81 @@ export class EvalRepository {
         source_type, source_session_id, failure_mode,
         created_at, created_by, tags_json, archived, metadata_json
       ) VALUES (
-        @id, @name, @description, @origin, @processingMethod, @variety, @cropYear,
-        @machineId, @batchSizeKg, @chargeTempC,
-        @targetFirstCrackSeconds, @targetDropSeconds, @targetDevelopmentPercentage,
-        @targetFCTempC, @targetDropTempC, @targetRoastColor,
-        @fcSecondsErrorTolerance, @dropSecondsErrorTolerance, @devPercentageErrorTolerance,
-        @maxRorSpikes, @maxRorCrashes,
-        @sensoryMinScore, @sensoryNotesJson,
-        @baselineCommandsJson,
-        @trialsRequired, @passAtKThreshold,
-        @expectation, @rejectReasonExpected, @dangerLevel,
-        @referenceSolutionJson,
-        @sourceType, @sourceSessionId, @failureMode,
-        @createdAt, @createdBy, @tagsJson, @archived, @metadataJson
+        ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?,
+        ?, ?,
+        ?,
+        ?, ?,
+        ?, ?, ?,
+        ?,
+        ?, ?, ?,
+        ?, ?, ?, ?, ?
       )
-    `);
-
-    stmt.run({
-      id: goldenCase.id,
-      name: goldenCase.name,
-      description: goldenCase.description ?? null,
-      origin: goldenCase.origin ?? null,
-      processingMethod: goldenCase.processingMethod ?? null,
-      variety: goldenCase.variety ?? null,
-      cropYear: goldenCase.cropYear ?? null,
-      machineId: goldenCase.machineId,
-      batchSizeKg: goldenCase.batchSizeKg ?? null,
-      chargeTempC: goldenCase.chargeTempC ?? null,
-      targetFirstCrackSeconds: goldenCase.targetFirstCrackSeconds ?? null,
-      targetDropSeconds: goldenCase.targetDropSeconds ?? null,
-      targetDevelopmentPercentage: goldenCase.targetDevelopmentPercentage ?? null,
-      targetFCTempC: goldenCase.targetFCTempC ?? null,
-      targetDropTempC: goldenCase.targetDropTempC ?? null,
-      targetRoastColor: goldenCase.targetRoastColor ?? null,
-      fcSecondsErrorTolerance: goldenCase.fcSecondsErrorTolerance ?? null,
-      dropSecondsErrorTolerance: goldenCase.dropSecondsErrorTolerance ?? null,
-      devPercentageErrorTolerance: goldenCase.devPercentageErrorTolerance ?? null,
-      maxRorSpikes: goldenCase.maxRorSpikes ?? null,
-      maxRorCrashes: goldenCase.maxRorCrashes ?? null,
-      sensoryMinScore: goldenCase.sensoryRange?.minScore ?? null,
-      sensoryNotesJson: goldenCase.sensoryRange?.notes ? JSON.stringify(goldenCase.sensoryRange.notes) : null,
-      baselineCommandsJson: JSON.stringify(goldenCase.baselineCommands ?? []),
-      trialsRequired: goldenCase.trialsRequired ?? 1,
-      passAtKThreshold: goldenCase.passAtKThreshold ?? null,
-      expectation: goldenCase.expectation ?? "SHOULD_SUCCEED",
-      rejectReasonExpected: goldenCase.rejectReasonExpected ?? null,
-      dangerLevel: goldenCase.dangerLevel ?? "SAFE",
-      referenceSolutionJson: goldenCase.referenceSolution ? JSON.stringify(goldenCase.referenceSolution) : null,
-      sourceType: goldenCase.sourceType ?? "SYNTHETIC",
-      sourceSessionId: goldenCase.sourceSessionId ?? null,
-      failureMode: goldenCase.failureMode ?? null,
-      createdAt: goldenCase.createdAt ?? new Date().toISOString(),
-      createdBy: goldenCase.createdBy ?? null,
-      tagsJson: JSON.stringify(goldenCase.tags ?? []),
-      archived: goldenCase.archived ? 1 : 0,
-      metadataJson: JSON.stringify(goldenCase.metadata ?? {})
-    });
+    `, [
+      goldenCase.id,
+      goldenCase.name,
+      goldenCase.description ?? null,
+      goldenCase.origin ?? null,
+      goldenCase.processingMethod ?? null,
+      goldenCase.variety ?? null,
+      goldenCase.cropYear ?? null,
+      goldenCase.machineId,
+      goldenCase.batchSizeKg ?? null,
+      goldenCase.chargeTempC ?? null,
+      goldenCase.targetFirstCrackSeconds ?? null,
+      goldenCase.targetDropSeconds ?? null,
+      goldenCase.targetDevelopmentPercentage ?? null,
+      goldenCase.targetFCTempC ?? null,
+      goldenCase.targetDropTempC ?? null,
+      goldenCase.targetRoastColor ?? null,
+      goldenCase.fcSecondsErrorTolerance ?? null,
+      goldenCase.dropSecondsErrorTolerance ?? null,
+      goldenCase.devPercentageErrorTolerance ?? null,
+      goldenCase.maxRorSpikes ?? null,
+      goldenCase.maxRorCrashes ?? null,
+      goldenCase.sensoryRange?.minScore ?? null,
+      goldenCase.sensoryRange?.notes ? JSON.stringify(goldenCase.sensoryRange.notes) : null,
+      JSON.stringify(goldenCase.baselineCommands ?? []),
+      goldenCase.trialsRequired ?? 1,
+      goldenCase.passAtKThreshold ?? null,
+      goldenCase.expectation ?? "SHOULD_SUCCEED",
+      goldenCase.rejectReasonExpected ?? null,
+      goldenCase.dangerLevel ?? "SAFE",
+      goldenCase.referenceSolution ? JSON.stringify(goldenCase.referenceSolution) : null,
+      goldenCase.sourceType ?? "SYNTHETIC",
+      goldenCase.sourceSessionId ?? null,
+      goldenCase.failureMode ?? null,
+      goldenCase.createdAt ?? new Date().toISOString(),
+      goldenCase.createdBy ?? null,
+      JSON.stringify(goldenCase.tags ?? []),
+      goldenCase.archived ? 1 : 0,
+      JSON.stringify(goldenCase.metadata ?? {})
+    ]);
 
     return goldenCase;
   }
 
-  getGoldenCase(id: string): GoldenCase | null {
-    const row = this.db.prepare("SELECT * FROM golden_cases WHERE id = ?").get(id) as any;
-    return row ? this.hydrateGoldenCase(row) : null;
+  async getGoldenCase(id: string): Promise<GoldenCase | null> {
+    const result = await this.db.query("SELECT * FROM golden_cases WHERE id = ?", [id]);
+    return result.rows.length > 0 ? this.hydrateGoldenCase(result.rows[0]) : null;
   }
 
-  listGoldenCases(filters: GoldenCaseFilters = {}): GoldenCase[] {
+  async listGoldenCases(filters: GoldenCaseFilters = {}): Promise<GoldenCase[]> {
     const conditions: string[] = [];
-    const params: Record<string, any> = {};
+    const params: any[] = [];
 
     if (filters.machineId) {
-      conditions.push("machine_id = @machineId");
-      params.machineId = filters.machineId;
+      conditions.push("machine_id = ?");
+      params.push(filters.machineId);
     }
 
     if (filters.archived !== undefined) {
-      conditions.push("archived = @archived");
-      params.archived = filters.archived ? 1 : 0;
+      conditions.push("archived = ?");
+      params.push(filters.archived ? 1 : 0);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -123,44 +121,43 @@ export class EvalRepository {
     const offset = filters.offset ?? 0;
 
     const sql = `SELECT * FROM golden_cases ${whereClause} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
-    const rows = this.db.prepare(sql).all(params) as any[];
-    return rows.map((row) => this.hydrateGoldenCase(row));
+    const result = await this.db.query(sql, params);
+    return result.rows.map((row: any) => this.hydrateGoldenCase(row));
   }
 
-  updateGoldenCase(id: string, updates: Partial<GoldenCase>): GoldenCase | null {
-    const existing = this.getGoldenCase(id);
+  async updateGoldenCase(id: string, updates: Partial<GoldenCase>): Promise<GoldenCase | null> {
+    const existing = await this.getGoldenCase(id);
     if (!existing) return null;
 
     const merged = { ...existing, ...updates };
-    const stmt = this.db.prepare(`
-      UPDATE golden_cases SET
-        name = @name,
-        description = @description,
-        archived = @archived,
-        tags_json = @tagsJson,
-        reference_solution_json = @referenceSolutionJson,
-        source_type = @sourceType,
-        source_session_id = @sourceSessionId
-      WHERE id = @id
-    `);
 
-    stmt.run({
-      id,
-      name: merged.name,
-      description: merged.description ?? null,
-      archived: merged.archived ? 1 : 0,
-      tagsJson: JSON.stringify(merged.tags ?? []),
-      referenceSolutionJson: merged.referenceSolution ? JSON.stringify(merged.referenceSolution) : null,
-      sourceType: merged.sourceType ?? "SYNTHETIC",
-      sourceSessionId: merged.sourceSessionId ?? null
-    });
+    await this.db.exec(`
+      UPDATE golden_cases SET
+        name = ?,
+        description = ?,
+        archived = ?,
+        tags_json = ?,
+        reference_solution_json = ?,
+        source_type = ?,
+        source_session_id = ?
+      WHERE id = ?
+    `, [
+      merged.name,
+      merged.description ?? null,
+      merged.archived ? 1 : 0,
+      JSON.stringify(merged.tags ?? []),
+      merged.referenceSolution ? JSON.stringify(merged.referenceSolution) : null,
+      merged.sourceType ?? "SYNTHETIC",
+      merged.sourceSessionId ?? null,
+      id
+    ]);
 
     return this.getGoldenCase(id);
   }
 
   // Eval Runs
-  createEvalRun(evalRun: EvalRun): EvalRun {
-    const stmt = this.db.prepare(`
+  async createEvalRun(evalRun: EvalRun): Promise<EvalRun> {
+    await this.db.exec(`
       INSERT INTO eval_runs (
         id, session_id, mission_id, golden_case_id, run_at, evaluator_id,
         trial_number, trial_set_id, total_trials,
@@ -172,79 +169,77 @@ export class EvalRepository {
         human_reviewed, human_outcome, human_notes, reviewed_by, reviewed_at,
         org_id, notes, artifacts_json
       ) VALUES (
-        @id, @sessionId, @missionId, @goldenCaseId, @runAt, @evaluatorId,
-        @trialNumber, @trialSetId, @totalTrials,
-        @outcome, @passedGatesJson, @failedGatesJson,
-        @agentRejected, @rejectionReason, @rejectionAppropriate,
-        @detailedMetricsJson, @metricsJson, @lmJudgeJson,
-        @commandsJson,
-        @agentTranscriptJson,
-        @humanReviewed, @humanOutcome, @humanNotes, @reviewedBy, @reviewedAt,
-        @orgId, @notes, @artifactsJson
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?,
+        ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?
       )
-    `);
-
-    stmt.run({
-      id: evalRun.id,
-      sessionId: evalRun.sessionId ?? null,
-      missionId: evalRun.missionId ?? null,
-      goldenCaseId: evalRun.goldenCaseId ?? null,
-      runAt: evalRun.runAt,
-      evaluatorId: evalRun.evaluatorId ?? null,
-      trialNumber: evalRun.trialNumber ?? null,
-      trialSetId: evalRun.trialSetId ?? null,
-      totalTrials: evalRun.totalTrials ?? null,
-      outcome: evalRun.outcome,
-      passedGatesJson: JSON.stringify(evalRun.passedGates ?? []),
-      failedGatesJson: JSON.stringify(evalRun.failedGates ?? []),
-      agentRejected: evalRun.agentRejected ? 1 : 0,
-      rejectionReason: evalRun.rejectionReason ?? null,
-      rejectionAppropriate: evalRun.rejectionAppropriate !== undefined ? (evalRun.rejectionAppropriate ? 1 : 0) : null,
-      detailedMetricsJson: evalRun.detailedMetrics ? JSON.stringify(evalRun.detailedMetrics) : null,
-      metricsJson: JSON.stringify(evalRun.metrics ?? []),
-      lmJudgeJson: evalRun.lmJudge ? JSON.stringify(evalRun.lmJudge) : null,
-      commandsJson: JSON.stringify(evalRun.commands ?? []),
-      agentTranscriptJson: evalRun.agentTranscript ? JSON.stringify(evalRun.agentTranscript) : null,
-      humanReviewed: evalRun.humanReviewed ? 1 : 0,
-      humanOutcome: evalRun.humanOutcome ?? null,
-      humanNotes: evalRun.humanNotes ?? null,
-      reviewedBy: evalRun.reviewedBy ?? null,
-      reviewedAt: evalRun.reviewedAt ?? null,
-      orgId: evalRun.orgId ?? null,
-      notes: evalRun.notes ?? null,
-      artifactsJson: JSON.stringify(evalRun.artifacts ?? [])
-    });
+    `, [
+      evalRun.id,
+      evalRun.sessionId ?? null,
+      evalRun.missionId ?? null,
+      evalRun.goldenCaseId ?? null,
+      evalRun.runAt,
+      evalRun.evaluatorId ?? null,
+      evalRun.trialNumber ?? null,
+      evalRun.trialSetId ?? null,
+      evalRun.totalTrials ?? null,
+      evalRun.outcome,
+      JSON.stringify(evalRun.passedGates ?? []),
+      JSON.stringify(evalRun.failedGates ?? []),
+      evalRun.agentRejected ? 1 : 0,
+      evalRun.rejectionReason ?? null,
+      evalRun.rejectionAppropriate !== undefined ? (evalRun.rejectionAppropriate ? 1 : 0) : null,
+      evalRun.detailedMetrics ? JSON.stringify(evalRun.detailedMetrics) : null,
+      JSON.stringify(evalRun.metrics ?? []),
+      evalRun.lmJudge ? JSON.stringify(evalRun.lmJudge) : null,
+      JSON.stringify(evalRun.commands ?? []),
+      evalRun.agentTranscript ? JSON.stringify(evalRun.agentTranscript) : null,
+      evalRun.humanReviewed ? 1 : 0,
+      evalRun.humanOutcome ?? null,
+      evalRun.humanNotes ?? null,
+      evalRun.reviewedBy ?? null,
+      evalRun.reviewedAt ?? null,
+      evalRun.orgId ?? null,
+      evalRun.notes ?? null,
+      JSON.stringify(evalRun.artifacts ?? [])
+    ]);
 
     return evalRun;
   }
 
-  getEvalRun(id: string): EvalRun | null {
-    const row = this.db.prepare("SELECT * FROM eval_runs WHERE id = ?").get(id) as any;
-    return row ? this.hydrateEvalRun(row) : null;
+  async getEvalRun(id: string): Promise<EvalRun | null> {
+    const result = await this.db.query("SELECT * FROM eval_runs WHERE id = ?", [id]);
+    return result.rows.length > 0 ? this.hydrateEvalRun(result.rows[0]) : null;
   }
 
-  listEvalRuns(filters: EvalRunFilters = {}): EvalRun[] {
+  async listEvalRuns(filters: EvalRunFilters = {}): Promise<EvalRun[]> {
     const conditions: string[] = [];
-    const params: Record<string, any> = {};
+    const params: any[] = [];
 
     if (filters.sessionId) {
-      conditions.push("session_id = @sessionId");
-      params.sessionId = filters.sessionId;
+      conditions.push("session_id = ?");
+      params.push(filters.sessionId);
     }
 
     if (filters.goldenCaseId) {
-      conditions.push("golden_case_id = @goldenCaseId");
-      params.goldenCaseId = filters.goldenCaseId;
+      conditions.push("golden_case_id = ?");
+      params.push(filters.goldenCaseId);
     }
 
     if (filters.outcome) {
-      conditions.push("outcome = @outcome");
-      params.outcome = filters.outcome;
+      conditions.push("outcome = ?");
+      params.push(filters.outcome);
     }
 
     if (filters.orgId) {
-      conditions.push("org_id = @orgId");
-      params.orgId = filters.orgId;
+      conditions.push("org_id = ?");
+      params.push(filters.orgId);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -252,8 +247,8 @@ export class EvalRepository {
     const offset = filters.offset ?? 0;
 
     const sql = `SELECT * FROM eval_runs ${whereClause} ORDER BY run_at DESC LIMIT ${limit} OFFSET ${offset}`;
-    const rows = this.db.prepare(sql).all(params) as any[];
-    return rows.map((row) => this.hydrateEvalRun(row));
+    const result = await this.db.query(sql, params);
+    return result.rows.map((row: any) => this.hydrateEvalRun(row));
   }
 
   private hydrateGoldenCase(row: any): GoldenCase {

@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { Database } from "@sim-corp/database";
 import {
   CommandProposalSchema,
   type CommandProposal,
@@ -26,87 +26,77 @@ export interface FindAllOptions {
 }
 
 export interface CommandProposalRepository {
-  create(proposal: CommandProposal): void;
-  findById(proposalId: string): CommandProposal | undefined;
-  findAll(options?: FindAllOptions): CommandProposal[];
-  findByStatus(status: string): CommandProposal[];
-  findByMachine(machineId: string): CommandProposal[];
-  findBySession(sessionId: string): CommandProposal[];
-  findPendingApprovals(): CommandProposal[];
-  updateStatus(proposalId: string, status: string): void;
-  approve(proposalId: string, approvedBy: Actor): void;
+  create(proposal: CommandProposal): Promise<void>;
+  findById(proposalId: string): Promise<CommandProposal | undefined>;
+  findAll(options?: FindAllOptions): Promise<CommandProposal[]>;
+  findByStatus(status: string): Promise<CommandProposal[]>;
+  findByMachine(machineId: string): Promise<CommandProposal[]>;
+  findBySession(sessionId: string): Promise<CommandProposal[]>;
+  findPendingApprovals(): Promise<CommandProposal[]>;
+  updateStatus(proposalId: string, status: string): Promise<void>;
+  approve(proposalId: string, approvedBy: Actor): Promise<void>;
   reject(
     proposalId: string,
     rejectedBy: Actor,
     reason: CommandRejectionReason
-  ): void;
-  markExecutionStarted(proposalId: string): void;
+  ): Promise<void>;
+  markExecutionStarted(proposalId: string): Promise<void>;
   markExecutionCompleted(
     proposalId: string,
     outcome: CommandExecutionResult
-  ): void;
-  addAuditEntry(proposalId: string, entry: AuditLogEntry): void;
+  ): Promise<void>;
+  addAuditEntry(proposalId: string, entry: AuditLogEntry): Promise<void>;
 }
 
 export function createCommandProposalRepository(
-  db: Database.Database
+  db: Database
 ): CommandProposalRepository {
   return {
-    create(proposal: CommandProposal): void {
-      const stmt = db.prepare(`
+    async create(proposal: CommandProposal): Promise<void> {
+      const command = proposal.command;
+      await db.exec(`
         INSERT INTO command_proposals (
           proposal_id, command_id, command_type, machine_id, site_id, org_id,
           target_value, target_unit, constraints, metadata,
           proposed_by, proposed_by_actor, agent_name, agent_version, reasoning,
           session_id, mission_id, status, created_at, approval_required,
           approval_timeout_seconds, audit_log
-        ) VALUES (
-          @proposalId, @commandId, @commandType, @machineId, @siteId, @orgId,
-          @targetValue, @targetUnit, @constraints, @metadata,
-          @proposedBy, @proposedByActor, @agentName, @agentVersion, @reasoning,
-          @sessionId, @missionId, @status, @createdAt, @approvalRequired,
-          @approvalTimeoutSeconds, @auditLog
-        )
-      `);
-
-      const command = proposal.command;
-      stmt.run({
-        proposalId: proposal.proposalId,
-        commandId: command.commandId,
-        commandType: command.commandType,
-        machineId: command.machineId,
-        siteId: command.siteId ?? null,
-        orgId: command.orgId ?? null,
-        targetValue: command.targetValue ?? null,
-        targetUnit: command.targetUnit ?? null,
-        constraints: JSON.stringify(command.constraints),
-        metadata: command.metadata ? JSON.stringify(command.metadata) : null,
-        proposedBy: proposal.proposedBy,
-        proposedByActor: proposal.proposedByActor
-          ? JSON.stringify(proposal.proposedByActor)
-          : null,
-        agentName: proposal.agentName ?? null,
-        agentVersion: proposal.agentVersion ?? null,
-        reasoning: proposal.reasoning,
-        sessionId: proposal.sessionId ?? null,
-        missionId: proposal.missionId ?? null,
-        status: proposal.status,
-        createdAt: proposal.createdAt,
-        approvalRequired: proposal.approvalRequired ? 1 : 0,
-        approvalTimeoutSeconds: proposal.approvalTimeoutSeconds,
-        auditLog: JSON.stringify(proposal.auditLog),
-      });
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        proposal.proposalId,
+        command.commandId,
+        command.commandType,
+        command.machineId,
+        command.siteId ?? null,
+        command.orgId ?? null,
+        command.targetValue ?? null,
+        command.targetUnit ?? null,
+        JSON.stringify(command.constraints),
+        command.metadata ? JSON.stringify(command.metadata) : null,
+        proposal.proposedBy,
+        proposal.proposedByActor ? JSON.stringify(proposal.proposedByActor) : null,
+        proposal.agentName ?? null,
+        proposal.agentVersion ?? null,
+        proposal.reasoning,
+        proposal.sessionId ?? null,
+        proposal.missionId ?? null,
+        proposal.status,
+        proposal.createdAt,
+        proposal.approvalRequired ? 1 : 0,
+        proposal.approvalTimeoutSeconds,
+        JSON.stringify(proposal.auditLog),
+      ]);
     },
 
-    findById(proposalId: string): CommandProposal | undefined {
-      const stmt = db.prepare(
-        "SELECT * FROM command_proposals WHERE proposal_id = ?"
+    async findById(proposalId: string): Promise<CommandProposal | undefined> {
+      const result = await db.query(
+        "SELECT * FROM command_proposals WHERE proposal_id = ?",
+        [proposalId]
       );
-      const row = stmt.get(proposalId) as any;
-      return row ? rowToProposal(row) : undefined;
+      return result.rows.length > 0 ? rowToProposal(result.rows[0]) : undefined;
     },
 
-    findAll(options: FindAllOptions = {}): CommandProposal[] {
+    async findAll(options: FindAllOptions = {}): Promise<CommandProposal[]> {
       const conditions: string[] = [];
       const params: any[] = [];
 
@@ -141,103 +131,98 @@ export function createCommandProposalRepository(
         ${limitClause} ${offsetClause}
       `;
 
-      const stmt = db.prepare(query);
-      const rows = stmt.all(...params) as any[];
-      return rows.map(rowToProposal);
+      const result = await db.query(query, params);
+      return result.rows.map(rowToProposal);
     },
 
-    findByStatus(status: string): CommandProposal[] {
-      const stmt = db.prepare(
-        "SELECT * FROM command_proposals WHERE status = ? ORDER BY created_at DESC"
+    async findByStatus(status: string): Promise<CommandProposal[]> {
+      const result = await db.query(
+        "SELECT * FROM command_proposals WHERE status = ? ORDER BY created_at DESC",
+        [status]
       );
-      const rows = stmt.all(status) as any[];
-      return rows.map(rowToProposal);
+      return result.rows.map(rowToProposal);
     },
 
-    findByMachine(machineId: string): CommandProposal[] {
-      const stmt = db.prepare(
-        "SELECT * FROM command_proposals WHERE machine_id = ? ORDER BY created_at DESC"
+    async findByMachine(machineId: string): Promise<CommandProposal[]> {
+      const result = await db.query(
+        "SELECT * FROM command_proposals WHERE machine_id = ? ORDER BY created_at DESC",
+        [machineId]
       );
-      const rows = stmt.all(machineId) as any[];
-      return rows.map(rowToProposal);
+      return result.rows.map(rowToProposal);
     },
 
-    findBySession(sessionId: string): CommandProposal[] {
-      const stmt = db.prepare(
-        "SELECT * FROM command_proposals WHERE session_id = ? ORDER BY created_at DESC"
+    async findBySession(sessionId: string): Promise<CommandProposal[]> {
+      const result = await db.query(
+        "SELECT * FROM command_proposals WHERE session_id = ? ORDER BY created_at DESC",
+        [sessionId]
       );
-      const rows = stmt.all(sessionId) as any[];
-      return rows.map(rowToProposal);
+      return result.rows.map(rowToProposal);
     },
 
-    findPendingApprovals(): CommandProposal[] {
-      const stmt = db.prepare(
-        "SELECT * FROM command_proposals WHERE status = 'PENDING_APPROVAL' ORDER BY created_at ASC"
+    async findPendingApprovals(): Promise<CommandProposal[]> {
+      const result = await db.query(
+        "SELECT * FROM command_proposals WHERE status = 'PENDING_APPROVAL' ORDER BY created_at ASC",
+        []
       );
-      const rows = stmt.all() as any[];
-      return rows.map(rowToProposal);
+      return result.rows.map(rowToProposal);
     },
 
-    updateStatus(proposalId: string, status: string): void {
-      const stmt = db.prepare(`
+    async updateStatus(proposalId: string, status: string): Promise<void> {
+      await db.exec(`
         UPDATE command_proposals
         SET status = ?
         WHERE proposal_id = ?
-      `);
-      stmt.run(status, proposalId);
+      `, [status, proposalId]);
     },
 
-    approve(proposalId: string, approvedBy: Actor): void {
+    async approve(proposalId: string, approvedBy: Actor): Promise<void> {
       const now = new Date().toISOString();
-      const stmt = db.prepare(`
+      await db.exec(`
         UPDATE command_proposals
         SET status = 'APPROVED',
             approved_by = ?,
             approved_at = ?
         WHERE proposal_id = ?
-      `);
-      stmt.run(JSON.stringify(approvedBy), now, proposalId);
+      `, [JSON.stringify(approvedBy), now, proposalId]);
     },
 
-    reject(
+    async reject(
       proposalId: string,
       rejectedBy: Actor,
       reason: CommandRejectionReason
-    ): void {
+    ): Promise<void> {
       const now = new Date().toISOString();
-      const stmt = db.prepare(`
+      await db.exec(`
         UPDATE command_proposals
         SET status = 'REJECTED',
             rejected_by = ?,
             rejected_at = ?,
             rejection_reason = ?
         WHERE proposal_id = ?
-      `);
-      stmt.run(
+      `, [
         JSON.stringify(rejectedBy),
         now,
         JSON.stringify(reason),
         proposalId
-      );
+      ]);
     },
 
-    markExecutionStarted(proposalId: string): void {
+    async markExecutionStarted(proposalId: string): Promise<void> {
       const now = new Date().toISOString();
-      const stmt = db.prepare(`
+      await db.exec(`
         UPDATE command_proposals
         SET status = 'EXECUTING',
             execution_started_at = ?
         WHERE proposal_id = ?
-      `);
-      stmt.run(now, proposalId);
+      `, [now, proposalId]);
     },
 
-    markExecutionCompleted(
+    async markExecutionCompleted(
       proposalId: string,
       outcome: CommandExecutionResult
-    ): void {
+    ): Promise<void> {
       const now = new Date().toISOString();
-      const proposal = this.findById(proposalId);
+      const proposal = await this.findById(proposalId);
       if (!proposal) {
         throw new Error(`Proposal ${proposalId} not found`);
       }
@@ -256,36 +241,34 @@ export function createCommandProposalRepository(
             ? "ABORTED"
             : "FAILED";
 
-      const stmt = db.prepare(`
+      await db.exec(`
         UPDATE command_proposals
         SET status = ?,
             execution_completed_at = ?,
             execution_duration_ms = ?,
             outcome = ?
         WHERE proposal_id = ?
-      `);
-      stmt.run(
+      `, [
         finalStatus,
         now,
         durationMs,
         JSON.stringify(outcome),
         proposalId
-      );
+      ]);
     },
 
-    addAuditEntry(proposalId: string, entry: AuditLogEntry): void {
-      const proposal = this.findById(proposalId);
+    async addAuditEntry(proposalId: string, entry: AuditLogEntry): Promise<void> {
+      const proposal = await this.findById(proposalId);
       if (!proposal) {
         throw new Error(`Proposal ${proposalId} not found`);
       }
 
       const auditLog = [...proposal.auditLog, entry];
-      const stmt = db.prepare(`
+      await db.exec(`
         UPDATE command_proposals
         SET audit_log = ?
         WHERE proposal_id = ?
-      `);
-      stmt.run(JSON.stringify(auditLog), proposalId);
+      `, [JSON.stringify(auditLog), proposalId]);
     },
   };
 }

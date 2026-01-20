@@ -12,12 +12,12 @@
   "dependencies": {
     "@sim-corp/schemas": "workspace:*",
     "@sim-corp/device-identity": "workspace:*",
+    "@sim-corp/database": "workspace:*",
     "@sim-corp/metrics": "workspace:*",
     "@sim-corp/health": "workspace:*",
     "@sim-corp/rate-limit": "workspace:*",
     "fastify": "^4.28.1",
     "mqtt": "^5.10.1",
-    "better-sqlite3": "^11.2.1",
     "jose": "^5.9.6"
   },
   "devDependencies": {

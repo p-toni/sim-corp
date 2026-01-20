@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { Database } from "@sim-corp/database";
 import {
   type CommandProposal,
   type RoasterCommand,
@@ -35,18 +35,18 @@ export interface ProposeCommandRequest {
 }
 
 export interface CommandService {
-  proposeCommand(request: ProposeCommandRequest): CommandProposal;
-  getAllProposals(options?: FindAllOptions): CommandProposal[];
-  getPendingApprovals(): CommandProposal[];
-  getProposal(proposalId: string): CommandProposal | undefined;
-  getProposalsByMachine(machineId: string): CommandProposal[];
-  getProposalsBySession(sessionId: string): CommandProposal[];
-  approveProposal(proposalId: string, approvedBy: Actor): CommandProposal;
+  proposeCommand(request: ProposeCommandRequest): Promise<CommandProposal>;
+  getAllProposals(options?: FindAllOptions): Promise<CommandProposal[]>;
+  getPendingApprovals(): Promise<CommandProposal[]>;
+  getProposal(proposalId: string): Promise<CommandProposal | undefined>;
+  getProposalsByMachine(machineId: string): Promise<CommandProposal[]>;
+  getProposalsBySession(sessionId: string): Promise<CommandProposal[]>;
+  approveProposal(proposalId: string, approvedBy: Actor): Promise<CommandProposal>;
   rejectProposal(
     proposalId: string,
     rejectedBy: Actor,
     reason: string
-  ): CommandProposal;
+  ): Promise<CommandProposal>;
 }
 
 export interface GovernorCheck {
@@ -69,7 +69,7 @@ export interface GovernorCheck {
 }
 
 export interface CommandServiceOptions {
-  db: Database.Database;
+  db: Database;
   getCurrentState?: (machineId: string) => Promise<Record<string, any>>;
   getRecentCommands?: (machineId: string) => Promise<RoasterCommand[]>;
   governor?: GovernorCheck;
@@ -82,19 +82,19 @@ export function createCommandService(
   const safetyGates = createSafetyGates();
 
   return {
-    proposeCommand(request: ProposeCommandRequest): CommandProposal {
+    async proposeCommand(request: ProposeCommandRequest): Promise<CommandProposal> {
       const now = new Date().toISOString();
 
       // Check Governor autonomy level and signals
       if (options.governor) {
-        const commandsInSession = request.sessionId
-          ? repo.findBySession(request.sessionId).length
-          : undefined;
+        const sessionProposals = request.sessionId
+          ? await repo.findBySession(request.sessionId)
+          : [];
+        const commandsInSession = sessionProposals.length > 0 ? sessionProposals.length : undefined;
 
         // Calculate recent failure rate from proposals in this session
         let recentFailureRate: number | undefined;
-        if (request.sessionId) {
-          const sessionProposals = repo.findBySession(request.sessionId);
+        if (sessionProposals.length > 0) {
           const executedCount = sessionProposals.filter(p => p.executedAt).length;
           const failedCount = sessionProposals.filter(p => p.executionStatus === "FAILED").length;
           if (executedCount > 0) {
@@ -124,7 +124,7 @@ export function createCommandService(
             `Blocked by Governor: ${reasonMessages}`,
             governorDecision.reasons[0]?.code
           );
-          repo.create(proposal);
+          await repo.create(proposal);
           return proposal;
         }
       }
@@ -139,23 +139,22 @@ export function createCommandService(
           now,
           `Constraint validation failed: ${constraintValidation.errors.join(", ")}`
         );
-        repo.create(proposal);
+        await repo.create(proposal);
         return proposal;
       }
 
       // Validate state guards (if state provider available)
       if (options.getCurrentState) {
-        const currentState = options.getCurrentState(request.command.machineId);
-        // Note: This is async in the interface but we'll handle sync for now
-        // In production, this should be refactored to support async validation
+        const currentState = await options.getCurrentState(request.command.machineId);
+        // Note: State validation could be added here
       }
 
       // Validate rate limits (if recent commands provider available)
       if (options.getRecentCommands) {
-        const recentCommands = options.getRecentCommands(
+        const recentCommands = await options.getRecentCommands(
           request.command.machineId
         );
-        // Note: Same async handling consideration
+        // Note: Rate limit validation could be added here
       }
 
       // Create proposal
@@ -186,33 +185,33 @@ export function createCommandService(
       };
 
       const validated = CommandProposalSchema.parse(proposal);
-      repo.create(validated);
+      await repo.create(validated);
 
       return validated;
     },
 
-    getAllProposals(options?: FindAllOptions): CommandProposal[] {
-      return repo.findAll(options);
+    async getAllProposals(options?: FindAllOptions): Promise<CommandProposal[]> {
+      return await repo.findAll(options);
     },
 
-    getPendingApprovals(): CommandProposal[] {
-      return repo.findPendingApprovals();
+    async getPendingApprovals(): Promise<CommandProposal[]> {
+      return await repo.findPendingApprovals();
     },
 
-    getProposal(proposalId: string): CommandProposal | undefined {
-      return repo.findById(proposalId);
+    async getProposal(proposalId: string): Promise<CommandProposal | undefined> {
+      return await repo.findById(proposalId);
     },
 
-    getProposalsByMachine(machineId: string): CommandProposal[] {
-      return repo.findByMachine(machineId);
+    async getProposalsByMachine(machineId: string): Promise<CommandProposal[]> {
+      return await repo.findByMachine(machineId);
     },
 
-    getProposalsBySession(sessionId: string): CommandProposal[] {
-      return repo.findBySession(sessionId);
+    async getProposalsBySession(sessionId: string): Promise<CommandProposal[]> {
+      return await repo.findBySession(sessionId);
     },
 
-    approveProposal(proposalId: string, approvedBy: Actor): CommandProposal {
-      const proposal = repo.findById(proposalId);
+    async approveProposal(proposalId: string, approvedBy: Actor): Promise<CommandProposal> {
+      const proposal = await repo.findById(proposalId);
       if (!proposal) {
         throw new Error(`Proposal ${proposalId} not found`);
       }
@@ -223,7 +222,7 @@ export function createCommandService(
         );
       }
 
-      repo.approve(proposalId, approvedBy);
+      await repo.approve(proposalId, approvedBy);
 
       const auditEntry: AuditLogEntry = {
         timestamp: new Date().toISOString(),
@@ -231,21 +230,21 @@ export function createCommandService(
         actor: approvedBy,
         details: {},
       };
-      repo.addAuditEntry(proposalId, auditEntry);
+      await repo.addAuditEntry(proposalId, auditEntry);
 
-      const updated = repo.findById(proposalId);
+      const updated = await repo.findById(proposalId);
       if (!updated) {
         throw new Error(`Proposal ${proposalId} not found after approval`);
       }
       return updated;
     },
 
-    rejectProposal(
+    async rejectProposal(
       proposalId: string,
       rejectedBy: Actor,
       reason: string
-    ): CommandProposal {
-      const proposal = repo.findById(proposalId);
+    ): Promise<CommandProposal> {
+      const proposal = await repo.findById(proposalId);
       if (!proposal) {
         throw new Error(`Proposal ${proposalId} not found`);
       }
@@ -262,7 +261,7 @@ export function createCommandService(
         details: {},
       };
 
-      repo.reject(proposalId, rejectedBy, rejectionReason);
+      await repo.reject(proposalId, rejectedBy, rejectionReason);
 
       const auditEntry: AuditLogEntry = {
         timestamp: new Date().toISOString(),
@@ -270,9 +269,9 @@ export function createCommandService(
         actor: rejectedBy,
         details: { reason },
       };
-      repo.addAuditEntry(proposalId, auditEntry);
+      await repo.addAuditEntry(proposalId, auditEntry);
 
-      const updated = repo.findById(proposalId);
+      const updated = await repo.findById(proposalId);
       if (!updated) {
         throw new Error(`Proposal ${proposalId} not found after rejection`);
       }

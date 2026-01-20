@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { Database } from "@sim-corp/database";
 import type {
   CommandMetrics,
   CommandTimeseriesMetrics,
@@ -8,28 +8,28 @@ import type {
 } from "@sim-corp/schemas";
 
 export interface CommandAnalytics {
-  getMetrics(startTime: string, endTime: string): CommandMetrics;
+  getMetrics(startTime: string, endTime: string): Promise<CommandMetrics>;
   getTimeseriesMetrics(
     metric: string,
     startTime: string,
     endTime: string,
     bucketSizeSeconds: number
-  ): CommandTimeseriesMetrics;
-  getAlerts(limit?: number): CommandAlert[];
-  getSummary(): CommandSummary;
+  ): Promise<CommandTimeseriesMetrics>;
+  getAlerts(limit?: number): Promise<CommandAlert[]>;
+  getSummary(): Promise<CommandSummary>;
 }
 
-export function createCommandAnalytics(db: Database.Database): CommandAnalytics {
+export function createCommandAnalytics(db: Database): CommandAnalytics {
   return {
-    getMetrics(startTime: string, endTime: string): CommandMetrics {
+    async getMetrics(startTime: string, endTime: string): Promise<CommandMetrics> {
       // Get all proposals in time window
-      const proposals = db
-        .prepare(
-          `SELECT * FROM command_proposals
-           WHERE created_at >= ? AND created_at <= ?
-           ORDER BY created_at DESC`
-        )
-        .all(startTime, endTime) as any[];
+      const result = await db.query(
+        `SELECT * FROM command_proposals
+         WHERE created_at >= ? AND created_at <= ?
+         ORDER BY created_at DESC`,
+        [startTime, endTime]
+      );
+      const proposals = result.rows as any[];
 
       const totalCommands = proposals.length;
 
@@ -177,12 +177,12 @@ export function createCommandAnalytics(db: Database.Database): CommandAnalytics 
       };
     },
 
-    getTimeseriesMetrics(
+    async getTimeseriesMetrics(
       metric: string,
       startTime: string,
       endTime: string,
       bucketSizeSeconds: number
-    ): CommandTimeseriesMetrics {
+    ): Promise<CommandTimeseriesMetrics> {
       const startMs = new Date(startTime).getTime();
       const endMs = new Date(endTime).getTime();
       const bucketMs = bucketSizeSeconds * 1000;
@@ -190,13 +190,13 @@ export function createCommandAnalytics(db: Database.Database): CommandAnalytics 
       const buckets: Record<number, any[]> = {};
 
       // Get all proposals in time window
-      const proposals = db
-        .prepare(
-          `SELECT * FROM command_proposals
-           WHERE created_at >= ? AND created_at <= ?
-           ORDER BY created_at ASC`
-        )
-        .all(startTime, endTime) as any[];
+      const result = await db.query(
+        `SELECT * FROM command_proposals
+         WHERE created_at >= ? AND created_at <= ?
+         ORDER BY created_at ASC`,
+        [startTime, endTime]
+      );
+      const proposals = result.rows as any[];
 
       // Group by bucket
       proposals.forEach((p) => {
@@ -291,7 +291,7 @@ export function createCommandAnalytics(db: Database.Database): CommandAnalytics 
       };
     },
 
-    getAlerts(limit: number = 100): CommandAlert[] {
+    async getAlerts(limit: number = 100): Promise<CommandAlert[]> {
       // For now, generate alerts based on metrics
       // In production, these would be stored in a dedicated alerts table
       const alerts: CommandAlert[] = [];
@@ -299,7 +299,7 @@ export function createCommandAnalytics(db: Database.Database): CommandAnalytics 
       // Check for recent high failure rate
       const last1Hour = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const now = new Date().toISOString();
-      const recentMetrics = this.getMetrics(last1Hour, now);
+      const recentMetrics = await this.getMetrics(last1Hour, now);
 
       if (recentMetrics.failureRate > 0.2) {
         alerts.push({
@@ -340,7 +340,7 @@ export function createCommandAnalytics(db: Database.Database): CommandAnalytics 
       return alerts.slice(0, limit);
     },
 
-    getSummary(): CommandSummary {
+    async getSummary(): Promise<CommandSummary> {
       const now = new Date().toISOString();
       const last24HoursStart = new Date(
         Date.now() - 24 * 60 * 60 * 1000
@@ -349,69 +349,68 @@ export function createCommandAnalytics(db: Database.Database): CommandAnalytics 
         Date.now() - 7 * 24 * 60 * 60 * 1000
       ).toISOString();
 
-      const last24Hours = this.getMetrics(last24HoursStart, now);
-      const last7Days = this.getMetrics(last7DaysStart, now);
+      const last24Hours = await this.getMetrics(last24HoursStart, now);
+      const last7Days = await this.getMetrics(last7DaysStart, now);
 
       // Get pending approvals
-      const pendingApprovals =
-        db
-          .prepare(
-            "SELECT COUNT(*) as count FROM command_proposals WHERE status = 'PENDING_APPROVAL'"
-          )
-          .get() as any;
+      const pendingApprovalsResult = await db.query(
+        "SELECT COUNT(*) as count FROM command_proposals WHERE status = 'PENDING_APPROVAL'",
+        []
+      );
+      const pendingApprovals = pendingApprovalsResult.rows[0] as any;
 
       // Get active executions
-      const activeExecutions =
-        db
-          .prepare(
-            "SELECT COUNT(*) as count FROM command_proposals WHERE status = 'EXECUTING'"
-          )
-          .get() as any;
+      const activeExecutionsResult = await db.query(
+        "SELECT COUNT(*) as count FROM command_proposals WHERE status = 'EXECUTING'",
+        []
+      );
+      const activeExecutions = activeExecutionsResult.rows[0] as any;
 
       // Get recent failures (last hour)
       const last1HourStart = new Date(
         Date.now() - 60 * 60 * 1000
       ).toISOString();
-      const recentFailures =
-        db
-          .prepare(
-            `SELECT COUNT(*) as count FROM command_proposals
-             WHERE status IN ('FAILED', 'ABORTED') AND created_at >= ?`
-          )
-          .get(last1HourStart) as any;
+      const recentFailuresResult = await db.query(
+        `SELECT COUNT(*) as count FROM command_proposals
+         WHERE status IN ('FAILED', 'ABORTED') AND created_at >= ?`,
+        [last1HourStart]
+      );
+      const recentFailures = recentFailuresResult.rows[0] as any;
 
       // Get top command types
-      const topCommandTypeRows = db
-        .prepare(
-          `SELECT command_type, COUNT(*) as count
-           FROM command_proposals
-           WHERE created_at >= ?
-           GROUP BY command_type
-           ORDER BY count DESC
-           LIMIT 5`
-        )
-        .all(last24HoursStart) as any[];
+      const topCommandTypeResult = await db.query(
+        `SELECT command_type, COUNT(*) as count
+         FROM command_proposals
+         WHERE created_at >= ?
+         GROUP BY command_type
+         ORDER BY count DESC
+         LIMIT 5`,
+        [last24HoursStart]
+      );
+      const topCommandTypeRows = topCommandTypeResult.rows as any[];
 
-      const topCommandTypes = topCommandTypeRows.map((row) => {
-        const typeProposals = db
-          .prepare(
+      const topCommandTypes = await Promise.all(
+        topCommandTypeRows.map(async (row) => {
+          const typeProposalsResult = await db.query(
             `SELECT status FROM command_proposals
-             WHERE command_type = ? AND created_at >= ?`
-          )
-          .all(row.command_type, last24HoursStart) as any[];
+             WHERE command_type = ? AND created_at >= ?`,
+            [row.command_type, last24HoursStart]
+          );
+          const typeProposals = typeProposalsResult.rows as any[];
 
-        const successCount = typeProposals.filter(
-          (p) => p.status === "COMPLETED"
-        ).length;
-        const successRate =
-          typeProposals.length > 0 ? successCount / typeProposals.length : 0;
+          const successCount = typeProposals.filter(
+            (p) => p.status === "COMPLETED"
+          ).length;
+          const successRate =
+            typeProposals.length > 0 ? successCount / typeProposals.length : 0;
 
-        return {
-          commandType: row.command_type,
-          count: row.count,
-          successRate,
-        };
-      });
+          return {
+            commandType: row.command_type,
+            count: row.count,
+            successRate,
+          };
+        })
+      );
 
       return {
         pendingApprovals: pendingApprovals?.count || 0,
@@ -419,7 +418,7 @@ export function createCommandAnalytics(db: Database.Database): CommandAnalytics 
         recentFailures: recentFailures?.count || 0,
         last24Hours,
         last7Days,
-        activeAlerts: this.getAlerts(10),
+        activeAlerts: await this.getAlerts(10),
         topCommandTypes,
         generatedAt: now,
       };

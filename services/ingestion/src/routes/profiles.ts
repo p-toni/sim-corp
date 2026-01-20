@@ -34,7 +34,7 @@ export function registerProfileRoutes(app: FastifyInstance, deps: ProfilesDeps):
     done(null, body as string);
   });
 
-  app.get("/profiles", (request: FastifyRequest<{ Querystring: ProfileQuery }>, reply: FastifyReply) => {
+  app.get("/profiles", async (request: FastifyRequest<{ Querystring: ProfileQuery }>, reply: FastifyReply) => {
     const { orgId, includeArchived, limit, ...rest } = request.query;
     if (!orgId) {
       return reply.status(400).send({ error: "orgId is required" });
@@ -46,18 +46,18 @@ export function registerProfileRoutes(app: FastifyInstance, deps: ProfilesDeps):
       limit: typeof limit === "string" ? Number(limit) : limit,
       ...rest
     };
-    return repo.listProfiles(parsedFilters);
+    return await repo.listProfiles(parsedFilters);
   });
 
   app.get(
     "/profiles/:profileId",
-    (request: FastifyRequest<{ Params: { profileId: string }; Querystring: { orgId?: string } }>, reply: FastifyReply) => {
+    async (request: FastifyRequest<{ Params: { profileId: string }; Querystring: { orgId?: string } }>, reply: FastifyReply) => {
     const { orgId } = request.query;
     if (!orgId) {
       return reply.status(400).send({ error: "orgId is required" });
     }
     if (!ensureOrgAccess(reply, request.actor, orgId)) return;
-    const profile = repo.getProfile(orgId, request.params.profileId);
+    const profile = await repo.getProfile(orgId, request.params.profileId);
     if (!profile) {
       return reply.status(404).send({ error: "Profile not found" });
       }
@@ -67,26 +67,26 @@ export function registerProfileRoutes(app: FastifyInstance, deps: ProfilesDeps):
 
   app.post(
     "/profiles",
-    (request: FastifyRequest<{ Body: { profile: unknown; changeNote?: string } }>, reply: FastifyReply) => {
+    async (request: FastifyRequest<{ Body: { profile: unknown; changeNote?: string } }>, reply: FastifyReply) => {
       const parsed = RoastProfileSchema.partial().parse(request.body.profile ?? {});
       if (!parsed.orgId) {
         return reply.status(400).send({ error: "orgId is required" });
       }
       if (!ensureOrgAccess(reply, request.actor, parsed.orgId)) return;
-      const created = repo.createProfile(parsed, request.body.changeNote, request.actor);
+      const created = await repo.createProfile(parsed, request.body.changeNote, request.actor);
       return reply.status(201).send(created);
     }
   );
 
   app.post(
     "/profiles/:profileId/new-version",
-    (request: FastifyRequest<{ Params: { profileId: string }; Body: { profile: unknown; changeNote?: string } }>, reply) => {
+    async (request: FastifyRequest<{ Params: { profileId: string }; Body: { profile: unknown; changeNote?: string } }>, reply) => {
       const parsed = RoastProfileSchema.partial().parse(request.body.profile ?? {});
       if (!parsed.orgId) {
         return reply.status(400).send({ error: "orgId is required" });
       }
       if (!ensureOrgAccess(reply, request.actor, parsed.orgId)) return;
-      const updated = repo.addProfileVersion(
+      const updated = await repo.addProfileVersion(
         parsed.orgId,
         request.params.profileId,
         parsed,
@@ -99,11 +99,11 @@ export function registerProfileRoutes(app: FastifyInstance, deps: ProfilesDeps):
 
   app.post(
     "/profiles/:profileId/archive",
-    (request: FastifyRequest<{ Params: { profileId: string }; Querystring: { orgId?: string } }>, reply: FastifyReply) => {
+    async (request: FastifyRequest<{ Params: { profileId: string }; Querystring: { orgId?: string } }>, reply: FastifyReply) => {
       const orgId = request.query.orgId;
       if (!orgId) return reply.status(400).send({ error: "orgId is required" });
       if (!ensureOrgAccess(reply, request.actor, orgId)) return;
-      const updated = repo.setProfileArchived(orgId, request.params.profileId, true, request.actor);
+      const updated = await repo.setProfileArchived(orgId, request.params.profileId, true, request.actor);
       if (!updated) return reply.status(404).send({ error: "Profile not found" });
       return updated;
     }
@@ -111,11 +111,11 @@ export function registerProfileRoutes(app: FastifyInstance, deps: ProfilesDeps):
 
   app.post(
     "/profiles/:profileId/unarchive",
-    (request: FastifyRequest<{ Params: { profileId: string }; Querystring: { orgId?: string } }>, reply: FastifyReply) => {
+    async (request: FastifyRequest<{ Params: { profileId: string }; Querystring: { orgId?: string } }>, reply: FastifyReply) => {
       const orgId = request.query.orgId;
       if (!orgId) return reply.status(400).send({ error: "orgId is required" });
       if (!ensureOrgAccess(reply, request.actor, orgId)) return;
-      const updated = repo.setProfileArchived(orgId, request.params.profileId, false, request.actor);
+      const updated = await repo.setProfileArchived(orgId, request.params.profileId, false, request.actor);
       if (!updated) return reply.status(404).send({ error: "Profile not found" });
       return updated;
     }
@@ -123,21 +123,21 @@ export function registerProfileRoutes(app: FastifyInstance, deps: ProfilesDeps):
 
   app.get(
     "/profiles/:profileId/versions",
-    (request: FastifyRequest<{ Params: { profileId: string }; Querystring: { orgId?: string } }>, reply: FastifyReply) => {
+    async (request: FastifyRequest<{ Params: { profileId: string }; Querystring: { orgId?: string } }>, reply: FastifyReply) => {
       const orgId = request.query.orgId;
       if (!orgId) return reply.status(400).send({ error: "orgId is required" });
       if (!ensureOrgAccess(reply, request.actor, orgId)) return;
-      return repo.listProfileVersions(orgId, request.params.profileId);
+      return await repo.listProfileVersions(orgId, request.params.profileId);
     }
   );
 
   app.get(
     "/profiles/:profileId/export",
-    (request: FastifyRequest<{ Params: { profileId: string }; Querystring: ProfileExportQuery }>, reply: FastifyReply) => {
+    async (request: FastifyRequest<{ Params: { profileId: string }; Querystring: ProfileExportQuery }>, reply: FastifyReply) => {
       const { orgId, format = "json" } = request.query;
       if (!orgId) return reply.status(400).send({ error: "orgId is required" });
       if (!ensureOrgAccess(reply, request.actor, orgId)) return;
-      const bundle = repo.exportProfileBundle(orgId, request.params.profileId);
+      const bundle = await repo.exportProfileBundle(orgId, request.params.profileId);
       if (format === "csv") {
         reply.header("content-type", "text/csv");
         return bundle.profiles.map(toCsvRow).join("\n");
@@ -148,7 +148,7 @@ export function registerProfileRoutes(app: FastifyInstance, deps: ProfilesDeps):
 
   app.post(
     "/profiles/import",
-    (request: FastifyRequest<{ Querystring: ProfileImportQuery; Body: unknown }>, reply: FastifyReply) => {
+    async (request: FastifyRequest<{ Querystring: ProfileImportQuery; Body: unknown }>, reply: FastifyReply) => {
       const { orgId, format = "json" } = request.query;
       if (!orgId) return reply.status(400).send({ error: "orgId is required" });
       if (!ensureOrgAccess(reply, request.actor, orgId)) return;
@@ -157,10 +157,10 @@ export function registerProfileRoutes(app: FastifyInstance, deps: ProfilesDeps):
           return reply.status(400).send({ error: "CSV payload must be text" });
         }
         const rows = parseCsvRows(request.body);
-        return repo.importCsvProfiles(orgId, rows, request.actor);
+        return await repo.importCsvProfiles(orgId, rows, request.actor);
       }
       const bundle = RoastProfileExportBundleSchema.parse(request.body);
-      return repo.importProfiles(orgId, bundle, request.actor);
+      return await repo.importProfiles(orgId, bundle, request.actor);
     }
   );
 }

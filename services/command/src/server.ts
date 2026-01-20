@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import type { Driver } from "@sim-corp/driver-core";
-import { openDatabase } from "./db/connection.js";
+import { getDatabase } from "./db/database.js";
 import { createCommandService } from "./core/command-service.js";
 import { createCommandExecutor } from "./core/executor.js";
 import { createCommandAnalytics } from "./core/analytics.js";
@@ -30,7 +30,7 @@ export function registerDriver(machineId: string, driver: Driver): void {
 }
 
 async function main() {
-  const db = openDatabase();
+  const db = await getDatabase();
   const commandService = createCommandService({ db });
   const executor = createCommandExecutor({ db, getDriver });
   const analytics = createCommandAnalytics(db);
@@ -73,4 +73,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 }
 
-export { createCommandService, createCommandExecutor, registerDriver };
+export { createCommandService, createCommandExecutor };

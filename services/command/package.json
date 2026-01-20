@@ -13,7 +13,7 @@
   "dependencies": {
     "@sim-corp/schemas": "workspace:*",
     "@sim-corp/driver-core": "workspace:*",
-    "better-sqlite3": "^11.7.0",
+    "@sim-corp/database": "workspace:*",
     "fastify": "^5.2.0",
     "zod": "^3.24.0",
     "@sim-corp/metrics": "workspace:*",

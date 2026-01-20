@@ -43,7 +43,7 @@ export class EvalService {
    * Run an evaluation of a session against a golden case
    */
   async runEvaluation(input: RunEvaluationInput): Promise<EvalRun> {
-    const goldenCase = this.repo.getGoldenCase(input.goldenCaseId);
+    const goldenCase = await this.repo.getGoldenCase(input.goldenCaseId);
     if (!goldenCase) {
       throw new Error(`Golden case not found: ${input.goldenCaseId}`);
     }
@@ -92,28 +92,28 @@ export class EvalService {
     };
 
     // Persist eval run
-    return this.repo.createEvalRun(evalRun);
+    return await this.repo.createEvalRun(evalRun);
   }
 
   /**
    * Get evaluation results for a session
    */
-  getSessionEvaluations(sessionId: string): EvalRun[] {
-    return this.repo.listEvalRuns({ sessionId });
+  async getSessionEvaluations(sessionId: string): Promise<EvalRun[]> {
+    return await this.repo.listEvalRuns({ sessionId });
   }
 
   /**
    * Get all evaluations for a golden case
    */
-  getGoldenCaseEvaluations(goldenCaseId: string): EvalRun[] {
-    return this.repo.listEvalRuns({ goldenCaseId });
+  async getGoldenCaseEvaluations(goldenCaseId: string): Promise<EvalRun[]> {
+    return await this.repo.listEvalRuns({ goldenCaseId });
   }
 
   /**
    * Check if a session meets promotion criteria
    */
-  canPromote(sessionId: string): { allowed: boolean; reason?: string } {
-    const evaluations = this.getSessionEvaluations(sessionId);
+  async canPromote(sessionId: string): Promise<{ allowed: boolean; reason?: string }> {
+    const evaluations = await this.getSessionEvaluations(sessionId);
 
     if (evaluations.length === 0) {
       return { allowed: false, reason: "No evaluations found" };
@@ -137,33 +137,33 @@ export class EvalService {
   /**
    * Create a new golden case
    */
-  createGoldenCase(goldenCase: Omit<GoldenCase, "id">): GoldenCase {
+  async createGoldenCase(goldenCase: Omit<GoldenCase, "id">): Promise<GoldenCase> {
     const withId: GoldenCase = {
       ...goldenCase,
       id: `golden-${randomUUID()}`,
       createdAt: goldenCase.createdAt ?? new Date().toISOString()
     };
-    return this.repo.createGoldenCase(withId);
+    return await this.repo.createGoldenCase(withId);
   }
 
   /**
    * List golden cases
    */
-  listGoldenCases(filters?: { machineId?: string; archived?: boolean }): GoldenCase[] {
-    return this.repo.listGoldenCases(filters);
+  async listGoldenCases(filters?: { machineId?: string; archived?: boolean }): Promise<GoldenCase[]> {
+    return await this.repo.listGoldenCases(filters);
   }
 
   /**
    * Get a specific golden case
    */
-  getGoldenCase(id: string): GoldenCase | null {
-    return this.repo.getGoldenCase(id);
+  async getGoldenCase(id: string): Promise<GoldenCase | null> {
+    return await this.repo.getGoldenCase(id);
   }
 
   /**
    * T-028.2 Phase 2: Create a golden case from a successful session
    */
-  createGoldenCaseFromSuccess(input: {
+  async createGoldenCaseFromSuccess(input: {
     sessionId: string;
     analysis: RoastAnalysis;
     machineId: string;
@@ -187,7 +187,7 @@ export class EvalService {
     };
     tags?: string[];
     createdBy?: string;
-  }): GoldenCase {
+  }): Promise<GoldenCase> {
     const goldenCase: Omit<GoldenCase, "id"> = {
       name: input.name,
       description: input.description,
@@ -236,13 +236,13 @@ export class EvalService {
       createdBy: input.createdBy,
     };
 
-    return this.createGoldenCase(goldenCase);
+    return await this.createGoldenCase(goldenCase);
   }
 
   /**
    * T-028.2 Phase 2: Create a golden case from a failed session
    */
-  createGoldenCaseFromFailure(input: {
+  async createGoldenCaseFromFailure(input: {
     sessionId: string;
     analysis: RoastAnalysis;
     machineId: string;
@@ -269,7 +269,7 @@ export class EvalService {
     passAtKThreshold?: number;
     tags?: string[];
     createdBy?: string;
-  }): GoldenCase {
+  }): Promise<GoldenCase> {
     const goldenCase: Omit<GoldenCase, "id"> = {
       name: input.name,
       description: input.description,
@@ -316,13 +316,13 @@ export class EvalService {
       createdBy: input.createdBy,
     };
 
-    return this.createGoldenCase(goldenCase);
+    return await this.createGoldenCase(goldenCase);
   }
 
   /**
    * T-028.2 Phase 2: Attach reference solution to existing golden case
    */
-  attachReferenceSolution(
+  async attachReferenceSolution(
     goldenCaseId: string,
     referenceSolution: {
       sessionId: string;
@@ -331,14 +331,14 @@ export class EvalService {
       notes?: string;
       expertReviewed?: boolean;
     }
-  ): GoldenCase | null {
-    const goldenCase = this.repo.getGoldenCase(goldenCaseId);
+  ): Promise<GoldenCase | null> {
+    const goldenCase = await this.repo.getGoldenCase(goldenCaseId);
     if (!goldenCase) {
       return null;
     }
 
     // Update golden case with reference solution
-    const updated = this.repo.updateGoldenCase(goldenCaseId, {
+    const updated = await this.repo.updateGoldenCase(goldenCaseId, {
       referenceSolution,
       sourceType: goldenCase.sourceType === "SYNTHETIC" ? "REAL_SUCCESS" : goldenCase.sourceType,
       sourceSessionId: goldenCase.sourceSessionId ?? referenceSolution.sessionId,
@@ -352,7 +352,7 @@ export class EvalService {
    * Runs N trials and aggregates results with pass@k and pass^k metrics
    */
   async runMultiTrialEvaluation(input: RunEvaluationInput): Promise<TrialSetSummary> {
-    const goldenCase = this.repo.getGoldenCase(input.goldenCaseId);
+    const goldenCase = await this.repo.getGoldenCase(input.goldenCaseId);
     if (!goldenCase) {
       throw new Error(`Golden case not found: ${input.goldenCaseId}`);
     }
@@ -441,7 +441,7 @@ export class EvalService {
     };
 
     // Persist eval run
-    return this.repo.createEvalRun(evalRun);
+    return await this.repo.createEvalRun(evalRun);
   }
 
   /**
@@ -570,14 +570,14 @@ export class EvalService {
   /**
    * T-028.2 Phase 3: Calculate saturation metrics for a golden case
    */
-  calculateSaturationMetrics(goldenCaseId: string): import("@sim-corp/schemas").GoldenCaseSaturationMetrics | null {
-    const goldenCase = this.repo.getGoldenCase(goldenCaseId);
+  async calculateSaturationMetrics(goldenCaseId: string): Promise<import("@sim-corp/schemas").GoldenCaseSaturationMetrics | null> {
+    const goldenCase = await this.repo.getGoldenCase(goldenCaseId);
     if (!goldenCase) {
       return null;
     }
 
     // Get all evaluations for this golden case
-    const allEvals = this.repo.listEvalRuns({ goldenCaseId });
+    const allEvals = await this.repo.listEvalRuns({ goldenCaseId });
     if (allEvals.length === 0) {
       // No evaluations yet - return default metrics
       return {
@@ -676,11 +676,11 @@ export class EvalService {
   /**
    * T-028.2 Phase 3: Calculate saturation summary across all golden cases
    */
-  calculateSaturationSummary(): import("@sim-corp/schemas").SaturationSummary {
-    const allGoldenCases = this.repo.listGoldenCases({ archived: false });
-    const metrics = allGoldenCases
-      .map(gc => this.calculateSaturationMetrics(gc.id))
-      .filter(m => m !== null) as import("@sim-corp/schemas").GoldenCaseSaturationMetrics[];
+  async calculateSaturationSummary(): Promise<import("@sim-corp/schemas").SaturationSummary> {
+    const allGoldenCases = await this.repo.listGoldenCases({ archived: false });
+    const metricsPromises = allGoldenCases.map(gc => this.calculateSaturationMetrics(gc.id));
+    const metricsResults = await Promise.all(metricsPromises);
+    const metrics = metricsResults.filter(m => m !== null) as import("@sim-corp/schemas").GoldenCaseSaturationMetrics[];
 
     const totalCases = metrics.length;
     const saturatedCases = metrics.filter(m => m.isSaturated).length;

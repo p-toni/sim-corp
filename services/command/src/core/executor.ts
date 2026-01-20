@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { Database } from "@sim-corp/database";
 import type { Driver } from "@sim-corp/driver-core";
 import {
   type CommandProposal,
@@ -18,11 +18,11 @@ interface AuditLogEntry {
 export interface CommandExecutor {
   executeApprovedCommand(proposalId: string): Promise<CommandExecutionResult>;
   abortCommand(proposalId: string): Promise<CommandExecutionResult>;
-  getExecutionStatus(proposalId: string): CommandProposal | undefined;
+  getExecutionStatus(proposalId: string): Promise<CommandProposal | undefined>;
 }
 
 export interface CommandExecutorOptions {
-  db: Database.Database;
+  db: Database;
   getDriver: (machineId: string) => Promise<Driver>;
 }
 
@@ -35,7 +35,7 @@ export function createCommandExecutor(
     async executeApprovedCommand(
       proposalId: string
     ): Promise<CommandExecutionResult> {
-      const proposal = repo.findById(proposalId);
+      const proposal = await repo.findById(proposalId);
       if (!proposal) {
         throw new Error(`Proposal ${proposalId} not found`);
       }
@@ -59,8 +59,8 @@ export function createCommandExecutor(
           errorCode: "UNSUPPORTED_OPERATION",
         };
 
-        repo.markExecutionCompleted(proposalId, result);
-        addAuditEntry(repo, proposalId, "EXECUTION_FAILED", {
+        await repo.markExecutionCompleted(proposalId, result);
+        await addAuditEntry(repo, proposalId, "EXECUTION_FAILED", {
           error: "Driver does not support write commands",
         });
 
@@ -68,16 +68,16 @@ export function createCommandExecutor(
       }
 
       // Mark execution started
-      repo.markExecutionStarted(proposalId);
-      addAuditEntry(repo, proposalId, "EXECUTION_STARTED", {});
+      await repo.markExecutionStarted(proposalId);
+      await addAuditEntry(repo, proposalId, "EXECUTION_STARTED", {});
 
       try {
         // Execute command via driver
         const result = await driver.writeCommand(proposal.command);
 
         // Mark execution completed
-        repo.markExecutionCompleted(proposalId, result);
-        addAuditEntry(repo, proposalId, "EXECUTION_COMPLETED", {
+        await repo.markExecutionCompleted(proposalId, result);
+        await addAuditEntry(repo, proposalId, "EXECUTION_COMPLETED", {
           result,
         });
 
@@ -93,8 +93,8 @@ export function createCommandExecutor(
           errorCode: "EXECUTION_ERROR",
         };
 
-        repo.markExecutionCompleted(proposalId, result);
-        addAuditEntry(repo, proposalId, "EXECUTION_FAILED", {
+        await repo.markExecutionCompleted(proposalId, result);
+        await addAuditEntry(repo, proposalId, "EXECUTION_FAILED", {
           error: errorMessage,
         });
 
@@ -103,7 +103,7 @@ export function createCommandExecutor(
     },
 
     async abortCommand(proposalId: string): Promise<CommandExecutionResult> {
-      const proposal = repo.findById(proposalId);
+      const proposal = await repo.findById(proposalId);
       if (!proposal) {
         throw new Error(`Proposal ${proposalId} not found`);
       }
@@ -127,7 +127,7 @@ export function createCommandExecutor(
           errorCode: "UNSUPPORTED_OPERATION",
         };
 
-        addAuditEntry(repo, proposalId, "ABORT_FAILED", {
+        await addAuditEntry(repo, proposalId, "ABORT_FAILED", {
           error: "Driver does not support abort",
         });
 
@@ -139,8 +139,8 @@ export function createCommandExecutor(
         const result = await driver.abortCommand(proposal.command.commandId);
 
         // Update proposal status
-        repo.markExecutionCompleted(proposalId, result);
-        addAuditEntry(repo, proposalId, "ABORTED", { result });
+        await repo.markExecutionCompleted(proposalId, result);
+        await addAuditEntry(repo, proposalId, "ABORTED", { result });
 
         return result;
       } catch (error) {
@@ -154,7 +154,7 @@ export function createCommandExecutor(
           errorCode: "ABORT_ERROR",
         };
 
-        addAuditEntry(repo, proposalId, "ABORT_FAILED", {
+        await addAuditEntry(repo, proposalId, "ABORT_FAILED", {
           error: errorMessage,
         });
 
@@ -162,18 +162,18 @@ export function createCommandExecutor(
       }
     },
 
-    getExecutionStatus(proposalId: string): CommandProposal | undefined {
-      return repo.findById(proposalId);
+    async getExecutionStatus(proposalId: string): Promise<CommandProposal | undefined> {
+      return await repo.findById(proposalId);
     },
   };
 }
 
-function addAuditEntry(
+async function addAuditEntry(
   repo: ReturnType<typeof createCommandProposalRepository>,
   proposalId: string,
   eventName: string,
   details: Record<string, any>
-): void {
+): Promise<void> {
   const entry: AuditLogEntry = {
     timestamp: new Date().toISOString(),
     event: eventName,
@@ -184,5 +184,5 @@ function addAuditEntry(
     },
     details,
   };
-  repo.addAuditEntry(proposalId, entry);
+  await repo.addAuditEntry(proposalId, entry);
 }

@@ -7,7 +7,7 @@ import { registerHealthRoutes } from "./routes/health";
 import { registerTelemetryRoutes } from "./routes/telemetry";
 import { registerEventRoutes } from "./routes/events";
 import { registerStreamRoutes } from "./routes/stream";
-import { openDatabase } from "./db/connection";
+import { getDatabase } from "./db/database";
 import { IngestionRepository } from "./db/repo";
 import { Sessionizer } from "./core/sessionizer";
 import { PersistencePipeline } from "./core/persist";
@@ -93,7 +93,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
 
   const telemetryStore = options.telemetryStore ?? new TelemetryStore();
   const eventStore = options.eventStore ?? new EventStore();
-  const db = openDatabase();
+  const db = await getDatabase(undefined, app.log);
   const repo = new IngestionRepository(db);
   const sessionizer = new Sessionizer();
   const opsPublisher = resolveOpsPublisher(options.opsPublisher, app);

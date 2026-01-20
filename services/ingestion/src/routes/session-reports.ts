@@ -12,33 +12,33 @@ export function registerSessionReportRoutes(app: FastifyInstance, deps: SessionR
 
   app.get(
     "/sessions/:sessionId/reports",
-    (
+    async (
       request: FastifyRequest<{
         Params: { sessionId: string };
         Querystring: { limit?: number | string; offset?: number | string };
       }>,
       reply: FastifyReply
     ) => {
-      const session = repo.getSession(request.params.sessionId);
+      const session = await repo.getSession(request.params.sessionId);
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
       if (!ensureOrgAccess(reply, request.actor, session.orgId)) return;
       const limit = toNumber(request.query.limit, 20);
       const offset = toNumber(request.query.offset, 0);
-      return repo.listSessionReports(session.sessionId, limit, offset);
+      return await repo.listSessionReports(session.sessionId, limit, offset);
     }
   );
 
   app.get(
     "/sessions/:sessionId/reports/latest",
-    (request: FastifyRequest<{ Params: { sessionId: string } }>, reply: FastifyReply) => {
-      const session = repo.getSession(request.params.sessionId);
+    async (request: FastifyRequest<{ Params: { sessionId: string } }>, reply: FastifyReply) => {
+      const session = await repo.getSession(request.params.sessionId);
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
       if (!ensureOrgAccess(reply, request.actor, session.orgId)) return;
-      const report = repo.getLatestSessionReport(session.sessionId);
+      const report = await repo.getLatestSessionReport(session.sessionId);
       if (!report) {
         return reply.status(404).send({ error: "Report not found" });
       }
@@ -46,8 +46,8 @@ export function registerSessionReportRoutes(app: FastifyInstance, deps: SessionR
     }
   );
 
-  app.get("/reports/:reportId", (request: FastifyRequest<{ Params: { reportId: string } }>, reply: FastifyReply) => {
-    const report = repo.getSessionReportById(request.params.reportId);
+  app.get("/reports/:reportId", async (request: FastifyRequest<{ Params: { reportId: string } }>, reply: FastifyReply) => {
+    const report = await repo.getSessionReportById(request.params.reportId);
     if (!report) {
       return reply.status(404).send({ error: "Report not found" });
     }
@@ -57,8 +57,8 @@ export function registerSessionReportRoutes(app: FastifyInstance, deps: SessionR
 
   app.post(
     "/sessions/:sessionId/reports",
-    (request: FastifyRequest<{ Params: { sessionId: string }; Body: unknown }>, reply: FastifyReply) => {
-      const session = repo.getSession(request.params.sessionId);
+    async (request: FastifyRequest<{ Params: { sessionId: string }; Body: unknown }>, reply: FastifyReply) => {
+      const session = await repo.getSession(request.params.sessionId);
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
@@ -74,7 +74,7 @@ export function registerSessionReportRoutes(app: FastifyInstance, deps: SessionR
           siteId: session.siteId,
           machineId: session.machineId
         };
-        const { report, created } = repo.createSessionReport(
+        const { report, created } = await repo.createSessionReport(
           session.sessionId,
           reportInput as RoastReport,
           typeof traceId === "string" ? traceId : undefined,

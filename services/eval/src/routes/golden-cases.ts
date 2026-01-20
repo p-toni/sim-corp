@@ -15,9 +15,9 @@ export function registerGoldenCaseRoutes(app: FastifyInstance, deps: GoldenCases
   const { evalService } = deps;
 
   // List golden cases
-  app.get("/golden-cases", (request: FastifyRequest<{ Querystring: GoldenCasesQuery }>) => {
+  app.get("/golden-cases", async (request: FastifyRequest<{ Querystring: GoldenCasesQuery }>) => {
     const { machineId, archived } = request.query;
-    return evalService.listGoldenCases({
+    return await evalService.listGoldenCases({
       machineId,
       archived: archived === "true"
     });
@@ -26,8 +26,8 @@ export function registerGoldenCaseRoutes(app: FastifyInstance, deps: GoldenCases
   // Get golden case by ID
   app.get(
     "/golden-cases/:id",
-    (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const goldenCase = evalService.getGoldenCase(request.params.id);
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const goldenCase = await evalService.getGoldenCase(request.params.id);
       if (!goldenCase) {
         return reply.status(404).send({ error: "Golden case not found" });
       }
@@ -39,7 +39,7 @@ export function registerGoldenCaseRoutes(app: FastifyInstance, deps: GoldenCases
   app.post("/golden-cases", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const parsed = GoldenCaseSchema.omit({ id: true }).parse(request.body);
-      const created = evalService.createGoldenCase(parsed);
+      const created = await evalService.createGoldenCase(parsed);
       return reply.status(201).send(created);
     } catch (err) {
       return reply.status(400).send({ error: "Invalid golden case data", details: err });
@@ -52,7 +52,7 @@ export function registerGoldenCaseRoutes(app: FastifyInstance, deps: GoldenCases
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const body = request.body as any;
-        const created = evalService.createGoldenCaseFromSuccess(body);
+        const created = await evalService.createGoldenCaseFromSuccess(body);
         return reply.status(201).send(created);
       } catch (err) {
         return reply.status(400).send({
@@ -69,7 +69,7 @@ export function registerGoldenCaseRoutes(app: FastifyInstance, deps: GoldenCases
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const body = request.body as any;
-        const created = evalService.createGoldenCaseFromFailure(body);
+        const created = await evalService.createGoldenCaseFromFailure(body);
         return reply.status(201).send(created);
       } catch (err) {
         return reply.status(400).send({
@@ -97,7 +97,7 @@ export function registerGoldenCaseRoutes(app: FastifyInstance, deps: GoldenCases
       reply: FastifyReply
     ) => {
       try {
-        const updated = evalService.attachReferenceSolution(
+        const updated = await evalService.attachReferenceSolution(
           request.params.id,
           request.body
         );
