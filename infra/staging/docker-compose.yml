@@ -1,0 +1,428 @@
+version: "3.9"
+
+# Sim-Corp Staging Stack
+# Local testing environment with all services running in Docker
+# Uses SQLite for simplicity - no PostgreSQL required
+
+services:
+  # ============================================================================
+  # Infrastructure
+  # ============================================================================
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: sim-mosquitto-staging
+    restart: unless-stopped
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    networks:
+      - sim-staging
+
+  # ============================================================================
+  # Core Services
+  # ============================================================================
+
+  company-kernel:
+    build:
+      context: ../../
+      dockerfile: services/company-kernel/Dockerfile
+    image: simcorp/company-kernel:staging
+    container_name: sim-company-kernel-staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      PORT: 3000
+      DATABASE_TYPE: sqlite
+      KERNEL_DB_PATH: /app/var/kernel/kernel.db
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    volumes:
+      - kernel-data:/app/var/kernel
+    ports:
+      - "3000:3000"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "--timeout=3", "http://localhost:3000/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sim-staging
+
+  ingestion:
+    build:
+      context: ../../
+      dockerfile: services/ingestion/Dockerfile
+    image: simcorp/ingestion:staging
+    container_name: sim-ingestion-staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      PORT: 4001
+      DATABASE_TYPE: sqlite
+      INGESTION_DB_PATH: /app/var/ingestion/ingestion.db
+      INGESTION_MQTT_URL: mqtt://mosquitto:1883
+      INGESTION_MQTT_CLIENT_ID: ingestion-staging
+      INGESTION_KERNEL_URL: http://company-kernel:3000
+      INGESTION_OPS_EVENTS_ENABLED: "true"
+      INGESTION_OPS_MQTT_URL: mqtt://mosquitto:1883
+      INGESTION_KERNEL_ENQUEUE_FALLBACK_ENABLED: "true"
+      AUTO_REPORT_MISSIONS_ENABLED: "true"
+      AUTO_EVAL_ENABLED: ${AUTO_EVAL_ENABLED:-true}
+      EVAL_SERVICE_URL: http://eval:4007
+      COMMAND_SERVICE_URL: http://command:3004
+      AUTH_MODE: ${AUTH_MODE:-none}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    volumes:
+      - ingestion-data:/app/var/ingestion
+    ports:
+      - "4001:4001"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      company-kernel:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "--timeout=3", "http://localhost:4001/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sim-staging
+
+  command:
+    build:
+      context: ../../
+      dockerfile: services/command/Dockerfile
+    image: simcorp/command:staging
+    container_name: sim-command-staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      PORT: 3004
+      DATABASE_TYPE: sqlite
+      COMMAND_DB_PATH: /app/var/command/command.db
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    volumes:
+      - command-data:/app/var/command
+    ports:
+      - "3004:3004"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "--timeout=3", "http://localhost:3004/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sim-staging
+
+  eval:
+    build:
+      context: ../../
+      dockerfile: services/eval/Dockerfile
+    image: simcorp/eval:staging
+    container_name: sim-eval-staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      PORT: 4007
+      DATABASE_TYPE: sqlite
+      EVAL_DB_PATH: /app/var/eval/eval.db
+      LM_JUDGE_ENABLED: ${LM_JUDGE_ENABLED:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LM_JUDGE_MODEL: ${LM_JUDGE_MODEL:-claude-3-5-sonnet-20241022}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    volumes:
+      - eval-data:/app/var/eval
+    ports:
+      - "4007:4007"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "--timeout=3", "http://localhost:4007/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sim-staging
+
+  governance:
+    build:
+      context: ../../
+      dockerfile: services/governance/Dockerfile
+    image: simcorp/governance:staging
+    container_name: sim-governance-staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      PORT: 4009
+      DATABASE_TYPE: sqlite
+      GOVERNANCE_DB_PATH: /app/var/governance/governance.db
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    volumes:
+      - governance-data:/app/var/governance
+    ports:
+      - "4009:4009"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "--timeout=3", "http://localhost:4009/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sim-staging
+
+  # ============================================================================
+  # Processing Services
+  # ============================================================================
+
+  sim-twin:
+    build:
+      context: ../../
+      dockerfile: services/sim-twin/Dockerfile
+    image: simcorp/sim-twin:staging
+    container_name: sim-twin-staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      PORT: 4002
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    ports:
+      - "4002:4002"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "--timeout=3", "http://localhost:4002/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sim-staging
+
+  analytics:
+    build:
+      context: ../../
+      dockerfile: services/analytics/Dockerfile
+    image: simcorp/analytics:staging
+    container_name: sim-analytics-staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      PORT: 4006
+      ANALYTICS_PORT: 4006
+      INGESTION_URL: http://ingestion:4001
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    ports:
+      - "4006:4006"
+    depends_on:
+      ingestion:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "--timeout=3", "http://localhost:4006/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sim-staging
+
+  event-inference:
+    build:
+      context: ../../
+      dockerfile: services/event-inference/Dockerfile
+    image: simcorp/event-inference:staging
+    container_name: sim-event-inference-staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      PORT: 4005
+      EVENT_INFERENCE_PORT: 4005
+      DATABASE_TYPE: sqlite
+      EVENT_INFERENCE_DB_PATH: /app/var/event-inference/config.db
+      MQTT_URL: mqtt://mosquitto:1883
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    volumes:
+      - event-inference-data:/app/var/event-inference
+    ports:
+      - "4005:4005"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "--timeout=3", "http://localhost:4005/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sim-staging
+
+  # ============================================================================
+  # Publishing & Integration
+  # ============================================================================
+
+  sim-publisher:
+    build:
+      context: ../../
+      dockerfile: services/sim-publisher/Dockerfile
+    image: simcorp/sim-publisher:staging
+    container_name: sim-publisher-staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      PORT: 4003
+      MQTT_URL: mqtt://mosquitto:1883
+      SIM_TWIN_URL: http://sim-twin:4002
+      DEVICE_KEYSTORE_PATH: /app/var/device-keys
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    volumes:
+      - device-keys:/app/var/device-keys
+    ports:
+      - "4003:4003"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      sim-twin:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "--timeout=3", "http://localhost:4003/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sim-staging
+
+  driver-bridge:
+    build:
+      context: ../../
+      dockerfile: services/driver-bridge/Dockerfile
+    image: simcorp/driver-bridge:staging
+    container_name: sim-driver-bridge-staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      PORT: 4004
+      MQTT_URL: mqtt://mosquitto:1883
+      DRIVER_TYPE: ${DRIVER_TYPE:-fake}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    ports:
+      - "4004:4004"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "--timeout=3", "http://localhost:4004/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sim-staging
+
+  # ============================================================================
+  # Workers & Automation
+  # ============================================================================
+
+  report-worker:
+    build:
+      context: ../../
+      dockerfile: services/report-worker/Dockerfile
+    image: simcorp/report-worker:staging
+    container_name: sim-report-worker-staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      PORT: 4008
+      REPORT_WORKER_PORT: 4008
+      KERNEL_URL: http://company-kernel:3000
+      INGESTION_URL: http://ingestion:4001
+      ANALYTICS_URL: http://analytics:4006
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    ports:
+      - "4008:4008"
+    depends_on:
+      company-kernel:
+        condition: service_healthy
+      ingestion:
+        condition: service_healthy
+      analytics:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "--timeout=3", "http://localhost:4008/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sim-staging
+
+  dispatcher:
+    build:
+      context: ../../
+      dockerfile: services/dispatcher/Dockerfile
+    image: simcorp/dispatcher:staging
+    container_name: sim-dispatcher-staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      PORT: 4010
+      DISPATCHER_PORT: 4010
+      DISPATCHER_MQTT_URL: mqtt://mosquitto:1883
+      KERNEL_URL: http://company-kernel:3000
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    ports:
+      - "4010:4010"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      company-kernel:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "--timeout=3", "http://localhost:4010/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sim-staging
+
+# ============================================================================
+# Volumes (Persistent Data)
+# ============================================================================
+volumes:
+  mosquitto-data:
+    driver: local
+  kernel-data:
+    driver: local
+  ingestion-data:
+    driver: local
+  command-data:
+    driver: local
+  eval-data:
+    driver: local
+  governance-data:
+    driver: local
+  event-inference-data:
+    driver: local
+  device-keys:
+    driver: local
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  sim-staging:
+    name: sim-staging
+    driver: bridge
