@@ -85,6 +85,14 @@ main() {
     log "Daily: $DAILY_BACKUP (time: $DAILY_TIME)"
     log "Weekly: $WEEKLY_BACKUP (day: $WEEKLY_DAY, time: $WEEKLY_TIME)"
 
+    # Start metrics exporter in background
+    if [ "${METRICS_ENABLED:-true}" = "true" ]; then
+        log "Starting metrics exporter on port ${METRICS_PORT:-9101}..."
+        /usr/local/bin/metrics-exporter &
+        METRICS_PID=$!
+        log "Metrics exporter started (PID: $METRICS_PID)"
+    fi
+
     # Wait for PostgreSQL to be ready
     log "Waiting for PostgreSQL..."
     while ! pg_isready -h "${POSTGRES_HOST:-postgres}" -p "${POSTGRES_PORT:-5432}" -U "${POSTGRES_USER:-simcorp}"; do

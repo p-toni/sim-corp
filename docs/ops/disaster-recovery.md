@@ -29,6 +29,12 @@ The backup service runs continuously in production and performs:
    - Full backup for compliance
    - Extended retention
 
+4. **Continuous WAL Archiving**
+   - Write-Ahead Log (WAL) segments archived every 5 minutes
+   - Enables Point-in-Time Recovery (PITR)
+   - Achieves <15 minute RPO target
+   - Stored alongside full backups (local/S3/GCS)
+
 ### Backup Components
 
 - **Backup Scripts:** `/infra/backup/*.sh`
@@ -36,6 +42,9 @@ The backup service runs continuously in production and performs:
   - `restore.sh` - Restore script
   - `verify-backup.sh` - Verification script
   - `scheduler.sh` - Backup scheduler
+  - `wal-archive.sh` - WAL archiving for PITR
+  - `pitr-restore.sh` - Point-in-time recovery
+  - `postgres-wal-config.sh` - PostgreSQL WAL configuration
 
 - **Backup Service:** Docker container (`sim-backup-prod`)
   - Runs continuously
@@ -318,6 +327,94 @@ simcorp_full_20260110_143000.sql.gz.meta     # Metadata
 
 ---
 
+### Scenario 5: Point-in-Time Recovery (PITR)
+
+**Symptoms:**
+- Need to restore to a specific moment in time
+- Bad transaction executed at known time
+- Data corruption detected at specific timestamp
+- Want to recover just before a mistake
+
+**Recovery Steps:**
+
+1. **Identify target recovery time:**
+   ```bash
+   # Example: Restore to 2:35 PM on Jan 15, 2026 (5 minutes before bad transaction)
+   TARGET_TIME='2026-01-15 14:35:00'
+   ```
+
+2. **Find base backup before target time:**
+   ```bash
+   docker-compose exec backup ls -lh /backups/simcorp_full_*.sql.gz
+   # Choose a backup from BEFORE the target time
+   BASE_BACKUP=simcorp_full_20260115_140000.sql.gz  # 2:00 PM backup
+   ```
+
+3. **Stop all services:**
+   ```bash
+   cd infra/production
+   docker-compose down
+   ```
+
+4. **Verify WAL archives are available:**
+   ```bash
+   docker-compose up -d backup
+   docker-compose exec backup ls -lh /backups/wal/
+
+   # Or check remote storage
+   aws s3 ls s3://${S3_BUCKET}/wal/
+   gsutil ls gs://${GCS_BUCKET}/wal/
+   ```
+
+5. **Perform PITR restore:**
+   ```bash
+   docker-compose exec backup bash
+   export BASE_BACKUP_FILE=simcorp_full_20260115_140000.sql.gz
+   export TARGET_TIME='2026-01-15 14:35:00'
+   export FORCE_PITR_RESTORE=true
+   /usr/local/bin/pitr-restore
+   ```
+
+6. **Wait for WAL replay:**
+   The script will:
+   - Restore the base backup
+   - Download all WAL archives
+   - Configure PostgreSQL for recovery
+   - Replay WAL files up to target time
+   - Promote database when target reached
+
+7. **Verify recovery point:**
+   ```bash
+   docker-compose exec postgres psql -U simcorp -d simcorp -c "
+   SELECT pg_last_wal_replay_lsn(), pg_last_xact_replay_timestamp();
+   "
+   ```
+
+8. **Check data at recovery point:**
+   ```bash
+   # Verify the bad transaction is NOT present
+   docker-compose exec postgres psql -U simcorp -d simcorp -c "
+   SELECT * FROM missions WHERE id = 'bad-transaction-id';
+   "
+   ```
+
+9. **Restart services:**
+   ```bash
+   docker-compose up -d
+   ```
+
+10. **Verify full stack:**
+    ```bash
+    docker-compose ps
+    curl http://localhost:3000/ready
+    ```
+
+**Expected Recovery Time:** 30-60 minutes
+
+**RPO (Recovery Point Objective):** <15 minutes (based on 5-minute WAL archiving)
+
+---
+
 ## Backup Verification
 
 ### Manual Verification
@@ -381,18 +478,56 @@ Add to cron or scheduled task:
 - `AWS_SECRET_ACCESS_KEY` - AWS secret key (required for S3)
 - `AWS_DEFAULT_REGION` - AWS region (default: `us-east-1`)
 
+### WAL Archiving Configuration
+
+To enable WAL archiving on PostgreSQL for PITR:
+
+**Option 1: Manual Configuration**
+```bash
+# On PostgreSQL host, run the configuration script
+docker-compose exec postgres bash
+/usr/local/bin/postgres-wal-config.sh
+# Restart PostgreSQL
+pg_ctl restart -D /var/lib/postgresql/data
+```
+
+**Option 2: Add to docker-compose.yml**
+```yaml
+postgres:
+  volumes:
+    - ../backup/postgres-wal-config.sh:/docker-entrypoint-initdb.d/10-wal-config.sh:ro
+```
+
+**PostgreSQL WAL Settings:**
+- `wal_level = replica` - Enable WAL archiving
+- `archive_mode = on` - Turn on archiving
+- `archive_command = '/usr/local/bin/wal-archive %p %f'` - Archive command
+- `archive_timeout = 300` - Force WAL switch every 5 minutes
+
+This configuration ensures:
+- WAL segments are archived every 5 minutes maximum
+- RPO of <15 minutes is achieved
+- PITR is possible to any point within WAL retention
+
 ### Example Configurations
 
-**Production with S3:**
+**Production with S3 and PITR:**
 ```env
+# Backup service settings
 BACKUP_STORAGE=s3
 S3_BUCKET=sim-corp-backups-prod
 AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=secret...
 AWS_DEFAULT_REGION=us-east-1
-BACKUP_ENCRYPTION=true
-BACKUP_ENCRYPTION_KEY=strong-passphrase-here
+ENCRYPTION=true
+ENCRYPTION_KEY=strong-passphrase-here
 RETENTION_DAYS=90
+
+# WAL archiving (enables PITR)
+WAL_ARCHIVE_ENABLED=true
+
+# PostgreSQL settings (set in postgres container)
+POSTGRES_ENABLE_WAL_ARCHIVING=true
 ```
 
 **Production with GCS:**
