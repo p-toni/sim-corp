@@ -2,23 +2,24 @@
  * Readiness assessment routes
  */
 
+import type { Database } from '@sim-corp/database';
 import type { FastifyInstance } from 'fastify';
 import { ReadinessReportSchema } from '@sim-corp/schemas/kernel/governance';
 import { createReadinessAssessor } from '../readiness/assessor.js';
 import { createMetricsCollector } from '../metrics/collector.js';
 import { GovernanceStateRepo, ReadinessAssessmentsRepo } from '../db/repo.js';
 
-export async function readinessRoutes(fastify: FastifyInstance) {
-  const collector = createMetricsCollector();
-  const stateRepo = new GovernanceStateRepo();
-  const assessmentsRepo = new ReadinessAssessmentsRepo();
+export async function readinessRoutes(fastify: FastifyInstance, db: Database) {
+  const collector = await createMetricsCollector();
+  const stateRepo = new GovernanceStateRepo(db);
+  const assessmentsRepo = new ReadinessAssessmentsRepo(db);
 
   /**
    * GET /readiness/current - Get current readiness assessment
    */
   fastify.get('/readiness/current', async (request, reply) => {
     // Get current governance state
-    const state = stateRepo.getState();
+    const state = await stateRepo.getState();
     if (!state) {
       return reply.code(500).send({ error: 'Governance state not initialized' });
     }
@@ -43,7 +44,7 @@ export async function readinessRoutes(fastify: FastifyInstance) {
     const report = await assessor.assess();
 
     // Save assessment
-    assessmentsRepo.save(report);
+    await assessmentsRepo.save(report);
 
     return report;
   });
@@ -52,7 +53,7 @@ export async function readinessRoutes(fastify: FastifyInstance) {
    * GET /readiness/latest - Get latest saved assessment
    */
   fastify.get('/readiness/latest', async (request, reply) => {
-    const latest = assessmentsRepo.getLatest();
+    const latest = await assessmentsRepo.getLatest();
     return latest;
   });
 
@@ -71,14 +72,20 @@ export async function readinessRoutes(fastify: FastifyInstance) {
             threshold: { type: 'number' },
           },
         },
+        500: {
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
+          },
+        },
       },
     },
   }, async (request, reply) => {
-    const latest = assessmentsRepo.getLatest();
+    const latest = await assessmentsRepo.getLatest();
 
     if (!latest) {
       // Run fresh assessment if none exists
-      const state = stateRepo.getState();
+      const state = await stateRepo.getState();
       if (!state) {
         return reply.code(500).send({ error: 'Governance state not initialized' });
       }
@@ -98,7 +105,7 @@ export async function readinessRoutes(fastify: FastifyInstance) {
       );
 
       const report = await assessor.assess();
-      assessmentsRepo.save(report);
+      await assessmentsRepo.save(report);
 
       return {
         score: report.overall.score,

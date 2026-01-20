@@ -2,22 +2,23 @@
  * Governance agent routes
  */
 
+import type { Database } from '@sim-corp/database';
 import type { FastifyInstance } from 'fastify';
 import { AutonomyGovernanceAgent } from '../agent/governance-agent.js';
 import { GovernanceReportsRepo, GovernanceStateRepo, ScopeExpansionProposalsRepo } from '../db/repo.js';
 
-export async function governanceRoutes(fastify: FastifyInstance) {
-  const reportsRepo = new GovernanceReportsRepo();
-  const stateRepo = new GovernanceStateRepo();
-  const proposalsRepo = new ScopeExpansionProposalsRepo();
+export async function governanceRoutes(fastify: FastifyInstance, db: Database) {
+  const reportsRepo = new GovernanceReportsRepo(db);
+  const stateRepo = new GovernanceStateRepo(db);
+  const proposalsRepo = new ScopeExpansionProposalsRepo(db);
 
   /**
    * POST /governance/run-cycle - Run weekly governance cycle
    */
   fastify.post('/governance/run-cycle', async (request, reply) => {
-    const agent = new AutonomyGovernanceAgent();
+    const agent = new AutonomyGovernanceAgent(db);
     const report = await agent.runWeeklyCycle();
-    agent.close();
+    await agent.close();
 
     return report;
   });
@@ -27,7 +28,7 @@ export async function governanceRoutes(fastify: FastifyInstance) {
    */
   fastify.get('/governance/reports', async (request, reply) => {
     const { limit = 10 } = request.query as { limit?: number };
-    const reports = reportsRepo.getAll(limit);
+    const reports = await reportsRepo.getAll(limit);
     return reports;
   });
 
@@ -35,7 +36,7 @@ export async function governanceRoutes(fastify: FastifyInstance) {
    * GET /governance/reports/latest - Get latest report
    */
   fastify.get('/governance/reports/latest', async (request, reply) => {
-    const report = reportsRepo.getLatest();
+    const report = await reportsRepo.getLatest();
     return report;
   });
 
@@ -44,7 +45,7 @@ export async function governanceRoutes(fastify: FastifyInstance) {
    */
   fastify.get<{ Params: { id: string } }>('/governance/reports/:id', async (request, reply) => {
     const { id } = request.params;
-    const report = reportsRepo.getById(id);
+    const report = await reportsRepo.getById(id);
     return report;
   });
 
@@ -63,10 +64,16 @@ export async function governanceRoutes(fastify: FastifyInstance) {
             daysSincePhaseStart: { type: 'number' },
           },
         },
+        404: {
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
+          },
+        },
       },
     },
   }, async (request, reply) => {
-    const state = stateRepo.getState();
+    const state = await stateRepo.getState();
     if (!state) {
       return reply.code(404).send({ error: 'Governance state not found' });
     }
@@ -87,7 +94,7 @@ export async function governanceRoutes(fastify: FastifyInstance) {
    * GET /governance/proposals - Get scope expansion proposals
    */
   fastify.get('/governance/proposals', async (request, reply) => {
-    const proposals = proposalsRepo.getPending();
+    const proposals = await proposalsRepo.getPending();
     return proposals;
   });
 
@@ -115,7 +122,7 @@ export async function governanceRoutes(fastify: FastifyInstance) {
     const { id } = request.params;
     const { approvedBy } = request.body;
 
-    proposalsRepo.approve(id, approvedBy);
+    await proposalsRepo.approve(id, approvedBy);
 
     // TODO: Update governance state with new whitelist
 
@@ -138,7 +145,7 @@ export async function governanceRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     const { id } = request.params;
 
-    proposalsRepo.reject(id);
+    await proposalsRepo.reject(id);
 
     return { success: true, id };
   });

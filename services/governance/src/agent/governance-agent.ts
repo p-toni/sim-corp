@@ -9,6 +9,7 @@
  * - Monitor circuit breaker events
  */
 
+import type { Database } from '@sim-corp/database';
 import type {
   GovernanceReport,
   AutonomyMetrics,
@@ -17,7 +18,7 @@ import type {
   Recommendation,
   Action,
 } from '@sim-corp/schemas/kernel/governance';
-import { createMetricsCollector } from '../metrics/collector.js';
+import { createMetricsCollector, type MetricsCollector } from '../metrics/collector.js';
 import { createReadinessAssessor } from '../readiness/assessor.js';
 import { generateScopeExpansionProposal } from './proposal-generator.js';
 import {
@@ -29,18 +30,17 @@ import {
 import { randomUUID } from 'crypto';
 
 export class AutonomyGovernanceAgent {
-  private metricsCollector: ReturnType<typeof createMetricsCollector>;
+  private metricsCollector: MetricsCollector | null = null;
   private stateRepo: GovernanceStateRepo;
   private reportsRepo: GovernanceReportsRepo;
   private eventsRepo: CircuitBreakerEventsRepo;
   private proposalsRepo: ScopeExpansionProposalsRepo;
 
-  constructor() {
-    this.metricsCollector = createMetricsCollector();
-    this.stateRepo = new GovernanceStateRepo();
-    this.reportsRepo = new GovernanceReportsRepo();
-    this.eventsRepo = new CircuitBreakerEventsRepo();
-    this.proposalsRepo = new ScopeExpansionProposalsRepo();
+  constructor(db: Database) {
+    this.stateRepo = new GovernanceStateRepo(db);
+    this.reportsRepo = new GovernanceReportsRepo(db);
+    this.eventsRepo = new CircuitBreakerEventsRepo(db);
+    this.proposalsRepo = new ScopeExpansionProposalsRepo(db);
   }
 
   /**
@@ -48,6 +48,11 @@ export class AutonomyGovernanceAgent {
    */
   async runWeeklyCycle(): Promise<GovernanceReport> {
     console.log('[GovernanceAgent] Starting weekly governance cycle');
+
+    // Initialize metrics collector if needed
+    if (!this.metricsCollector) {
+      this.metricsCollector = await createMetricsCollector();
+    }
 
     // 1. Collect metrics
     const metrics = await this.collectMetrics();
@@ -58,7 +63,7 @@ export class AutonomyGovernanceAgent {
     console.log(`[GovernanceAgent] Readiness assessed: ${(readiness.overall.score * 100).toFixed(1)}%, ready=${readiness.overall.ready}`);
 
     // 3. Get circuit breaker events
-    const circuitBreakerEvents = this.eventsRepo.getRecent(10);
+    const circuitBreakerEvents = await this.eventsRepo.getRecent(10);
     console.log(`[GovernanceAgent] Circuit breaker events: ${circuitBreakerEvents.length} recent events`);
 
     // 4. Decide on scope expansion
@@ -74,10 +79,10 @@ export class AutonomyGovernanceAgent {
     console.log(`[GovernanceAgent] Report generated: ${report.id}`);
 
     // 6. Save report
-    this.reportsRepo.save(report);
+    await this.reportsRepo.save(report);
 
     // 7. Update state
-    this.stateRepo.updateState({
+    await this.stateRepo.updateState({
       lastReportDate: new Date(),
     });
 
@@ -90,6 +95,10 @@ export class AutonomyGovernanceAgent {
    * Collect autonomy metrics for the past week
    */
   private async collectMetrics(): Promise<AutonomyMetrics> {
+    if (!this.metricsCollector) {
+      throw new Error('Metrics collector not initialized');
+    }
+
     const end = new Date();
     const start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
 
@@ -100,7 +109,7 @@ export class AutonomyGovernanceAgent {
    * Assess readiness for autonomy expansion
    */
   private async assessReadiness(metrics: AutonomyMetrics): Promise<ReadinessReport> {
-    const state = this.stateRepo.getState();
+    const state = await this.stateRepo.getState();
     if (!state) {
       throw new Error('Governance state not initialized');
     }
@@ -133,14 +142,14 @@ export class AutonomyGovernanceAgent {
     }
 
     // Don't propose if there are recent unresolved circuit breaker events
-    const unresolvedEvents = this.eventsRepo.getUnresolved();
+    const unresolvedEvents = await this.eventsRepo.getUnresolved();
     if (unresolvedEvents.length > 0) {
       console.log(`[GovernanceAgent] ${unresolvedEvents.length} unresolved circuit breaker events, not proposing expansion`);
       return undefined;
     }
 
     // Don't propose if there's already a pending proposal
-    const pendingProposals = this.proposalsRepo.getPending();
+    const pendingProposals = await this.proposalsRepo.getPending();
     if (pendingProposals.length > 0) {
       console.log('[GovernanceAgent] Pending proposal already exists, not proposing new expansion');
       return undefined;
@@ -154,10 +163,10 @@ export class AutonomyGovernanceAgent {
     });
 
     // Save proposal
-    this.proposalsRepo.save(proposal);
+    await this.proposalsRepo.save(proposal);
 
     // Update state
-    this.stateRepo.updateState({
+    await this.stateRepo.updateState({
       lastExpansionDate: new Date(),
     });
 
@@ -295,7 +304,9 @@ export class AutonomyGovernanceAgent {
   /**
    * Close database connections
    */
-  close(): void {
-    this.metricsCollector.close();
+  async close(): Promise<void> {
+    if (this.metricsCollector) {
+      await this.metricsCollector.close();
+    }
   }
 }

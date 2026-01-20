@@ -1,8 +1,9 @@
 /**
  * Repository for governance data access
+ * Uses async database abstraction layer
  */
 
-import { db } from './connection.js';
+import type { Database } from '@sim-corp/database';
 import type {
   GovernanceState,
   GovernanceReport,
@@ -17,10 +18,13 @@ import type {
  * Governance state repository (singleton)
  */
 export class GovernanceStateRepo {
-  getState(): GovernanceState | null {
-    const row = db.prepare('SELECT * FROM governance_state WHERE id = 1').get() as any;
-    if (!row) return null;
+  constructor(private db: Database) {}
 
+  async getState(): Promise<GovernanceState | null> {
+    const result = await this.db.query('SELECT * FROM governance_state WHERE id = 1');
+    if (result.rows.length === 0) return null;
+
+    const row: any = result.rows[0];
     return {
       currentPhase: row.current_phase,
       phaseStartDate: new Date(row.phase_start_date),
@@ -30,39 +34,43 @@ export class GovernanceStateRepo {
     };
   }
 
-  updateState(state: Partial<GovernanceState>): void {
+  async updateState(state: Partial<GovernanceState>): Promise<void> {
     const updates: string[] = [];
-    const params: any = {};
+    const params: any[] = [];
 
     if (state.currentPhase !== undefined) {
-      updates.push('current_phase = @currentPhase');
-      params.currentPhase = state.currentPhase;
+      updates.push('current_phase = ?');
+      params.push(state.currentPhase);
     }
 
     if (state.phaseStartDate !== undefined) {
-      updates.push('phase_start_date = @phaseStartDate');
-      params.phaseStartDate = state.phaseStartDate.toISOString();
+      updates.push('phase_start_date = ?');
+      params.push(state.phaseStartDate.toISOString());
     }
 
     if (state.commandWhitelist !== undefined) {
-      updates.push('command_whitelist = @commandWhitelist');
-      params.commandWhitelist = JSON.stringify(state.commandWhitelist);
+      updates.push('command_whitelist = ?');
+      params.push(JSON.stringify(state.commandWhitelist));
     }
 
     if (state.lastReportDate !== undefined) {
-      updates.push('last_report_date = @lastReportDate');
-      params.lastReportDate = state.lastReportDate.toISOString();
+      updates.push('last_report_date = ?');
+      params.push(state.lastReportDate.toISOString());
     }
 
     if (state.lastExpansionDate !== undefined) {
-      updates.push('last_expansion_date = @lastExpansionDate');
-      params.lastExpansionDate = state.lastExpansionDate.toISOString();
+      updates.push('last_expansion_date = ?');
+      params.push(state.lastExpansionDate.toISOString());
     }
 
-    updates.push("updated_at = datetime('now')");
+    if (this.db.type === 'sqlite') {
+      updates.push("updated_at = datetime('now')");
+    } else {
+      updates.push('updated_at = NOW()');
+    }
 
     const sql = `UPDATE governance_state SET ${updates.join(', ')} WHERE id = 1`;
-    db.prepare(sql).run(params);
+    await this.db.exec(sql, params);
   }
 }
 
@@ -70,49 +78,50 @@ export class GovernanceStateRepo {
  * Governance reports repository
  */
 export class GovernanceReportsRepo {
-  save(report: GovernanceReport): void {
-    db.prepare(`
+  constructor(private db: Database) {}
+
+  async save(report: GovernanceReport): Promise<void> {
+    await this.db.exec(
+      `
       INSERT INTO governance_reports (
         id, week_start, week_end, generated_at,
         metrics, readiness, expansion, circuit_breaker_events,
         summary, recommendations, next_actions
-      ) VALUES (
-        @id, @weekStart, @weekEnd, @generatedAt,
-        @metrics, @readiness, @expansion, @circuitBreakerEvents,
-        @summary, @recommendations, @nextActions
-      )
-    `).run({
-      id: report.id,
-      weekStart: report.weekStart.toISOString(),
-      weekEnd: report.weekEnd.toISOString(),
-      generatedAt: report.generatedAt.toISOString(),
-      metrics: JSON.stringify(report.metrics),
-      readiness: JSON.stringify(report.readiness),
-      expansion: report.expansion ? JSON.stringify(report.expansion) : null,
-      circuitBreakerEvents: JSON.stringify(report.circuitBreakerEvents),
-      summary: report.summary,
-      recommendations: JSON.stringify(report.recommendations),
-      nextActions: JSON.stringify(report.nextActions),
-    });
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+      [
+        report.id,
+        report.weekStart.toISOString(),
+        report.weekEnd.toISOString(),
+        report.generatedAt.toISOString(),
+        JSON.stringify(report.metrics),
+        JSON.stringify(report.readiness),
+        report.expansion ? JSON.stringify(report.expansion) : null,
+        JSON.stringify(report.circuitBreakerEvents),
+        report.summary,
+        JSON.stringify(report.recommendations),
+        JSON.stringify(report.nextActions),
+      ]
+    );
   }
 
-  getById(id: string): GovernanceReport | null {
-    const row = db.prepare('SELECT * FROM governance_reports WHERE id = ?').get(id) as any;
-    if (!row) return null;
+  async getById(id: string): Promise<GovernanceReport | null> {
+    const result = await this.db.query('SELECT * FROM governance_reports WHERE id = ?', [id]);
+    if (result.rows.length === 0) return null;
 
-    return this.rowToReport(row);
+    return this.rowToReport(result.rows[0]);
   }
 
-  getLatest(): GovernanceReport | null {
-    const row = db.prepare('SELECT * FROM governance_reports ORDER BY week_end DESC LIMIT 1').get() as any;
-    if (!row) return null;
+  async getLatest(): Promise<GovernanceReport | null> {
+    const result = await this.db.query('SELECT * FROM governance_reports ORDER BY week_end DESC LIMIT 1');
+    if (result.rows.length === 0) return null;
 
-    return this.rowToReport(row);
+    return this.rowToReport(result.rows[0]);
   }
 
-  getAll(limit = 10): GovernanceReport[] {
-    const rows = db.prepare('SELECT * FROM governance_reports ORDER BY week_end DESC LIMIT ?').all(limit) as any[];
-    return rows.map(row => this.rowToReport(row));
+  async getAll(limit = 10): Promise<GovernanceReport[]> {
+    const result = await this.db.query('SELECT * FROM governance_reports ORDER BY week_end DESC LIMIT ?', [limit]);
+    return result.rows.map(row => this.rowToReport(row));
   }
 
   private rowToReport(row: any): GovernanceReport {
@@ -136,51 +145,58 @@ export class GovernanceReportsRepo {
  * Circuit breaker events repository
  */
 export class CircuitBreakerEventsRepo {
-  save(event: CircuitBreakerEvent): void {
-    db.prepare(`
+  constructor(private db: Database) {}
+
+  async save(event: CircuitBreakerEvent): Promise<void> {
+    await this.db.exec(
+      `
       INSERT INTO circuit_breaker_events (
         id, timestamp, rule, metrics, action, details, resolved, resolved_at
-      ) VALUES (
-        @id, @timestamp, @rule, @metrics, @action, @details, @resolved, @resolvedAt
-      )
-    `).run({
-      id: event.id,
-      timestamp: event.timestamp.toISOString(),
-      rule: JSON.stringify(event.rule),
-      metrics: JSON.stringify(event.metrics),
-      action: event.action,
-      details: event.details,
-      resolved: event.resolved ? 1 : 0,
-      resolvedAt: event.resolvedAt ? event.resolvedAt.toISOString() : null,
-    });
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+      [
+        event.id,
+        event.timestamp.toISOString(),
+        JSON.stringify(event.rule),
+        JSON.stringify(event.metrics),
+        event.action,
+        event.details,
+        event.resolved ? 1 : 0,
+        event.resolvedAt ? event.resolvedAt.toISOString() : null,
+      ]
+    );
   }
 
-  resolve(id: string): void {
-    db.prepare(`
-      UPDATE circuit_breaker_events
-      SET resolved = 1, resolved_at = datetime('now')
-      WHERE id = ?
-    `).run(id);
+  async resolve(id: string): Promise<void> {
+    const sql =
+      this.db.type === 'sqlite'
+        ? `UPDATE circuit_breaker_events SET resolved = 1, resolved_at = datetime('now') WHERE id = ?`
+        : `UPDATE circuit_breaker_events SET resolved = 1, resolved_at = NOW() WHERE id = ?`;
+
+    await this.db.exec(sql, [id]);
   }
 
-  getUnresolved(): CircuitBreakerEvent[] {
-    const rows = db.prepare(`
+  async getUnresolved(): Promise<CircuitBreakerEvent[]> {
+    const result = await this.db.query(`
       SELECT * FROM circuit_breaker_events
       WHERE resolved = 0
       ORDER BY timestamp DESC
-    `).all() as any[];
+    `);
 
-    return rows.map(row => this.rowToEvent(row));
+    return result.rows.map(row => this.rowToEvent(row));
   }
 
-  getRecent(limit = 10): CircuitBreakerEvent[] {
-    const rows = db.prepare(`
+  async getRecent(limit = 10): Promise<CircuitBreakerEvent[]> {
+    const result = await this.db.query(
+      `
       SELECT * FROM circuit_breaker_events
       ORDER BY timestamp DESC
       LIMIT ?
-    `).all(limit) as any[];
+    `,
+      [limit]
+    );
 
-    return rows.map(row => this.rowToEvent(row));
+    return result.rows.map(row => this.rowToEvent(row));
   }
 
   private rowToEvent(row: any): CircuitBreakerEvent {
@@ -201,49 +217,57 @@ export class CircuitBreakerEventsRepo {
  * Circuit breaker rules repository
  */
 export class CircuitBreakerRulesRepo {
-  getAll(): CircuitBreakerRule[] {
-    const rows = db.prepare('SELECT * FROM circuit_breaker_rules').all() as any[];
-    return rows.map(row => this.rowToRule(row));
+  constructor(private db: Database) {}
+
+  async getAll(): Promise<CircuitBreakerRule[]> {
+    const result = await this.db.query('SELECT * FROM circuit_breaker_rules');
+    return result.rows.map(row => this.rowToRule(row));
   }
 
-  getEnabled(): CircuitBreakerRule[] {
-    const rows = db.prepare('SELECT * FROM circuit_breaker_rules WHERE enabled = 1').all() as any[];
-    return rows.map(row => this.rowToRule(row));
+  async getEnabled(): Promise<CircuitBreakerRule[]> {
+    const result = await this.db.query('SELECT * FROM circuit_breaker_rules WHERE enabled = 1');
+    return result.rows.map(row => this.rowToRule(row));
   }
 
-  update(name: string, updates: Partial<CircuitBreakerRule>): void {
+  async update(name: string, updates: Partial<CircuitBreakerRule>): Promise<void> {
     const fields: string[] = [];
-    const params: any = { name };
+    const params: any[] = [];
 
     if (updates.enabled !== undefined) {
-      fields.push('enabled = @enabled');
-      params.enabled = updates.enabled ? 1 : 0;
+      fields.push('enabled = ?');
+      params.push(updates.enabled ? 1 : 0);
     }
 
     if (updates.condition !== undefined) {
-      fields.push('condition = @condition');
-      params.condition = updates.condition;
+      fields.push('condition = ?');
+      params.push(updates.condition);
     }
 
     if (updates.window !== undefined) {
-      fields.push('window = @window');
-      params.window = updates.window;
+      fields.push('window = ?');
+      params.push(updates.window);
     }
 
     if (updates.action !== undefined) {
-      fields.push('action = @action');
-      params.action = updates.action;
+      fields.push('action = ?');
+      params.push(updates.action);
     }
 
     if (updates.alertSeverity !== undefined) {
-      fields.push('alert_severity = @alertSeverity');
-      params.alertSeverity = updates.alertSeverity;
+      fields.push('alert_severity = ?');
+      params.push(updates.alertSeverity);
     }
 
-    fields.push("updated_at = datetime('now')");
+    if (this.db.type === 'sqlite') {
+      fields.push("updated_at = datetime('now')");
+    } else {
+      fields.push('updated_at = NOW()');
+    }
 
-    const sql = `UPDATE circuit_breaker_rules SET ${fields.join(', ')} WHERE name = @name`;
-    db.prepare(sql).run(params);
+    params.push(name); // WHERE clause parameter
+
+    const sql = `UPDATE circuit_breaker_rules SET ${fields.join(', ')} WHERE name = ?`;
+    await this.db.exec(sql, params);
   }
 
   private rowToRule(row: any): CircuitBreakerRule {
@@ -262,8 +286,12 @@ export class CircuitBreakerRulesRepo {
  * Metrics snapshots repository
  */
 export class MetricsSnapshotsRepo {
-  save(metrics: AutonomyMetrics): void {
-    db.prepare(`
+  constructor(private db: Database) {}
+
+  async save(metrics: AutonomyMetrics): Promise<void> {
+    const timestampSql = this.db.type === 'sqlite' ? "datetime('now')" : 'NOW()';
+
+    await this.db.execRaw(`
       INSERT INTO metrics_snapshots (
         timestamp, period_start, period_end,
         commands_total, commands_proposed, commands_approved, commands_rejected,
@@ -272,41 +300,21 @@ export class MetricsSnapshotsRepo {
         incidents_total, incidents_critical, incidents_from_autonomous,
         constraint_violations, emergency_aborts, safety_gate_triggers
       ) VALUES (
-        datetime('now'), @periodStart, @periodEnd,
-        @commandsTotal, @commandsProposed, @commandsApproved, @commandsRejected,
-        @commandsSucceeded, @commandsFailed, @commandsRolledBack,
-        @successRate, @approvalRate, @rollbackRate, @errorRate,
-        @incidentsTotal, @incidentsCritical, @incidentsFromAutonomous,
-        @constraintViolations, @emergencyAborts, @safetyGateTriggers
+        ${timestampSql}, '${metrics.period.start.toISOString()}', '${metrics.period.end.toISOString()}',
+        ${metrics.commands.total}, ${metrics.commands.proposed}, ${metrics.commands.approved}, ${metrics.commands.rejected},
+        ${metrics.commands.succeeded}, ${metrics.commands.failed}, ${metrics.commands.rolledBack},
+        ${metrics.rates.successRate}, ${metrics.rates.approvalRate}, ${metrics.rates.rollbackRate}, ${metrics.rates.errorRate},
+        ${metrics.incidents.total}, ${metrics.incidents.critical}, ${metrics.incidents.fromAutonomousActions},
+        ${metrics.safety.constraintViolations}, ${metrics.safety.emergencyAborts}, ${metrics.safety.safetyGateTriggers}
       )
-    `).run({
-      periodStart: metrics.period.start.toISOString(),
-      periodEnd: metrics.period.end.toISOString(),
-      commandsTotal: metrics.commands.total,
-      commandsProposed: metrics.commands.proposed,
-      commandsApproved: metrics.commands.approved,
-      commandsRejected: metrics.commands.rejected,
-      commandsSucceeded: metrics.commands.succeeded,
-      commandsFailed: metrics.commands.failed,
-      commandsRolledBack: metrics.commands.rolledBack,
-      successRate: metrics.rates.successRate,
-      approvalRate: metrics.rates.approvalRate,
-      rollbackRate: metrics.rates.rollbackRate,
-      errorRate: metrics.rates.errorRate,
-      incidentsTotal: metrics.incidents.total,
-      incidentsCritical: metrics.incidents.critical,
-      incidentsFromAutonomous: metrics.incidents.fromAutonomousActions,
-      constraintViolations: metrics.safety.constraintViolations,
-      emergencyAborts: metrics.safety.emergencyAborts,
-      safetyGateTriggers: metrics.safety.safetyGateTriggers,
-    });
+    `);
   }
 
-  getLatest(): AutonomyMetrics | null {
-    const row = db.prepare('SELECT * FROM metrics_snapshots ORDER BY timestamp DESC LIMIT 1').get() as any;
-    if (!row) return null;
+  async getLatest(): Promise<AutonomyMetrics | null> {
+    const result = await this.db.query('SELECT * FROM metrics_snapshots ORDER BY timestamp DESC LIMIT 1');
+    if (result.rows.length === 0) return null;
 
-    return this.rowToMetrics(row);
+    return this.rowToMetrics(result.rows[0]);
   }
 
   private rowToMetrics(row: any): AutonomyMetrics {
@@ -348,8 +356,11 @@ export class MetricsSnapshotsRepo {
  * Readiness assessments repository
  */
 export class ReadinessAssessmentsRepo {
-  save(assessment: ReadinessReport): void {
-    db.prepare(`
+  constructor(private db: Database) {}
+
+  async save(assessment: ReadinessReport): Promise<void> {
+    await this.db.exec(
+      `
       INSERT INTO readiness_assessments (
         timestamp, current_phase, days_since_phase_start,
         overall_score, overall_ready, overall_blockers,
@@ -357,40 +368,35 @@ export class ReadinessAssessmentsRepo {
         process_score, process_max_score, process_items,
         organizational_score, organizational_max_score, organizational_items,
         recommendations, next_actions
-      ) VALUES (
-        @timestamp, @currentPhase, @daysSincePhaseStart,
-        @overallScore, @overallReady, @overallBlockers,
-        @technicalScore, @technicalMaxScore, @technicalItems,
-        @processScore, @processMaxScore, @processItems,
-        @organizationalScore, @organizationalMaxScore, @organizationalItems,
-        @recommendations, @nextActions
-      )
-    `).run({
-      timestamp: assessment.timestamp.toISOString(),
-      currentPhase: assessment.currentPhase,
-      daysSincePhaseStart: assessment.daysSincePhaseStart,
-      overallScore: assessment.overall.score,
-      overallReady: assessment.overall.ready ? 1 : 0,
-      overallBlockers: JSON.stringify(assessment.overall.blockers),
-      technicalScore: assessment.technical.score,
-      technicalMaxScore: assessment.technical.maxScore,
-      technicalItems: JSON.stringify(assessment.technical.items),
-      processScore: assessment.process.score,
-      processMaxScore: assessment.process.maxScore,
-      processItems: JSON.stringify(assessment.process.items),
-      organizationalScore: assessment.organizational.score,
-      organizationalMaxScore: assessment.organizational.maxScore,
-      organizationalItems: JSON.stringify(assessment.organizational.items),
-      recommendations: JSON.stringify(assessment.recommendations),
-      nextActions: JSON.stringify(assessment.nextActions),
-    });
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+      [
+        assessment.timestamp.toISOString(),
+        assessment.currentPhase,
+        assessment.daysSincePhaseStart,
+        assessment.overall.score,
+        assessment.overall.ready ? 1 : 0,
+        JSON.stringify(assessment.overall.blockers),
+        assessment.technical.score,
+        assessment.technical.maxScore,
+        JSON.stringify(assessment.technical.items),
+        assessment.process.score,
+        assessment.process.maxScore,
+        JSON.stringify(assessment.process.items),
+        assessment.organizational.score,
+        assessment.organizational.maxScore,
+        JSON.stringify(assessment.organizational.items),
+        JSON.stringify(assessment.recommendations),
+        JSON.stringify(assessment.nextActions),
+      ]
+    );
   }
 
-  getLatest(): ReadinessReport | null {
-    const row = db.prepare('SELECT * FROM readiness_assessments ORDER BY timestamp DESC LIMIT 1').get() as any;
-    if (!row) return null;
+  async getLatest(): Promise<ReadinessReport | null> {
+    const result = await this.db.query('SELECT * FROM readiness_assessments ORDER BY timestamp DESC LIMIT 1');
+    if (result.rows.length === 0) return null;
 
-    return this.rowToAssessment(row);
+    return this.rowToAssessment(result.rows[0]);
   }
 
   private rowToAssessment(row: any): ReadinessReport {
@@ -428,64 +434,67 @@ export class ReadinessAssessmentsRepo {
  * Scope expansion proposals repository
  */
 export class ScopeExpansionProposalsRepo {
-  save(proposal: ScopeExpansionProposal): void {
-    db.prepare(`
+  constructor(private db: Database) {}
+
+  async save(proposal: ScopeExpansionProposal): Promise<void> {
+    await this.db.exec(
+      `
       INSERT INTO scope_expansion_proposals (
         proposal_id, timestamp, proposed_by,
         current_phase, target_phase, commands_to_whitelist, validation_period,
         metrics, readiness, key_achievements,
         risk_level, mitigations, rollback_plan,
         required_approvals, status
-      ) VALUES (
-        @proposalId, @timestamp, @proposedBy,
-        @currentPhase, @targetPhase, @commandsToWhitelist, @validationPeriod,
-        @metrics, @readiness, @keyAchievements,
-        @riskLevel, @mitigations, @rollbackPlan,
-        @requiredApprovals, @status
-      )
-    `).run({
-      proposalId: proposal.proposalId,
-      timestamp: proposal.timestamp.toISOString(),
-      proposedBy: proposal.proposedBy,
-      currentPhase: proposal.expansion.currentPhase,
-      targetPhase: proposal.expansion.targetPhase,
-      commandsToWhitelist: JSON.stringify(proposal.expansion.commandsToWhitelist),
-      validationPeriod: proposal.expansion.validationPeriod,
-      metrics: JSON.stringify(proposal.rationale.metrics),
-      readiness: JSON.stringify(proposal.rationale.readiness),
-      keyAchievements: JSON.stringify(proposal.rationale.keyAchievements),
-      riskLevel: proposal.riskAssessment.level,
-      mitigations: JSON.stringify(proposal.riskAssessment.mitigations),
-      rollbackPlan: proposal.riskAssessment.rollbackPlan,
-      requiredApprovals: JSON.stringify(proposal.requiredApprovals),
-      status: 'pending',
-    });
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+      [
+        proposal.proposalId,
+        proposal.timestamp.toISOString(),
+        proposal.proposedBy,
+        proposal.expansion.currentPhase,
+        proposal.expansion.targetPhase,
+        JSON.stringify(proposal.expansion.commandsToWhitelist),
+        proposal.expansion.validationPeriod,
+        JSON.stringify(proposal.rationale.metrics),
+        JSON.stringify(proposal.rationale.readiness),
+        JSON.stringify(proposal.rationale.keyAchievements),
+        proposal.riskAssessment.level,
+        JSON.stringify(proposal.riskAssessment.mitigations),
+        proposal.riskAssessment.rollbackPlan,
+        JSON.stringify(proposal.requiredApprovals),
+        'pending',
+      ]
+    );
   }
 
-  approve(proposalId: string, approvedBy: string): void {
-    db.prepare(`
-      UPDATE scope_expansion_proposals
-      SET status = 'approved', approved_at = datetime('now'), approved_by = ?
-      WHERE proposal_id = ?
-    `).run(approvedBy, proposalId);
+  async approve(proposalId: string, approvedBy: string): Promise<void> {
+    const sql =
+      this.db.type === 'sqlite'
+        ? `UPDATE scope_expansion_proposals SET status = 'approved', approved_at = datetime('now'), approved_by = ? WHERE proposal_id = ?`
+        : `UPDATE scope_expansion_proposals SET status = 'approved', approved_at = NOW(), approved_by = ? WHERE proposal_id = ?`;
+
+    await this.db.exec(sql, [approvedBy, proposalId]);
   }
 
-  reject(proposalId: string): void {
-    db.prepare(`
+  async reject(proposalId: string): Promise<void> {
+    await this.db.exec(
+      `
       UPDATE scope_expansion_proposals
       SET status = 'rejected'
       WHERE proposal_id = ?
-    `).run(proposalId);
+    `,
+      [proposalId]
+    );
   }
 
-  getPending(): ScopeExpansionProposal[] {
-    const rows = db.prepare(`
+  async getPending(): Promise<ScopeExpansionProposal[]> {
+    const result = await this.db.query(`
       SELECT * FROM scope_expansion_proposals
       WHERE status = 'pending'
       ORDER BY timestamp DESC
-    `).all() as any[];
+    `);
 
-    return rows.map(row => this.rowToProposal(row));
+    return result.rows.map(row => this.rowToProposal(row));
   }
 
   private rowToProposal(row: any): ScopeExpansionProposal {

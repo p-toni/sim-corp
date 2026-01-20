@@ -2,14 +2,15 @@
  * Metrics routes for governance service
  */
 
+import type { Database } from '@sim-corp/database';
 import type { FastifyInstance } from 'fastify';
 import { TimeRangeSchema, AutonomyMetricsSchema } from '@sim-corp/schemas/kernel/governance';
 import { createMetricsCollector } from '../metrics/collector.js';
 import { MetricsSnapshotsRepo } from '../db/repo.js';
 
-export async function metricsRoutes(fastify: FastifyInstance) {
-  const collector = createMetricsCollector();
-  const snapshotsRepo = new MetricsSnapshotsRepo();
+export async function metricsRoutes(fastify: FastifyInstance, db: Database) {
+  const collector = await createMetricsCollector();
+  const snapshotsRepo = new MetricsSnapshotsRepo(db);
 
   /**
    * GET /metrics/current - Get current metrics
@@ -20,7 +21,7 @@ export async function metricsRoutes(fastify: FastifyInstance) {
     const metrics = await collector.collectAll({ start, end });
 
     // Save snapshot
-    snapshotsRepo.save(metrics);
+    await snapshotsRepo.save(metrics);
 
     return metrics;
   });
@@ -29,7 +30,7 @@ export async function metricsRoutes(fastify: FastifyInstance) {
    * GET /metrics/latest - Get latest snapshot
    */
   fastify.get('/metrics/latest', async (request, reply) => {
-    const latest = snapshotsRepo.getLatest();
+    const latest = await snapshotsRepo.getLatest();
     return latest;
   });
 
@@ -43,7 +44,7 @@ export async function metricsRoutes(fastify: FastifyInstance) {
     const metrics = await collector.collectAll({ start, end });
 
     // Save snapshot
-    snapshotsRepo.save(metrics);
+    await snapshotsRepo.save(metrics);
 
     return metrics;
   });

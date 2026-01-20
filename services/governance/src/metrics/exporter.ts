@@ -2,6 +2,7 @@
  * Prometheus metrics exporter for governance service
  */
 
+import type { Database } from '@sim-corp/database';
 import { register, Gauge, Counter } from 'prom-client';
 import type { AutonomyMetrics, ReadinessReport, CircuitBreakerEvent } from '@sim-corp/schemas/kernel/governance';
 import { GovernanceStateRepo, MetricsSnapshotsRepo, ReadinessAssessmentsRepo, CircuitBreakerEventsRepo } from '../db/repo.js';
@@ -44,16 +45,16 @@ export class GovernanceMetricsExporter {
   private constraintViolationsCounter: Counter;
   private emergencyAbortsCounter: Counter;
 
-  constructor() {
-    this.stateRepo = new GovernanceStateRepo();
-    this.metricsRepo = new MetricsSnapshotsRepo();
-    this.readinessRepo = new ReadinessAssessmentsRepo();
-    this.eventsRepo = new CircuitBreakerEventsRepo();
+  constructor(db: Database) {
+    this.stateRepo = new GovernanceStateRepo(db);
+    this.metricsRepo = new MetricsSnapshotsRepo(db);
+    this.readinessRepo = new ReadinessAssessmentsRepo(db);
+    this.eventsRepo = new CircuitBreakerEventsRepo(db);
 
     // Initialize metrics
     this.currentPhaseGauge = new Gauge({
       name: 'simcorp_governance_current_phase_info',
-      help: 'Current autonomy phase (L3=0, L3+=1, L4=2, L4+=3, L5=4)',
+      help: 'Current autonomy phase (1=active, 0=inactive)',
       labelNames: ['phase'],
     });
 
@@ -154,30 +155,30 @@ export class GovernanceMetricsExporter {
   /**
    * Update all metrics from current state
    */
-  updateMetrics(): void {
-    this.updatePhaseMetrics();
-    this.updateCommandMetrics();
-    this.updateReadinessMetrics();
-    this.updateCircuitBreakerMetrics();
+  async updateMetrics(): Promise<void> {
+    await this.updatePhaseMetrics();
+    await this.updateCommandMetrics();
+    await this.updateReadinessMetrics();
+    await this.updateCircuitBreakerMetrics();
   }
 
   /**
    * Update phase metrics
    */
-  private updatePhaseMetrics(): void {
-    const state = this.stateRepo.getState();
+  private async updatePhaseMetrics(): Promise<void> {
+    const state = await this.stateRepo.getState();
     if (!state) return;
 
-    // Map phase to numeric value
-    const phaseMap: Record<string, number> = {
-      'L3': 0,
-      'L3+': 1,
-      'L4': 2,
-      'L4+': 3,
-      'L5': 4,
-    };
+    // All possible phases
+    const allPhases = ['L3', 'L3+', 'L4', 'L4+', 'L5'];
 
-    this.currentPhaseGauge.labels(state.currentPhase).set(phaseMap[state.currentPhase] ?? 0);
+    // Reset all phase labels to 0 (inactive)
+    for (const phase of allPhases) {
+      this.currentPhaseGauge.labels(phase).set(0);
+    }
+
+    // Set current phase to 1 (active)
+    this.currentPhaseGauge.labels(state.currentPhase).set(1);
 
     const daysSincePhaseStart = Math.floor(
       (Date.now() - state.phaseStartDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -188,8 +189,8 @@ export class GovernanceMetricsExporter {
   /**
    * Update command execution metrics
    */
-  private updateCommandMetrics(): void {
-    const metrics = this.metricsRepo.getLatest();
+  private async updateCommandMetrics(): Promise<void> {
+    const metrics = await this.metricsRepo.getLatest();
     if (!metrics) return;
 
     // Update rate gauges
@@ -221,8 +222,8 @@ export class GovernanceMetricsExporter {
   /**
    * Update readiness metrics
    */
-  private updateReadinessMetrics(): void {
-    const readiness = this.readinessRepo.getLatest();
+  private async updateReadinessMetrics(): Promise<void> {
+    const readiness = await this.readinessRepo.getLatest();
     if (!readiness) return;
 
     // Update overall score
@@ -242,8 +243,8 @@ export class GovernanceMetricsExporter {
   /**
    * Update circuit breaker metrics
    */
-  private updateCircuitBreakerMetrics(): void {
-    const unresolvedEvents = this.eventsRepo.getUnresolved();
+  private async updateCircuitBreakerMetrics(): Promise<void> {
+    const unresolvedEvents = await this.eventsRepo.getUnresolved();
     this.circuitBreakerUnresolvedGauge.set(unresolvedEvents.length);
   }
 
@@ -261,11 +262,15 @@ export class GovernanceMetricsExporter {
    */
   startPeriodicUpdates(intervalMs: number = 30000): NodeJS.Timeout {
     // Initial update
-    this.updateMetrics();
+    this.updateMetrics().catch(err => {
+      console.error('[MetricsExporter] Error in initial update:', err);
+    });
 
     // Periodic updates
     return setInterval(() => {
-      this.updateMetrics();
+      this.updateMetrics().catch(err => {
+        console.error('[MetricsExporter] Error in periodic update:', err);
+      });
     }, intervalMs);
   }
 
@@ -280,6 +285,6 @@ export class GovernanceMetricsExporter {
 /**
  * Create and initialize metrics exporter
  */
-export function createMetricsExporter(): GovernanceMetricsExporter {
-  return new GovernanceMetricsExporter();
+export function createMetricsExporter(db: Database): GovernanceMetricsExporter {
+  return new GovernanceMetricsExporter(db);
 }

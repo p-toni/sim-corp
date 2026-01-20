@@ -8,7 +8,7 @@
  */
 
 import type { AutonomyMetrics, TimeRange } from '@sim-corp/schemas/kernel/governance';
-import Database from 'better-sqlite3';
+import { createDatabase, type Database } from '@sim-corp/database';
 
 export interface MetricsCollectorConfig {
   commandDbPath: string;
@@ -16,21 +16,19 @@ export interface MetricsCollectorConfig {
 }
 
 export class MetricsCollector {
-  private commandDb: Database.Database;
+  private commandDb: Database;
 
-  constructor(config: MetricsCollectorConfig) {
-    // In-memory databases cannot be readonly
-    const options = config.commandDbPath === ':memory:' ? {} : { readonly: config.readonly !== false };
-    this.commandDb = new Database(config.commandDbPath, options);
+  constructor(config: MetricsCollectorConfig, commandDb: Database) {
+    this.commandDb = commandDb;
   }
 
   /**
    * Collect all autonomy metrics for a given time range
    */
   async collectAll(timeRange: TimeRange): Promise<AutonomyMetrics> {
-    const commandMetrics = this.collectCommandMetrics(timeRange);
-    const incidentMetrics = this.collectIncidentMetrics(timeRange);
-    const safetyMetrics = this.collectSafetyMetrics(timeRange);
+    const commandMetrics = await this.collectCommandMetrics(timeRange);
+    const incidentMetrics = await this.collectIncidentMetrics(timeRange);
+    const safetyMetrics = await this.collectSafetyMetrics(timeRange);
 
     return {
       period: timeRange,
@@ -44,20 +42,30 @@ export class MetricsCollector {
   /**
    * Collect command execution metrics
    */
-  private collectCommandMetrics(timeRange: TimeRange): {
+  private async collectCommandMetrics(timeRange: TimeRange): Promise<{
     commands: AutonomyMetrics['commands'];
     rates: AutonomyMetrics['rates'];
-  } {
+  }> {
     // Query command proposals within time range
-    const proposals = this.commandDb.prepare(`
+    console.log(`[MetricsCollector] Querying commands between ${timeRange.start.toISOString()} and ${timeRange.end.toISOString()}`);
+
+    const dateTimeFunc = this.commandDb.type === 'sqlite' ? 'datetime' : 'to_timestamp';
+    const betweenClause = this.commandDb.type === 'sqlite'
+      ? `datetime(created_at) BETWEEN datetime(?) AND datetime(?)`
+      : `created_at BETWEEN to_timestamp(?, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AND to_timestamp(?, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
+
+    const result = await this.commandDb.query(`
       SELECT
         status,
         execution_status,
         COUNT(*) as count
       FROM command_proposals
-      WHERE created_at BETWEEN ? AND ?
+      WHERE ${betweenClause}
       GROUP BY status, execution_status
-    `).all(timeRange.start.toISOString(), timeRange.end.toISOString()) as any[];
+    `, [timeRange.start.toISOString(), timeRange.end.toISOString()]);
+
+    const proposals = result.rows as any[];
+    console.log(`[MetricsCollector] Found ${proposals.length} groups of proposals`);
 
     // Aggregate counts
     let total = 0;
@@ -128,16 +136,26 @@ export class MetricsCollector {
    * Collect incident metrics
    * Note: Placeholder implementation - would integrate with incident tracking system
    */
-  private collectIncidentMetrics(timeRange: TimeRange): AutonomyMetrics['incidents'] {
+  private async collectIncidentMetrics(timeRange: TimeRange): Promise<AutonomyMetrics['incidents']> {
     // Placeholder: In production, this would query an incident tracking database
     // For now, we'll infer incidents from command failures
-    const criticalFailures = this.commandDb.prepare(`
+    const betweenClause = this.commandDb.type === 'sqlite'
+      ? `datetime(created_at) BETWEEN datetime(?) AND datetime(?)`
+      : `created_at BETWEEN to_timestamp(?, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AND to_timestamp(?, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
+
+    const jsonExtract = this.commandDb.type === 'sqlite'
+      ? `json_extract(command, '$.type')`
+      : `command->>'type'`;
+
+    const result = await this.commandDb.query(`
       SELECT COUNT(*) as count
       FROM command_proposals
-      WHERE created_at BETWEEN ? AND ?
+      WHERE ${betweenClause}
         AND execution_status = 'failed'
-        AND json_extract(command, '$.type') IN ('EMERGENCY_SHUTDOWN', 'ABORT')
-    `).get(timeRange.start.toISOString(), timeRange.end.toISOString()) as any;
+        AND ${jsonExtract} IN ('EMERGENCY_SHUTDOWN', 'ABORT')
+    `, [timeRange.start.toISOString(), timeRange.end.toISOString()]);
+
+    const criticalFailures = result.rows[0] as any;
 
     return {
       total: criticalFailures?.count || 0,
@@ -149,32 +167,43 @@ export class MetricsCollector {
   /**
    * Collect safety metrics
    */
-  private collectSafetyMetrics(timeRange: TimeRange): AutonomyMetrics['safety'] {
+  private async collectSafetyMetrics(timeRange: TimeRange): Promise<AutonomyMetrics['safety']> {
+    const betweenClause = this.commandDb.type === 'sqlite'
+      ? `datetime(created_at) BETWEEN datetime(?) AND datetime(?)`
+      : `created_at BETWEEN to_timestamp(?, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AND to_timestamp(?, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
+
+    const jsonExtract = this.commandDb.type === 'sqlite'
+      ? `json_extract(command, '$.type')`
+      : `command->>'type'`;
+
     // Count constraint violations (rejections due to constraint checks)
-    const constraintViolations = this.commandDb.prepare(`
+    const constraintResult = await this.commandDb.query(`
       SELECT COUNT(*) as count
       FROM command_proposals
-      WHERE created_at BETWEEN ? AND ?
+      WHERE ${betweenClause}
         AND status = 'rejected'
         AND rejection_reason LIKE '%constraint%'
-    `).get(timeRange.start.toISOString(), timeRange.end.toISOString()) as any;
+    `, [timeRange.start.toISOString(), timeRange.end.toISOString()]);
+    const constraintViolations = constraintResult.rows[0] as any;
 
     // Count emergency aborts (ABORT commands)
-    const emergencyAborts = this.commandDb.prepare(`
+    const abortsResult = await this.commandDb.query(`
       SELECT COUNT(*) as count
       FROM command_proposals
-      WHERE created_at BETWEEN ? AND ?
-        AND json_extract(command, '$.type') = 'ABORT'
-    `).get(timeRange.start.toISOString(), timeRange.end.toISOString()) as any;
+      WHERE ${betweenClause}
+        AND ${jsonExtract} = 'ABORT'
+    `, [timeRange.start.toISOString(), timeRange.end.toISOString()]);
+    const emergencyAborts = abortsResult.rows[0] as any;
 
     // Count safety gate triggers (rejections due to safety gates)
-    const safetyGates = this.commandDb.prepare(`
+    const gatesResult = await this.commandDb.query(`
       SELECT COUNT(*) as count
       FROM command_proposals
-      WHERE created_at BETWEEN ? AND ?
+      WHERE ${betweenClause}
         AND status = 'rejected'
         AND (rejection_reason LIKE '%safety%' OR rejection_reason LIKE '%gate%')
-    `).get(timeRange.start.toISOString(), timeRange.end.toISOString()) as any;
+    `, [timeRange.start.toISOString(), timeRange.end.toISOString()]);
+    const safetyGates = gatesResult.rows[0] as any;
 
     return {
       constraintViolations: constraintViolations?.count || 0,
@@ -198,18 +227,28 @@ export class MetricsCollector {
   /**
    * Close database connections
    */
-  close(): void {
-    this.commandDb.close();
+  async close(): Promise<void> {
+    await this.commandDb.close();
   }
 }
 
 /**
  * Create metrics collector from environment
  */
-export function createMetricsCollector(): MetricsCollector {
+export async function createMetricsCollector(): Promise<MetricsCollector> {
   const commandDbPath = process.env.COMMAND_DB_PATH || '../command/var/command.db';
 
-  return new MetricsCollector({
-    commandDbPath,
+  // Create database connection for command service database
+  const commandDb = await createDatabase({
+    type: 'sqlite',
+    path: commandDbPath,
+    schema: '', // Read-only access, no schema initialization needed
+    logger: {
+      error: (msg: string) => console.error(`[MetricsCollector] ${msg}`),
+      warn: (msg: string) => console.warn(`[MetricsCollector] ${msg}`),
+      info: (msg: string) => console.log(`[MetricsCollector] ${msg}`),
+    },
   });
+
+  return new MetricsCollector({ commandDbPath }, commandDb);
 }

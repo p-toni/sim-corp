@@ -5,6 +5,7 @@
  * to prevent runaway autonomy.
  */
 
+import type { Database } from '@sim-corp/database';
 import type {
   CircuitBreakerRule,
   CircuitBreakerEvent,
@@ -16,6 +17,7 @@ import {
   CircuitBreakerEventsRepo,
   GovernanceStateRepo,
 } from '../db/repo.js';
+import { createMetricsCollector } from '../metrics/collector.js';
 import { randomUUID } from 'crypto';
 
 export interface CircuitBreakerConfig {
@@ -30,11 +32,11 @@ export class CircuitBreaker {
   private stateRepo: GovernanceStateRepo;
   private intervalId?: NodeJS.Timeout;
 
-  constructor(config: CircuitBreakerConfig) {
+  constructor(config: CircuitBreakerConfig, db: Database) {
     this.config = config;
-    this.rulesRepo = new CircuitBreakerRulesRepo();
-    this.eventsRepo = new CircuitBreakerEventsRepo();
-    this.stateRepo = new GovernanceStateRepo();
+    this.rulesRepo = new CircuitBreakerRulesRepo(db);
+    this.eventsRepo = new CircuitBreakerEventsRepo(db);
+    this.stateRepo = new GovernanceStateRepo(db);
   }
 
   /**
@@ -76,8 +78,12 @@ export class CircuitBreaker {
    * Run circuit breaker check
    */
   private async check(): Promise<void> {
+    console.log('[CircuitBreaker] Running check...');
+
     // Get enabled rules
-    const rules = this.rulesRepo.getEnabled();
+    const rules = await this.rulesRepo.getEnabled();
+    console.log(`[CircuitBreaker] Found ${rules.length} enabled rules`);
+
     if (rules.length === 0) {
       return;
     }
@@ -85,11 +91,14 @@ export class CircuitBreaker {
     // Collect recent metrics for each rule's window
     for (const rule of rules) {
       try {
+        console.log(`[CircuitBreaker] Checking rule: "${rule.name}"`);
         await this.checkRule(rule);
       } catch (error) {
         console.error(`[CircuitBreaker] Error checking rule "${rule.name}":`, error);
       }
     }
+
+    console.log('[CircuitBreaker] Check complete');
   }
 
   /**
@@ -102,11 +111,14 @@ export class CircuitBreaker {
     const start = new Date(now.getTime() - windowMs);
 
     // Collect metrics for the window
-    // Note: This would ideally use the MetricsCollector, but we'll simulate for now
     const metrics = await this.getMetricsForWindow({ start, end: now });
+
+    console.log(`[CircuitBreaker] Rule "${rule.name}" - Error rate: ${(metrics.rates.errorRate * 100).toFixed(2)}%, Condition: ${rule.condition}`);
 
     // Evaluate rule
     const shouldTrigger = evaluateRule(rule, metrics);
+
+    console.log(`[CircuitBreaker] Rule "${rule.name}" - Should trigger: ${shouldTrigger}`);
 
     if (shouldTrigger) {
       await this.triggerBreaker(rule, metrics);
@@ -132,7 +144,7 @@ export class CircuitBreaker {
     };
 
     // Save event
-    this.eventsRepo.save(event);
+    await this.eventsRepo.save(event);
 
     // Execute action
     await this.executeAction(event);
@@ -168,7 +180,7 @@ export class CircuitBreaker {
    * Revert autonomy level to L3
    */
   private async revertToL3(event: CircuitBreakerEvent): Promise<void> {
-    const state = this.stateRepo.getState();
+    const state = await this.stateRepo.getState();
     if (!state) {
       console.error('[CircuitBreaker] Cannot revert to L3: governance state not found');
       return;
@@ -182,7 +194,7 @@ export class CircuitBreaker {
     console.warn(`[CircuitBreaker] Reverting from ${state.currentPhase} to L3`);
 
     // Update governance state
-    this.stateRepo.updateState({
+    await this.stateRepo.updateState({
       currentPhase: 'L3',
       phaseStartDate: new Date(),
       commandWhitelist: [], // Clear whitelist - require human approval for all commands
@@ -222,50 +234,26 @@ export class CircuitBreaker {
 
   /**
    * Get metrics for a time window
-   * Placeholder: Would use MetricsCollector
    */
   private async getMetricsForWindow(timeRange: { start: Date; end: Date }): Promise<AutonomyMetrics> {
-    // Placeholder: In production, would use MetricsCollector
-    // For now, return empty metrics to avoid errors
-    return {
-      period: timeRange,
-      commands: {
-        total: 0,
-        proposed: 0,
-        approved: 0,
-        rejected: 0,
-        succeeded: 0,
-        failed: 0,
-        rolledBack: 0,
-      },
-      rates: {
-        successRate: 1.0,
-        approvalRate: 1.0,
-        rollbackRate: 0.0,
-        errorRate: 0.0,
-      },
-      incidents: {
-        total: 0,
-        critical: 0,
-        fromAutonomousActions: 0,
-      },
-      safety: {
-        constraintViolations: 0,
-        emergencyAborts: 0,
-        safetyGateTriggers: 0,
-      },
-    };
+    const collector = await createMetricsCollector();
+    try {
+      const metrics = await collector.collectAll(timeRange);
+      return metrics;
+    } finally {
+      await collector.close();
+    }
   }
 }
 
 /**
  * Create circuit breaker from environment
  */
-export function createCircuitBreaker(): CircuitBreaker {
+export function createCircuitBreaker(db: Database): CircuitBreaker {
   const config: CircuitBreakerConfig = {
     enabled: process.env.CIRCUIT_BREAKER_ENABLED !== 'false',
     checkInterval: parseInt(process.env.CIRCUIT_BREAKER_INTERVAL || '60000', 10), // Default: 1 minute
   };
 
-  return new CircuitBreaker(config);
+  return new CircuitBreaker(config, db);
 }
