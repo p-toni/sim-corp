@@ -1041,6 +1041,97 @@ Done:
     - Environment variables: DATABASE_POOL_MIN/MAX, QUEUE_CONCURRENCY
   - **Impact**: Production-ready Kubernetes manifests with resource limits prevent resource exhaustion and OOM kills. HPA enables automatic scaling for traffic spikes while controlling costs. Resource metrics enable monitoring and right-sizing. Cost allocation labels enable spending tracking. Grafana dashboard provides visibility into resource utilization and autoscaling behavior. Conservative scaling policies prevent thrashing. Foundation for cluster autoscaling, VPA (Vertical Pod Autoscaler), and custom metrics autoscaling.
 
+- **T-050 Autonomy Governance Agent & Circuit Breakers (2026-01-13):**
+  - **Scope**: Structured framework for safe L3→L4→L5 autonomy expansion with safety controls
+  - **Phase 1: Foundation (Schemas)**
+    - AutonomyPhase enum: L3, L3+, L4, L4+, L5
+    - AutonomyMetrics: Command execution metrics (rates, incidents, safety)
+    - ReadinessReport: 80-point assessment (technical 35, process 25, organizational 20)
+    - CircuitBreakerRule: Safety rules with condition/window/action/severity
+    - CircuitBreakerEvent: Triggered safety events with resolution tracking
+    - ScopeExpansionProposal: Agent-generated autonomy expansion proposals
+    - GovernanceReport: Weekly governance cycle summary
+    - All schemas with Zod validation and TypeScript types
+  - **Phase 2: Database & MetricsCollector**
+    - SQLite schema with 7 tables (governance_state, metrics_snapshots, readiness_assessments, governance_reports, circuit_breaker_rules, circuit_breaker_events, scope_expansion_proposals)
+    - 7 repository classes: GovernanceState, MetricsSnapshots, ReadinessAssessments, GovernanceReports, CircuitBreakerRules, CircuitBreakerEvents, ScopeExpansionProposals
+    - MetricsCollector: Aggregates command service data (success/approval/rollback/error rates)
+    - Default L3 governance state with empty command whitelist
+    - 4 default circuit breaker rules (high error rate, repeated failures, critical incident, high rollback rate)
+  - **Phase 3: ReadinessAssessor (80-point checklist)**
+    - Technical readiness (35 points): Command performance (6+ months, >99.5% success), safety & testing (eval coverage, zero incidents), infrastructure (circuit breakers, monitoring, kill switch, chaos tests)
+    - Process readiness (25 points): Documentation (runbooks, incident playbooks, architecture docs), approval workflow (escalation, stakeholder sign-off), compliance (security review, audit trail, rollback plan)
+    - Organizational readiness (20 points): Team readiness (on-call training, consensus), stakeholder buy-in (product/ops approval)
+    - Threshold: ≥95% (76/80 points) + all required items for readiness
+    - Smart recommendation generation (expand, maintain, investigate)
+  - **Phase 4: CircuitBreaker & GovernanceAgent**
+    - Circuit Breaker: Real-time monitoring with 60s evaluation cycle
+    - Rule evaluation with condition parsing (>, >=, <, <=, ===)
+    - Three actions: revert_to_l3 (critical), pause_command_type (high), alert_only (medium/low)
+    - Automatic L3 reversion on safety violations
+    - GovernanceAgent: Weekly governance cycle (collect metrics → assess readiness → check circuit breakers → decide expansion → generate report)
+    - Proposal generator: Risk assessment, validation periods (14-60 days), required approvals
+    - Command whitelists per phase:
+      * L3 → L3+: SET_POWER, SET_FAN (14-day validation, tech-lead approval)
+      * L3+ → L4: SET_DRUM, SET_AIRFLOW (21-day validation, tech-lead + ops-lead approval)
+      * L4 → L4+: PREHEAT, COOLING_CYCLE (30-day validation, tech-lead + ops-lead + product-lead approval)
+      * L4+ → L5: EMERGENCY_SHUTDOWN, ABORT (60-day validation, tech-lead + ops-lead + product-lead + exec-sponsor approval)
+  - **Phase 5: REST API & Integration Tests**
+    - Metrics endpoints: /api/metrics/current, /api/metrics/latest, /api/metrics/weekly
+    - Readiness endpoints: /api/readiness/current, /api/readiness/latest, /api/readiness/score
+    - Circuit breaker endpoints: events, rules (GET/PATCH), resolve
+    - Governance endpoints: run-cycle, reports, state, proposals (approve/reject)
+    - Health endpoints: /health (liveness), /ready (readiness)
+    - 23 API integration tests covering all endpoints
+    - Removed Zod schema validation from routes (Fastify compatibility)
+    - Fixed health routes to use registerHealthChecks
+  - **Phase 6: Grafana Dashboard & Prometheus Metrics**
+    - Comprehensive Grafana dashboard (10 panels):
+      * Current autonomy phase gauge with color coding
+      * Overall readiness score gauge with thresholds (80/90/95%)
+      * Command execution rates time series
+      * Unresolved circuit breaker events counter
+      * Days at current phase indicator
+      * Hourly command execution bar chart
+      * Readiness scores by category (technical/process/organizational)
+      * Active circuit breaker events table
+      * Safety metrics (incidents, constraint violations, emergency aborts)
+      * Readiness blockers table
+    - Prometheus metrics exporter (15 metrics):
+      * Phase: current_phase_info, days_since_phase_start
+      * Commands: success/approval/error/rollback rates, commands_total{status}
+      * Readiness: overall score, category scores (technical/process/organizational)
+      * Circuit breaker: events_total, events_unresolved
+      * Safety: incidents_total{severity}, constraint_violations, emergency_aborts
+    - Annotations: Phase changes (purple), circuit breaker events (red)
+    - Auto-provisioning via Docker Compose
+    - 30-second metrics update interval
+  - **Phase 7: Documentation & Runbooks**
+    - Service README (300+ lines): Overview, autonomy levels, architecture, database schema, API reference, 80-point checklist, weekly cycle, configuration, monitoring, development, deployment, troubleshooting
+    - Operator Runbook (400+ lines): Daily/weekly/monthly operations, phase transition procedures (approval, rollback), incident response playbooks (circuit breaker, critical incidents), circuit breaker management (rules, thresholds, tuning), maintenance (backups, cleanup, log rotation), troubleshooting guides, emergency contacts, quick reference commands, decision trees
+    - Circuit Breaker Documentation (300+ lines): Design principles, architecture, rule configuration reference, condition syntax, time windows, action types, alert severity, default rules with rationale, rule evaluation logic, event lifecycle, best practices, future enhancements, troubleshooting
+  - **Tests:**
+    - 69 tests passing across 5 test files:
+      * 15 circuit breaker rule evaluation tests
+      * 10 governance agent proposal generation tests
+      * 12 readiness assessment tests
+      * 9 metrics collection tests
+      * 23 API integration tests
+    - No regressions, full test coverage
+  - **Dependencies:**
+    - Added prom-client@^15.1.3 to services/governance
+  - **Deliverables:**
+    - ✅ Complete autonomy governance framework (7 phases)
+    - ✅ 80-point readiness checklist with objective criteria
+    - ✅ Circuit breaker safety system with automatic L3 reversion
+    - ✅ Weekly governance cycle with proposal generation
+    - ✅ Comprehensive REST API (20+ endpoints)
+    - ✅ Grafana dashboard with 10 panels
+    - ✅ Prometheus metrics (15 metrics exported)
+    - ✅ Comprehensive documentation (1000+ lines total)
+    - ✅ 69 tests passing (no regressions)
+  - **Impact**: Sim-Corp now has structured framework for safe autonomy expansion from L3 (human-in-loop) to L5 (full autonomy). Objective 80-point checklist prevents premature expansion. Circuit breakers provide fail-safe automatic reversion to L3 on safety violations. Weekly governance cycle with agent-generated proposals streamlines approval process. Complete monitoring infrastructure (Grafana + Prometheus) provides visibility into autonomy health. Comprehensive documentation enables operations team to manage autonomy progression. Foundation for regulatory compliance (audit trail, approval workflows, safety controls). Enables confident advancement toward L4+ autonomy with safety guarantees.
+
 Now:
 - M4 (Safe Autopilot L3 Beta) P0 + P1 complete
 - T-028.1 (LM-as-judge) complete - M3 fully unblocked
@@ -1057,16 +1148,24 @@ Now:
   - T-042 (Rate Limiting & Throttling) COMPLETE
   - T-043 (Connection Pooling & Caching) COMPLETE
   - T-044 (Resource Limits & Autoscaling) COMPLETE
+- **T-050 (Autonomy Governance Agent & Circuit Breakers) COMPLETE**
+- **Operational Readiness Improvements (2026-01-19) COMPLETE:**
+  - Event inference config persistence to database
+  - Automated key rotation scheduler for HSM
+  - Key lifecycle monitoring with Prometheus metrics
+- **Staging Environment Setup (2026-01-20) COMPLETE:**
+  - Full staging docker-compose with all 12 services
+  - SQLite-based (no PostgreSQL dependency)
+  - scripts/staging-up.sh and staging-down.sh
+  - Comprehensive documentation (docs/ops/staging-deployment.md)
+  - Governance service Dockerfile
 
 Next:
-- T-050 — Autonomy Governance Agent & Circuit Breakers (P1) [Planned]
 - T-029 — Bullet R1 USB driver implementation (awaiting hardware access)
+- M5 P2 — Infrastructure as Code, CI/CD hardening, Chaos Engineering (optional)
 
 Open questions (UNCONFIRMED if needed):
-- Event inference heuristics: May need machine-specific calibration for production
-- Key rotation: Automation strategy for production
-- HSM integration: Timeline for production hardening
-- Database migration: ingestion/eval services need async conversion for PostgreSQL support
+- Database migration: ingestion/eval services already async - just remove legacy connection.ts when ready
 
 Working set (files/ids/commands):
 - CONTINUITY.md
@@ -1195,3 +1294,53 @@ Working set (files/ids/commands):
 - infra/k8s/monitoring/resource-utilization-dashboard.json (T-044 Grafana dashboard)
 - infra/k8s/README.md (T-044 comprehensive documentation, 400+ lines)
 - docs/tasks/T-044-PLAN.md (T-044 implementation plan)
+- services/governance/* (T-050 autonomy governance service)
+  - src/db/schema.sql (governance database schema)
+  - src/db/repo.ts (7 repository classes)
+  - src/metrics/collector.ts (command metrics aggregation)
+  - src/metrics/exporter.ts (Prometheus metrics exporter)
+  - src/readiness/assessor.ts (80-point checklist evaluator)
+  - src/readiness/checklists/technical.ts (35-point technical readiness)
+  - src/readiness/checklists/process.ts (25-point process readiness)
+  - src/readiness/checklists/organizational.ts (20-point organizational readiness)
+  - src/readiness/recommendations.ts (smart recommendation generation)
+  - src/circuit-breaker/rules.ts (rule evaluation with condition parsing)
+  - src/circuit-breaker/breaker.ts (real-time monitoring with auto-revert)
+  - src/agent/proposal-generator.ts (scope expansion proposals)
+  - src/agent/governance-agent.ts (weekly governance cycle)
+  - src/routes/metrics.ts (metrics API endpoints)
+  - src/routes/readiness.ts (readiness API endpoints)
+  - src/routes/circuit-breaker.ts (circuit breaker API endpoints)
+  - src/routes/governance.ts (governance API endpoints)
+  - src/server.ts (Fastify server with circuit breaker start)
+  - tests/metrics.test.ts (9 metrics tests)
+  - tests/readiness.test.ts (12 readiness tests)
+  - tests/circuit-breaker.test.ts (15 circuit breaker tests)
+  - tests/governance-agent.test.ts (10 proposal generation tests)
+  - tests/api-integration.test.ts (23 API integration tests)
+  - README.md (comprehensive service documentation, 300+ lines)
+  - RUNBOOK.md (operator runbook, 400+ lines)
+  - docs/CIRCUIT-BREAKER.md (circuit breaker documentation, 300+ lines)
+  - package.json (prom-client dependency)
+- libs/schemas/src/kernel/governance.ts (T-050 governance schemas, 305 lines)
+- infra/monitoring/grafana/dashboards/autonomy-governance.json (T-050 Grafana dashboard)
+- infra/monitoring/grafana/dashboards/README.md (T-050 dashboard documentation)
+- infra/monitoring/grafana/provisioning/dashboards/autonomy-governance.yml (T-050 provisioning)
+- services/event-inference/src/db/database.ts (event inference config persistence)
+- services/event-inference/src/db/repo.ts (ConfigRepository for machine configs)
+- services/event-inference/src/core/engine.ts (updated with config persistence)
+- services/event-inference/src/routes/config.ts (GET/POST/DELETE config endpoints)
+- services/event-inference/src/server.ts (database initialization)
+- services/event-inference/tests/config-persistence.test.ts (11 tests)
+- libs/device-identity/src/rotation-scheduler.ts (KeyRotationScheduler)
+- libs/device-identity/src/key-lifecycle-monitor.ts (KeyLifecycleMonitor with Prometheus metrics)
+- libs/device-identity/tests/rotation-scheduler.test.ts (13 tests)
+- libs/device-identity/tests/key-lifecycle-monitor.test.ts (14 tests)
+- infra/staging/docker-compose.yml (staging environment with all 12 services)
+- infra/staging/.env.example (staging environment template)
+- infra/staging/mosquitto.conf (MQTT broker config)
+- infra/staging/README.md (staging quick-start guide)
+- scripts/staging-up.sh (staging startup script)
+- scripts/staging-down.sh (staging shutdown script)
+- services/governance/Dockerfile (governance service Docker image)
+- docs/ops/staging-deployment.md (comprehensive staging documentation)
