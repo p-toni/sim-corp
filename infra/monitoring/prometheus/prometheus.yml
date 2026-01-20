@@ -101,6 +101,22 @@ scrape_configs:
           service: 'dispatcher'
           tier: 'ops'
 
+  # Governance (Autonomy Governance & Circuit Breakers)
+  - job_name: 'governance'
+    static_configs:
+      - targets: ['host.docker.internal:4007']
+        labels:
+          service: 'governance'
+          tier: 'autonomy'
+
+  # Backup Service (Backup & Disaster Recovery Metrics)
+  - job_name: 'backup'
+    static_configs:
+      - targets: ['backup:9101']
+        labels:
+          service: 'backup'
+          tier: 'infrastructure'
+
   # Prometheus self-monitoring
   - job_name: 'prometheus'
     static_configs:

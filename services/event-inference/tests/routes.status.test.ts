@@ -3,7 +3,12 @@ import { buildServer } from "../src/server";
 
 describe("routes", () => {
   it("returns status and allows config update", async () => {
-    const server = await buildServer({ logger: false, mqttClient: null });
+    const server = await buildServer({
+      logger: false,
+      mqttClient: null,
+      dbPath: ":memory:",
+      enableGracefulShutdown: false,
+    });
     const status = await server.inject({ method: "GET", url: "/status" });
     expect(status.statusCode).toBe(200);
 
@@ -14,8 +19,8 @@ describe("routes", () => {
         orgId: "o",
         siteId: "s",
         machineId: "m",
-        config: { fcBtThresholdC: 195 }
-      }
+        config: { fcBtThresholdC: 195 },
+      },
     });
     expect(configRes.statusCode).toBe(200);
     const cfg = configRes.json() as { fcBtThresholdC: number };

@@ -405,6 +405,9 @@ importers:
 
   services/command:
     dependencies:
+      '@sim-corp/database':
+        specifier: workspace:*
+        version: link:../../libs/database
       '@sim-corp/driver-core':
         specifier: workspace:*
         version: link:../../drivers/core
@@ -417,9 +420,6 @@ importers:
       '@sim-corp/schemas':
         specifier: workspace:*
         version: link:../../libs/schemas
-      better-sqlite3:
-        specifier: ^11.7.0
-        version: 11.10.0
       fastify:
         specifier: ^5.2.0
         version: 5.6.2
@@ -565,6 +565,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.32.1
         version: 0.32.1
+      '@sim-corp/database':
+        specifier: workspace:*
+        version: link:../../libs/database
       '@sim-corp/health':
         specifier: workspace:*
         version: link:../../libs/health
@@ -602,6 +605,9 @@ importers:
 
   services/event-inference:
     dependencies:
+      '@sim-corp/database':
+        specifier: workspace:*
+        version: link:../../libs/database
       '@sim-corp/health':
         specifier: workspace:*
         version: link:../../libs/health
@@ -636,6 +642,9 @@ importers:
 
   services/governance:
     dependencies:
+      '@sim-corp/database':
+        specifier: workspace:*
+        version: link:../../libs/database
       '@sim-corp/health':
         specifier: workspace:*
         version: link:../../libs/health
@@ -673,6 +682,9 @@ importers:
 
   services/ingestion:
     dependencies:
+      '@sim-corp/database':
+        specifier: workspace:*
+        version: link:../../libs/database
       '@sim-corp/device-identity':
         specifier: workspace:*
         version: link:../../libs/device-identity
@@ -688,9 +700,6 @@ importers:
       '@sim-corp/schemas':
         specifier: workspace:*
         version: link:../../libs/schemas
-      better-sqlite3:
-        specifier: ^11.2.1
-        version: 11.10.0
       fastify:
         specifier: ^4.28.1
         version: 4.29.1
