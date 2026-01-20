@@ -2,21 +2,52 @@ import {
   TelemetryEnvelopeSchema,
   TelemetryPointSchema,
   type RoastEvent,
-  type TelemetryEnvelope
+  type TelemetryEnvelope,
 } from "@sim-corp/schemas";
 import { DEFAULT_CONFIG, mergeConfig, type MachineHeuristicsConfig } from "./config";
-import { detectCharge, detectDropDueToSilence, detectFirstCrack, detectTurningPoint } from "./heuristics";
+import {
+  detectCharge,
+  detectDropDueToSilence,
+  detectFirstCrack,
+  detectTurningPoint,
+} from "./heuristics";
 import type { MachineKey } from "./state";
 import { StateStore } from "./state";
+import type { ConfigRepository } from "../db/repo";
 
 interface EngineStatus {
   machines: ReturnType<StateStore["snapshot"]>;
   configs: Record<string, MachineHeuristicsConfig>;
 }
 
+export interface InferenceEngineOptions {
+  /** Optional repository for persisting configs. If not provided, configs are in-memory only. */
+  configRepo?: ConfigRepository;
+}
+
 export class InferenceEngine {
   private readonly state = new StateStore();
   private readonly configs = new Map<string, MachineHeuristicsConfig>();
+  private readonly configRepo?: ConfigRepository;
+
+  constructor(options: InferenceEngineOptions = {}) {
+    this.configRepo = options.configRepo;
+  }
+
+  /**
+   * Load all persisted configs from database into memory.
+   * Call this during startup if using persistent storage.
+   */
+  async loadConfigs(): Promise<number> {
+    if (!this.configRepo) {
+      return 0;
+    }
+    const persisted = await this.configRepo.getAllConfigs();
+    for (const [key, config] of persisted) {
+      this.configs.set(key, config);
+    }
+    return persisted.size;
+  }
 
   handleTelemetry(envelope: TelemetryEnvelope): RoastEvent[] {
     const parsed = TelemetryEnvelopeSchema.parse(envelope);
@@ -89,14 +120,48 @@ export class InferenceEngine {
   getStatus(): EngineStatus {
     return {
       machines: this.state.snapshot(),
-      configs: Object.fromEntries(this.configs.entries())
+      configs: Object.fromEntries(this.configs.entries()),
     };
   }
 
-  upsertConfig(key: MachineKey, cfg: Partial<MachineHeuristicsConfig>): MachineHeuristicsConfig {
+  /**
+   * Upsert config for a machine. Persists to database if repo is available.
+   */
+  async upsertConfig(
+    key: MachineKey,
+    cfg: Partial<MachineHeuristicsConfig>
+  ): Promise<MachineHeuristicsConfig> {
     const merged = mergeConfig(this.resolveConfig(key), cfg);
     this.configs.set(toKey(key), merged);
+
+    // Persist to database if available
+    if (this.configRepo) {
+      await this.configRepo.upsertConfig(key, merged);
+    }
+
     return merged;
+  }
+
+  /**
+   * Get config for a specific machine (returns default if not configured)
+   */
+  getConfig(key: MachineKey): MachineHeuristicsConfig {
+    return this.resolveConfig(key);
+  }
+
+  /**
+   * Delete config for a machine (reverts to defaults)
+   */
+  async deleteConfig(key: MachineKey): Promise<boolean> {
+    const keyStr = toKey(key);
+    const existed = this.configs.has(keyStr);
+    this.configs.delete(keyStr);
+
+    if (this.configRepo) {
+      await this.configRepo.deleteConfig(key);
+    }
+
+    return existed;
   }
 
   private resolveConfig(key: MachineKey): MachineHeuristicsConfig {

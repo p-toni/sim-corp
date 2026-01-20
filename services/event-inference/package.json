@@ -10,6 +10,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@sim-corp/database": "workspace:*",
     "@sim-corp/schemas": "workspace:*",
     "@sim-corp/secrets": "workspace:*",
     "fastify": "^4.28.1",
