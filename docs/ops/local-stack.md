@@ -2,6 +2,18 @@
 
 Spin up the full simulated stack (MQTT + services) and exercise live telemetry end-to-end.
 
+> **Note:** This runbook covers the **development stack** which mounts source code for rapid iteration.
+> For a production-like Docker deployment, see the [Staging Deployment Guide](./staging-deployment.md).
+
+## Local vs Staging
+
+| Feature | Local Stack | Staging Stack |
+|---------|-------------|---------------|
+| Source code | Mounted (live reload) | Built into images |
+| Rebuild needed | No | Yes |
+| Best for | Development | Testing, demos |
+| Command | `pnpm stack:up` | `./scripts/staging-up.sh` |
+
 ## Prereqs
 - Docker / Docker Compose
 - pnpm deps installed locally (`pnpm install` in repo root)

@@ -12,7 +12,7 @@ This guide covers deploying Sim-Corp services to production using Docker contain
 
 ### Services
 
-Sim-Corp production stack consists of 11 containerized services:
+Sim-Corp production stack consists of 12 containerized services:
 
 | Service | Port | Purpose | Dependencies |
 |---------|------|---------|--------------|
@@ -26,6 +26,7 @@ Sim-Corp production stack consists of 11 containerized services:
 | **sim-publisher** | 4003 | Telemetry publisher (dev/testing) | Mosquitto, Sim-Twin |
 | **driver-bridge** | 4004 | Hardware driver abstraction | Mosquitto |
 | **report-worker** | 4008 | Report generation orchestrator | Kernel, Ingestion, Analytics |
+| **governance** | 4009 | Autonomy governance, circuit breakers | - |
 | **dispatcher** | 4010 | Ops event automation | Mosquitto, Kernel |
 
 ### Infrastructure
@@ -131,6 +132,17 @@ done
 ## Deployment
 
 ### Local Production Testing
+
+For local testing with production-like Docker images, use the **staging environment**:
+
+```bash
+# Staging (recommended for local testing)
+./scripts/staging-up.sh --build
+```
+
+See [Staging Deployment Guide](./staging-deployment.md) for details.
+
+For testing the full production stack locally (with PostgreSQL, resource limits, etc.):
 
 ```bash
 cd infra/production
