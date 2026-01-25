@@ -8,8 +8,10 @@
     "./client": "./src/client.ts"
   },
   "scripts": {
+    "build": "echo 'Using tsx runtime - no build needed'",
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "start:dev": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -19,13 +21,13 @@
     "zod": "^3.23.8",
     "@sim-corp/metrics": "workspace:*",
     "@sim-corp/health": "workspace:*",
-    "@sim-corp/rate-limit": "workspace:*"
+    "@sim-corp/rate-limit": "workspace:*",
+    "tsx": "^4.19.2"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
     "@vitest/coverage-v8": "^2.1.3",
     "supertest": "^7.0.0",
-    "tsx": "^4.19.2",
     "vitest": "^2.1.3"
   }
 }

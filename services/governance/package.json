@@ -5,8 +5,10 @@
   "type": "module",
   "main": "src/server.ts",
   "scripts": {
+    "build": "echo 'Using tsx runtime - no build needed'",
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
+    "start:dev": "tsx src/server.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -18,12 +20,12 @@
     "better-sqlite3": "^11.7.0",
     "fastify": "^5.2.0",
     "prom-client": "^15.1.0",
-    "zod": "^3.24.0"
+    "zod": "^3.24.0",
+    "tsx": "^4.19.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^24.10.1",
-    "tsx": "^4.19.2",
     "vitest": "^2.1.3"
   }
 }

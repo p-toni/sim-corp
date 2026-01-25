@@ -1,5 +1,4 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
-import { registerHealthRoute } from "./routes/health";
 import { registerAnalyzeRoute } from "./routes/analyze-session";
 import { registerPredictionRoute } from "./routes/prediction-session";
 import { initializeMetrics, metricsHandler, Registry as PrometheusRegistry } from "@sim-corp/metrics";
@@ -44,8 +43,6 @@ export async function buildServer(options: BuildOptions = {}): Promise<FastifyIn
     timeout: 10000,
     logger: app.log,
   });
-
-  registerHealthRoute(app);
   registerAnalyzeRoute(app);
   registerPredictionRoute(app);
 

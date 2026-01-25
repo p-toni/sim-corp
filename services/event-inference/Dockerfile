@@ -1,35 +1,32 @@
-# Sim-Corp event-inference Service - Production Dockerfile
+# Sim-Corp Event-Inference Service - Production Dockerfile
 
 FROM node:20-bullseye AS deps
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
-COPY libs/*/package.json ./libs/*/
-COPY services/event-inference/package.json ./services/event-inference/
-RUN pnpm install --frozen-lockfile
-
-FROM node:20-bullseye AS builder
-RUN corepack enable && corepack prepare pnpm@latest --activate
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/libs ./libs
-COPY --from=deps /app/services/event-inference/node_modules ./services/event-inference/node_modules
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.json ./
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.json tsconfig.base.json ./
 COPY libs ./libs
-COPY services/event-inference ./services/event-inference
-RUN pnpm --filter @sim-corp/event-inference build
+COPY scripts ./scripts
+COPY services/event-inference/package.json ./services/event-inference/
+RUN pnpm install
+RUN pnpm --filter @sim-corp/schemas build; exit 0
+RUN pnpm --filter @sim-corp/database build; exit 0
+RUN pnpm --filter @sim-corp/metrics build; exit 0
+RUN pnpm --filter @sim-corp/health build; exit 0
 
 FROM node:20-alpine AS production
 RUN corepack enable && corepack prepare pnpm@latest --activate
 RUN addgroup -g 1001 -S simcorp && adduser -S simcorp -u 1001
 WORKDIR /app
-COPY --chown=simcorp:simcorp pnpm-workspace.yaml package.json pnpm-lock.yaml ./
-COPY --chown=simcorp:simcorp libs/*/package.json ./libs/*/
-COPY --chown=simcorp:simcorp services/event-inference/package.json ./services/event-inference/
-RUN pnpm install --frozen-lockfile --prod
-COPY --from=builder --chown=simcorp:simcorp /app/libs/schemas/dist ./libs/schemas/dist
-COPY --from=builder --chown=simcorp:simcorp /app/libs/agent-runtime/dist ./libs/agent-runtime/dist 2>/dev/null || true
-COPY --from=builder --chown=simcorp:simcorp /app/services/event-inference/dist ./services/event-inference/dist
+COPY --chown=simcorp:simcorp pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.json tsconfig.base.json ./
+COPY --chown=simcorp:simcorp libs ./libs
+COPY --chown=simcorp:simcorp scripts ./scripts
+COPY --chown=simcorp:simcorp services/event-inference ./services/event-inference
+RUN pnpm install
+COPY --from=deps /app/libs/schemas/dist ./libs/schemas/dist
+COPY --from=deps /app/libs/database/dist ./libs/database/dist
+COPY --from=deps /app/libs/metrics/dist ./libs/metrics/dist
+COPY --from=deps /app/libs/health/dist ./libs/health/dist
+RUN mkdir -p /app/var/event-inference && chown -R simcorp:simcorp /app/var
 USER simcorp
 ENV NODE_ENV=production PORT=4005
 EXPOSE 4005

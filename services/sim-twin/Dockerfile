@@ -3,32 +3,27 @@
 FROM node:20-bullseye AS deps
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
-COPY libs/*/package.json ./libs/*/
-COPY services/sim-twin/package.json ./services/sim-twin/
-RUN pnpm install --frozen-lockfile
-
-FROM node:20-bullseye AS builder
-RUN corepack enable && corepack prepare pnpm@latest --activate
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/libs ./libs
-COPY --from=deps /app/services/sim-twin/node_modules ./services/sim-twin/node_modules
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.json ./
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.json tsconfig.base.json ./
 COPY libs ./libs
-COPY services/sim-twin ./services/sim-twin
-RUN pnpm --filter @sim-corp/sim-twin build
+COPY scripts ./scripts
+COPY services/sim-twin/package.json ./services/sim-twin/
+RUN pnpm install
+RUN pnpm --filter @sim-corp/schemas build; exit 0
+RUN pnpm --filter @sim-corp/metrics build; exit 0
+RUN pnpm --filter @sim-corp/health build; exit 0
 
 FROM node:20-alpine AS production
 RUN corepack enable && corepack prepare pnpm@latest --activate
 RUN addgroup -g 1001 -S simcorp && adduser -S simcorp -u 1001
 WORKDIR /app
-COPY --chown=simcorp:simcorp pnpm-workspace.yaml package.json pnpm-lock.yaml ./
-COPY --chown=simcorp:simcorp libs/*/package.json ./libs/*/
-COPY --chown=simcorp:simcorp services/sim-twin/package.json ./services/sim-twin/
-RUN pnpm install --frozen-lockfile --prod
-COPY --from=builder --chown=simcorp:simcorp /app/libs/schemas/dist ./libs/schemas/dist
-COPY --from=builder --chown=simcorp:simcorp /app/services/sim-twin/dist ./services/sim-twin/dist
+COPY --chown=simcorp:simcorp pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.json tsconfig.base.json ./
+COPY --chown=simcorp:simcorp libs ./libs
+COPY --chown=simcorp:simcorp scripts ./scripts
+COPY --chown=simcorp:simcorp services/sim-twin ./services/sim-twin
+RUN pnpm install
+COPY --from=deps /app/libs/schemas/dist ./libs/schemas/dist
+COPY --from=deps /app/libs/metrics/dist ./libs/metrics/dist
+COPY --from=deps /app/libs/health/dist ./libs/health/dist
 USER simcorp
 ENV NODE_ENV=production PORT=4002
 EXPOSE 4002

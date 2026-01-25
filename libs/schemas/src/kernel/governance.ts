@@ -111,14 +111,14 @@ export type RecommendationType = z.infer<typeof RecommendationTypeSchema>;
 /**
  * Recommendation for next actions
  */
-export const RecommendationSchema = z.object({
+export const GovernanceRecommendationSchema = z.object({
   type: RecommendationTypeSchema,
   priority: z.enum(['high', 'medium', 'low']),
   rationale: z.string(),
   actions: z.array(z.string()),
 });
 
-export type Recommendation = z.infer<typeof RecommendationSchema>;
+export type GovernanceRecommendation = z.infer<typeof GovernanceRecommendationSchema>;
 
 /**
  * Action item for governance
@@ -157,7 +157,7 @@ export const ReadinessReportSchema = z.object({
   process: ChecklistStatusSchema,
   organizational: ChecklistStatusSchema,
 
-  recommendations: z.array(RecommendationSchema),
+  recommendations: z.array(GovernanceRecommendationSchema),
   nextActions: z.array(ActionSchema),
 });
 
@@ -260,7 +260,7 @@ export const GovernanceReportSchema = z.object({
   circuitBreakerEvents: z.array(CircuitBreakerEventSchema),
 
   summary: z.string(),
-  recommendations: z.array(RecommendationSchema),
+  recommendations: z.array(GovernanceRecommendationSchema),
   nextActions: z.array(ActionSchema),
 });
 

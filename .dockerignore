@@ -69,9 +69,7 @@ tmp
 temp
 .cache
 
-# Monorepo artifacts not needed
+# Monorepo artifacts not needed in most builds
 apps/roaster-desktop
-agents
-drivers
-scripts
 infra
+# Note: libs, drivers, scripts, agents are needed for workspace resolution

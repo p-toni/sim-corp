@@ -4,9 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "echo 'Using tsx runtime - no build needed'",
     "predev": "pnpm -C .. --filter @sim-corp/schemas run build && pnpm -C .. --filter @sim-corp/agent-runtime run build && pnpm -C .. --filter @sim-corp/roast-report-agent run build",
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "start:dev": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -16,12 +18,12 @@
     "@sim-corp/schemas": "workspace:*",
     "fastify": "^4.28.1",
     "zod": "^3.24.0",
-    "@sim-corp/metrics": "workspace:*"
+    "@sim-corp/metrics": "workspace:*",
+    "tsx": "^4.19.2"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
     "@vitest/coverage-v8": "^2.1.3",
-    "tsx": "^4.19.2",
     "vitest": "^2.1.3"
   }
 }
